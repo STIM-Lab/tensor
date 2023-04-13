@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.19)
 
 #Name your project here
-project(tensor LANGUAGES CXX)
+project(tensor LANGUAGES CXX CUDA)
 
 
 #set the module directory
@@ -60,12 +60,11 @@ include_directories(
 			${TIRA_INCLUDE_DIRS}
 )
 
-#create an executable
+# tensorview executable
 add_executable(tensorview
 				tensorview.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
 )
-
 
 target_link_libraries(tensorview
 				PRIVATE glfw
@@ -74,5 +73,14 @@ target_link_libraries(tensorview
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
 				PRIVATE imgui::imgui
-#				ZLIB::ZLIB
+)
+
+# tensorvote executable
+add_executable(tensorvote
+				tensorvote.cuh	
+				tensorvote.cu
+)
+
+target_link_libraries(tensorvote
+				PRIVATE glm::glm
 )
