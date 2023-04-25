@@ -15,7 +15,9 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
-#find_package(ZLIB REQUIRED)
+find_package(Eigen3 REQUIRED)
+set(Boost_NO_WARN_NEW_VERSIONS 1)
+find_package(Boost REQUIRED COMPONENTS program_options)
 
 
 #build the executable in the binary directory on MS Visual Studio
@@ -61,18 +63,33 @@ include_directories(
 )
 
 # tensorview executable
-add_executable(tensorview
-				tensorview.cpp
+add_executable(tensorview2
+				tensorview2.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
 )
 
-target_link_libraries(tensorview
+target_link_libraries(tensorview2
 				PRIVATE glfw
 				PRIVATE glm::glm
 				PRIVATE GLEW::GLEW
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
 				PRIVATE imgui::imgui
+)
+
+#create an executable
+add_executable(tensorview3
+				tensorview3.cpp
+)
+
+target_link_libraries(tensorview3
+				PRIVATE glm::glm
+				PRIVATE glfw
+				PRIVATE GLEW::GLEW
+				${OPENGL_LIBRARIES}
+				${CMAKE_DL_LIBS}
+				Boost::program_options
+				Eigen3::Eigen
 )
 
 # tensorvote executable
@@ -84,3 +101,8 @@ add_executable(tensorvote
 target_link_libraries(tensorvote
 				PRIVATE glm::glm
 )
+
+# tensorview 3 components
+configure_file(data/oval3d.npy 
+			   oval3d.npy COPYONLY)
+
