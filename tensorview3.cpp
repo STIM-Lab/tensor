@@ -14,12 +14,15 @@ GLFWwindow* window;                                     // pointer to the GLFW w
 const char* glsl_version = "#version 130";              // specify the version of GLSL
 tira::camera camera;
 
+bool perspective = false;
+
 bool dragging = false;
 double xprev, yprev;
 
 tira::volume<glm::mat3> T;
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
+float epsilon = 0.001;
 
 int zi = 0;
 
@@ -57,7 +60,12 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	if (zi < 0) zi = 0;
 	if (zi >= T.Z()) zi = T.Z() - 1;
 	std::cout << zi << std::endl;
+}
 
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+		perspective = !perspective;
+	}
 }
 
 std::string vertex_shader_source = R"(
@@ -201,6 +209,7 @@ GLFWwindow* InitGLFW() {
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetCursorPosCallback(window, cursor_position_callback);
 	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetKeyCallback(window, key_callback);
 
 	return window;
 }
@@ -377,10 +386,16 @@ int main(int argc, char** argv) {
 		
 		glm::mat4 Mprojection;
 		if (aspect > 1) {
-			Mprojection = glm::ortho(-aspect*frame/2.0f, aspect * frame/2.0f, -frame/2.0f, frame/2.0f, -2.0f * frame, 2.0f * frame);
+			if (!perspective)
+				Mprojection = glm::ortho(-aspect * frame / 2.0f, aspect * frame / 2.0f, -frame / 2.0f, frame / 2.0f, -2.0f * frame, 2.0f * frame);
+			else
+				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
 		}
 		else {
-			Mprojection = glm::ortho(-frame/2.0f, frame/2.0f, -frame/2.0f/aspect, frame/2.0f/aspect, -2.0f * frame, 2.0f * frame);
+			if(!perspective)
+				Mprojection = glm::ortho(-frame/2.0f, frame/2.0f, -frame/2.0f/aspect, frame/2.0f/aspect, -2.0f * frame, 2.0f * frame);
+			else
+				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
 		}
 
 		glm::mat4 Mview = camera.getMatrix();								// generate a view matrix from the camera
