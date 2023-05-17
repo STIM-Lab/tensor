@@ -15,7 +15,10 @@ const char* glsl_version = "#version 130";              // specify the version o
 tira::camera camera;
 
 bool perspective = false;
-
+float zoom = 1.0f;
+float right = 0.0f;
+float up = 0.0f;
+bool ctrl = false;
 bool dragging = false;
 double xprev, yprev;
 
@@ -66,7 +69,51 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
 		perspective = !perspective;
 	}
+	if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_PRESS) {
+		ctrl = true;
+		std::cout << "true" << std::endl;
+	}
+	if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_RELEASE) {
+		ctrl = false;
+		std::cout << "false" << std::endl;
+	}
+	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS && ctrl) {
+		zoom -= 0.1;
+		if (zoom < 0.1) zoom = 0.1;
+		std::cout << "zoom=" << zoom << std::endl;
+	}
+	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS && ctrl) {
+		zoom += 0.1;
+		if (zoom > 2) zoom = 2;
+		std::cout << "zoom=" << zoom << std::endl;
+	}
+	if (key == GLFW_KEY_UP && action == GLFW_PRESS) {
+		up += 5;
+		if (up > 100) up = 100;
+		std::cout << "up=" << up << std::endl;
+	}
+	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) {
+		up -= 5;
+		if (up < -100) up = -100;
+		std::cout << "up=" << up << std::endl;
+	}
+	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
+		right += 5;
+		if (right > 100) right = 100;
+		std::cout << "right=" << right << std::endl;
+	}
+	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
+		right -= 5;
+		if (right < -100) right = -100;
+		std::cout << "right=" << right << std::endl;
+	}
+	if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+		zoom = 1.0f;
+		right = 0.0f;
+		up = 0.0f;
+	}
 }
+
 
 std::string vertex_shader_source = R"(
 	#version 330 core
@@ -210,7 +257,6 @@ GLFWwindow* InitGLFW() {
 	glfwSetCursorPosCallback(window, cursor_position_callback);
 	glfwSetScrollCallback(window, scroll_callback);
 	glfwSetKeyCallback(window, key_callback);
-
 	return window;
 }
 
@@ -387,7 +433,7 @@ int main(int argc, char** argv) {
 		glm::mat4 Mprojection;
 		if (aspect > 1) {
 			if (!perspective)
-				Mprojection = glm::ortho(-aspect * frame / 2.0f, aspect * frame / 2.0f, -frame / 2.0f, frame / 2.0f, -2.0f * frame, 2.0f * frame);
+				Mprojection = glm::ortho(-aspect * frame / 2.0f * zoom + right, aspect * frame / 2.0f * zoom + right, -frame / 2.0f * zoom + up, frame / 2.0f * zoom + up, -2.0f * frame, 2.0f * frame);
 			else
 				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
 		}
