@@ -80,6 +80,8 @@ target_link_libraries(tensorview2
 #create an executable
 add_executable(tensorview3
 				tensorview3.cpp
+				gui.cpp
+				gui.h
 )
 
 target_link_libraries(tensorview3
@@ -90,6 +92,7 @@ target_link_libraries(tensorview3
 				${CMAKE_DL_LIBS}
 				Boost::program_options
 				Eigen3::Eigen
+				PRIVATE imgui::imgui
 )
 
 # tensorvote executable

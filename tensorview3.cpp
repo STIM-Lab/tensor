@@ -4,11 +4,12 @@
 
 #include "tira/graphics_gl.h"
 #include "tira/volume.h"
+#include "gui.h"
 #include <glm/gtc/quaternion.hpp>
-
 #include <boost/program_options.hpp>
-
+#include <complex>
 #include <Eigen/Eigenvalues>
+#define PI 3.14159265358979323846
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
@@ -40,7 +41,7 @@ void glfw_error_callback(int error, const char* description)
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS && window_focused)
 		dragging = true;
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
 		dragging = false;
@@ -107,13 +108,17 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		if (right < -100) right = -100;
 		std::cout << "right=" << right << std::endl;
 	}
-	if (key == GLFW_KEY_R && action == GLFW_PRESS) {
-		zoom = 1.0f;
-		right = 0.0f;
-		up = 0.0f;
-	}
 }
 
+void resetPlane(float frame) {
+	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
+	camera.LookAt(frame / 2.0f, frame / 2.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+
+	right = 0.0f;
+	up = 0.0f;
+	zoom = 1.0f;
+	zi = 0;
+}
 
 std::string vertex_shader_source = R"(
 	#version 330 core
@@ -269,7 +274,173 @@ void InitGLEW() {
 	}
 }
 
+float determinant(glm::mat3 T, int n) {
+	float det = 0.0f;
+	glm::mat3 submatrix(0.0f);
+	if (n == 2)
+		return ((T[0][0] * T[1][1]) - (T[1][0] * T[0][1]));
+	else {
+		for (int x = 0; x < n; x++) {
+			int subi = 0;
+			for (int i = 1; i < n; i++) {
+				int subj = 0;
+				for (int j = 0; j < n; j++) {
+					if (j == x)
+						continue;
+					submatrix[subi][subj] = T[i][j];
+					subj++;
+				}
+				subi++;
+			}
+			det = det + (pow(-1, x) * T[0][x] * determinant(submatrix, n - 1));
+		}
+	}
+	return det;
+}
+std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, std::vector<float> eigvals) {
+	std::vector<std::vector<float>> vecs;
+
+	for (const float& v : eigvals) {
+		float a, b, c, d, e, f, g, h, i;
+		a = matrix[0][0]; b = matrix[0][1]; c = matrix[0][2];
+		d = matrix[1][0]; e = matrix[1][1]; f = matrix[1][2];
+		g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
+
+		std::vector<float> row0 = { a - v, b, c };
+		std::vector<float> row1 = { d, e - v, f };
+		std::vector<float> row2 = { g, h, i - v };
+
+		std::vector<float> r0xr1 = {
+			row0[1] * row1[2] - row0[2] * row1[1],
+			row0[2] * row1[0] - row0[0] * row1[2],
+			row0[0] * row1[1] - row0[1] * row1[0]
+		};
+
+		std::vector<float> r0xr2 = {
+			row0[1] * row2[2] - row0[2] * row2[1],
+			row0[2] * row2[0] - row0[0] * row2[2],
+			row0[0] * row2[1] - row0[1] * row2[0]
+		};
+
+		std::vector<float> r1xr2 = {
+			row1[1] * row2[2] - row1[2] * row2[1],
+			row1[2] * row2[0] - row1[0] * row2[2],
+			row1[0] * row2[1] - row1[1] * row2[0]
+		};
+
+		float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
+		float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
+		float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
+		int imax = 0;
+		float dmax = d0;
+
+		if (d1 > dmax) {
+			dmax = d1;
+			imax = 1;
+		}
+		if (d2 > dmax) {
+			imax = 2;
+		}
+
+		if (imax == 0) {
+			vecs.push_back({ r0xr1[0] / std::sqrt(d0), r0xr1[1] / std::sqrt(d0), r0xr1[2] / std::sqrt(d0) });
+		}
+		if (imax == 1) {
+			vecs.push_back({ r0xr2[0] / std::sqrt(d1), r0xr2[1] / std::sqrt(d1), r0xr2[2] / std::sqrt(d1) });
+		}
+		if (imax == 2) {
+			vecs.push_back({ r1xr2[0] / std::sqrt(d2), r1xr2[1] / std::sqrt(d2), r1xr2[2] / std::sqrt(d2) });
+		}
+	}
+	return vecs;
+}
+
+std::vector<float> cubic(float a, float b, float c, float d) {
+	float p = b * b - (3.0f * a * c);
+	float q = (9.0f * a * b * c) - (2 * b * b * b) - 27.0f * a * a * d;
+	float n = 27.0f * p * p * p / (q * q);
+	float theta = acos(q / (2.0f * p * sqrt(p)));
+	std::vector<float> roots(3);
+	
+	roots[0] = (-b + 2.0f * std::cos(theta / 3.0f) * sqrt(p)) / (3.0f * a);
+	roots[1] = (-b + 2.0f * std::cos((theta / 3.0f) + (120.0f * (PI / 180.0f))) * sqrt(p)) / (3.0f * a);
+	roots[2] = (-b + 2.0f * std::cos((theta / 3.0f) + (240.0f * (PI / 180.0f))) * sqrt(p)) / (3.0f * a);
+
+	return roots;
+}
+
 void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
+	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
+	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
+
+	float p, p1, p2 = 0.0f;
+	float avg_diag, sum_diag = 0.0f;
+	float phi, r = 0.0f;
+	glm::mat3 B(1.0);
+
+	for (size_t zi = 0; zi < T.Z(); zi++) {
+		for (size_t yi = 0; yi < T.Y(); yi++) {
+			for (size_t xi = 0; xi < T.X(); xi++) {
+
+				glm::mat3 A = T(xi, yi, zi);
+				
+				std::vector<float> lambdas(3);
+				std::vector<std::vector<float>> eigvecs(3, std::vector<float>(3));
+
+				float a, b, c, d, e, f, g, h, i;
+				a = A[0][0]; b = A[0][1]; c = A[0][2];
+				d = A[1][0]; e = A[1][1]; f = A[1][2];
+				g = A[2][0]; h = A[2][1]; i = A[2][2];
+
+				if ((b * b + c * c + f * f) == 0.0f)
+					lambdas = { a, e, i};
+				else {
+					float trace = a + e + i;
+					float tr2_m3x3 = (a * a + b * d + c * g) + (d * b + e * e + f * h) + (g * c + h * f + i * i);
+					float det_m3x3 = determinant(A, 3); //(a * e * i - a * f * h) + (b * f * g - b * d * i) + (c * d * h - c * e * g);
+					lambdas = cubic(-1.0f, trace, -0.5f * (trace * trace - tr2_m3x3), det_m3x3);
+				}
+					
+
+				// calculating eigenvectors
+				eigvecs = ComputeEigenvectors(A, lambdas);
+
+				// sort the eignevalues
+				if (lambdas[0] < lambdas[1]) {
+					std::swap(lambdas[0], lambdas[1]);
+					std::swap(eigvecs[0], eigvecs[1]);
+				}
+				if (lambdas[0] < lambdas[2]) {
+					std::swap(lambdas[0], lambdas[2]);
+					std::swap(eigvecs[0], eigvecs[2]);
+				}
+				if (lambdas[1] < lambdas[2]) {
+					std::swap(lambdas[1], lambdas[2]);
+					std::swap(eigvecs[1], eigvecs[2]);
+				}
+					
+
+				lambda(xi, yi, zi, 0) = lambdas[0];
+				eigenvectors(xi, yi, zi)[0][0] = eigvecs[0][0];
+				eigenvectors(xi, yi, zi)[0][1] = eigvecs[0][1];
+				eigenvectors(xi, yi, zi)[0][2] = eigvecs[0][2];
+
+				lambda(xi, yi, zi, 1) = lambdas[1];
+				eigenvectors(xi, yi, zi)[1][0] = eigvecs[1][0];
+				eigenvectors(xi, yi, zi)[1][1] = eigvecs[1][1];
+				eigenvectors(xi, yi, zi)[1][2] = eigvecs[1][2];
+
+				lambda(xi, yi, zi, 2) = lambdas[2];
+				eigenvectors(xi, yi, zi)[2][0] = eigvecs[2][0];
+				eigenvectors(xi, yi, zi)[2][1] = eigvecs[2][1];
+				eigenvectors(xi, yi, zi)[2][2] = eigvecs[2][2];
+			}
+		}
+	}
+}
+
+
+void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 
 	/// I'm looking for better methods to do this, and eventually have to put it on the GPU
 	/// Unstable (roots method): https://en.wikipedia.org/wiki/Eigenvalue_algorithm#3.C3.973_matrices
@@ -278,7 +449,7 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
 	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
 
-	double lambda0, lambda1, lambda2;
+	float lambda0, lambda1, lambda2;
 	for (size_t zi = 0; zi < T.Z(); zi++) {
 		for (size_t yi = 0; yi < T.Y(); yi++) {
 			for (size_t xi = 0; xi < T.X(); xi++) {
@@ -388,6 +559,7 @@ int main(int argc, char** argv) {
 
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
+	InitUI(window, glsl_version);
 	InitGLEW();
 
 	// Enable OpenGL environment parameters
@@ -397,7 +569,6 @@ int main(int argc, char** argv) {
 	float frame = std::max(T.X(), T.Y());
 	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
 	camera.LookAt(frame / 2.0f, frame / 2.0f, 0);
-
 
 
 	glm::vec3 l(1.0f, 0.5f, 0.5f);
@@ -411,10 +582,7 @@ int main(int argc, char** argv) {
 
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
-	float ambient = 0.3;
-
-
-	
+	float ambient = 0.3;	
 
 	
 
@@ -422,11 +590,11 @@ int main(int argc, char** argv) {
 
 		
 		glfwPollEvents();													// Poll and handle events (inputs, window resize, etc.)
-
+		RenderUI();
 		int display_w, display_h;                                           // size of the frame buffer (openGL display)
 		glfwGetFramebufferSize(window, &display_w, &display_h);
 		
-
+		if (reset) resetPlane(frame);
 		float aspect = (float)display_w / (float)display_h;
 		
 		
@@ -485,11 +653,12 @@ int main(int argc, char** argv) {
 		
 		
 
-
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 
 	}
 
+	DestroyUI();
 	glfwDestroyWindow(window);                                      // Destroy the GLFW rendering window
 	glfwTerminate();                                                // Terminate GLFW
 
