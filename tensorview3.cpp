@@ -297,6 +297,7 @@ float determinant(glm::mat3 T, int n) {
 	}
 	return det;
 }
+
 std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, std::vector<float> eigvals) {
 	std::vector<std::vector<float>> vecs;
 
@@ -341,6 +342,10 @@ std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, std::vecto
 		if (d2 > dmax) {
 			imax = 2;
 		}
+		
+		if (d0 == 0.0f) d0 = epsilon;
+		if (d1 == 0.0f) d1 = epsilon;
+		if (d2 == 0.0f) d2 = epsilon;
 
 		if (imax == 0) {
 			vecs.push_back({ r0xr1[0] / std::sqrt(d0), r0xr1[1] / std::sqrt(d0), r0xr1[2] / std::sqrt(d0) });
@@ -356,15 +361,54 @@ std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, std::vecto
 }
 
 std::vector<float> cubic(float a, float b, float c, float d) {
+
+	std::vector<float> roots(3);
+
+	//float q = (c / 3.0f) - ((b * b) / 9.0f);
+	//float r = ((c * b - 3.0f * d) / 6.0f) - (b * b * b / 27.0f);
+	//
+	//float discrim = (r * r) + (q * q * q);
+	//// Case 1: only one real solution
+	//if (discrim > 0) {
+	//	float A = std::cbrtf(abs(r) + std::sqrt(discrim));
+	//	float term1 = 0.0f;
+	//	if (r >= 0) term1 = A - (q / A);
+	//	else term1 = (q / A) - A;
+	// 
+	//	roots[0] = term1 - (b / 3.0f);
+	//	roots[1] = -(term1 / 2.0f) - (b / 3.0f);
+	//	roots[2] = roots[1];
+	//	//std::cout << "case 1 happened" << std::endl;
+	//}
+	//// Case 2: All roots are real
+	//else if (discrim <= 0.0f) {
+	//	float theta = 0.0f;
+	//	if (q == 0.0f) theta = 0.0f;
+	//	else theta = std::acosf(r / std::sqrt(-q * -q * -q));
+	//	roots[0] = 2 * std::sqrt(-q) * std::cosf(theta / 3.0f) - b / 3.0f;
+	//	roots[1] = 2 * std::sqrt(-q) * std::cosf((theta / 3.0f) + (120.0f * (PI / 180.0f))) - b / 3.0f;
+	//	roots[2] = 2 * std::sqrt(-q) * std::cosf((theta / 3.0f) + (240 * (PI / 180.0f))) - b / 3.0f;
+	//}
+	
+
 	float p = b * b - (3.0f * a * c);
 	float q = (9.0f * a * b * c) - (2 * b * b * b) - 27.0f * a * a * d;
-	float n = 27.0f * p * p * p / (q * q);
-	float theta = acos(q / (2.0f * p * sqrt(p)));
-	std::vector<float> roots(3);
 	
-	roots[0] = (-b + 2.0f * std::cos(theta / 3.0f) * sqrt(p)) / (3.0f * a);
-	roots[1] = (-b + 2.0f * std::cos((theta / 3.0f) + (120.0f * (PI / 180.0f))) * sqrt(p)) / (3.0f * a);
-	roots[2] = (-b + 2.0f * std::cos((theta / 3.0f) + (240.0f * (PI / 180.0f))) * sqrt(p)) / (3.0f * a);
+	if (p == 0.0f) {
+		roots = { -b / (3.0f * a), -b / (3.0f * a) , -b / (3.0f * a) };
+		std::cout << "p is zero" << std::endl;
+	}
+	else {
+		float discrim = 27.0f * (p * p * p) / (q * q);
+		float theta = 0.0f;
+		if (q / (2.0f * p * std::sqrt(p)) > 1.0f) theta = std::acosf(1.0f);// std::cout << "bigger than 1 " << p << " " << q << std::endl;
+		else
+			theta = std::acosf(q / (2.0f * p * std::sqrt(p)));
+		
+		roots[0] = (-b + 2.0f * std::cosf(theta / 3.0f) * std::sqrt(p)) / (3.0f * a);
+		roots[1] = (-b + 2.0f * std::cosf((theta / 3.0f) + (120.0f * (PI / 180.0f))) * std::sqrt(p)) / (3.0f * a);
+		roots[2] = (-b + 2.0f * std::cosf((theta / 3.0f) + (240.0f * (PI / 180.0f))) * std::sqrt(p)) / (3.0f * a);
+	}
 
 	return roots;
 }
@@ -372,11 +416,6 @@ std::vector<float> cubic(float a, float b, float c, float d) {
 void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
 	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
-
-	float p, p1, p2 = 0.0f;
-	float avg_diag, sum_diag = 0.0f;
-	float phi, r = 0.0f;
-	glm::mat3 B(1.0);
 
 	for (size_t zi = 0; zi < T.Z(); zi++) {
 		for (size_t yi = 0; yi < T.Y(); yi++) {
@@ -393,12 +432,14 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 				g = A[2][0]; h = A[2][1]; i = A[2][2];
 
 				if ((b * b + c * c + f * f) == 0.0f)
-					lambdas = { a, e, i};
+					lambdas = { a, e, i };
 				else {
 					float trace = a + e + i;
-					float tr2_m3x3 = (a * a + b * d + c * g) + (d * b + e * e + f * h) + (g * c + h * f + i * i);
-					float det_m3x3 = determinant(A, 3); //(a * e * i - a * f * h) + (b * f * g - b * d * i) + (c * d * h - c * e * g);
-					lambdas = cubic(-1.0f, trace, -0.5f * (trace * trace - tr2_m3x3), det_m3x3);
+					float trace2 = (a * a + b * d + c * g) + (d * b + e * e + f * h) + (g * c + h * f + i * i);
+					float det = determinant(A, 3); //(a * e * i - a * f * h) + (b * f * g - b * d * i) + (c * d * h - c * e * g);
+					lambdas = cubic(1.0f, -trace, 0.5f * (trace * trace - trace2), -det);
+					//if (xi == 10 && yi == 11)
+					//	std::cout << trace << " " << -0.5f * (trace * trace - trace2) << " " << det << std::endl;
 				}
 					
 
@@ -438,7 +479,6 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 		}
 	}
 }
-
 
 void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 
@@ -546,6 +586,7 @@ int main(int argc, char** argv) {
 		std::cout << "ERROR: invalid colormap component" << std::endl;
 		return 1;
 	}
+	
 
 	// Load the tensor field
 	std::cout << "loading file...";
@@ -622,7 +663,13 @@ int main(int argc, char** argv) {
 
 		for (size_t xi = 0; xi < T.X(); xi++) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
-				
+				/*if (xi == 10 && yi == 11) 
+				{
+					for(int i = 0 ; i < 3; i++)
+						std::cout << eigenvectors(xi, yi, zi)[i][0] << " " << eigenvectors(xi, yi, zi)[i][1] << " " << eigenvectors(xi, yi, zi)[i][2] << std::endl;
+					std::cout << lambda(xi, yi, zi, 0) << " " << lambda(xi, yi, zi, 1) << " " << lambda(xi, yi, zi, 2) << std::endl;
+				}*/
+
 				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 
 				//glm::mat3 evmatrix = glm::transpose(eigenvectors(xi, yi, zi));
