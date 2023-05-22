@@ -480,6 +480,10 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	}
 }
 
+glm::vec3 CalculateEigenvalues(glm::mat3 T){
+	// HELIA: calculate the eigenvalues and return them as a vector
+}
+
 void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 
 	/// I'm looking for better methods to do this, and eventually have to put it on the GPU
@@ -510,6 +514,9 @@ void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 				es.compute(A, true);
 
 				Eigen::Vector3f l = es.eigenvalues().real();
+				glm::vec3 = CalculateEigenvalues(t);
+				// HELIA: compare the eigenvalues to make sure they are identical
+
 				Eigen::Matrix3f V = es.eigenvectors().real();
 
 				Eigen::Vector3f evecs[3];
