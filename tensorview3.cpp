@@ -280,74 +280,76 @@ std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, glm::vec3 
 	g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
 
 	float p1 = b * b + c * c + f * f;
-	if (p1 == 0) {
-		vecs.push_back({ 1.0f, 0.0f, 0.0f });
+	if (p1 == 0) {												// if the matrix is diagonal
+		vecs.push_back({ 1.0f, 0.0f, 0.0f });					// align the eigenvectors with the current basis
 		vecs.push_back({ 0.0f, 1.0f, 0.0f });
 		vecs.push_back({ 0.0f, 0.0f, 1.0f });
+		return vecs;
 	}
-	//if (debug) std::cout << "p1: " << p1 << std::endl;
-	else
-	{
-		for (int j = 0; j < 3; j++) {
-			float v = eigvals[j];
-			if(debug) std::cout << "################################   Eigenvalue " << j+1 << "  ################################" << std::endl;
-			std::vector<float> row0 = { a - v, b, c };
-			std::vector<float> row1 = { d, e - v, f };
-			std::vector<float> row2 = { g, h, i - v };
+	for (int j = 0; j < 3; j++) {								// for each eigenvalue
+		float v = eigvals[j];									// store the eigenvalue in v
+		if (debug)
+			std::cout << "################################   Eigenvalue " << j + 1 << "  ################################" << std::endl;
+		std::vector<float> row0 = { a - v, b, c };
+		std::vector<float> row1 = { d, e - v, f };
+		std::vector<float> row2 = { g, h, i - v };
 
-			/*if (debug) std::cout << "check1: " << row0[0] << " " << row0[1] << " " << row0[2] << std::endl;
-			if (debug) std::cout << "check2: " << row1[0] << " " << row1[1] << " " << row1[2] << std::endl;
-			if (debug) std::cout << "check3: " << row2[0] << " " << row2[1] << " " << row2[2] << std::endl;*/
-			// Calculating the cross-product between each two row
-			std::vector<float> r0xr1 = {
-				row0[1] * row1[2] - row0[2] * row1[1],
-				row0[2] * row1[0] - row0[0] * row1[2],
-				row0[0] * row1[1] - row0[1] * row1[0]
-			};
+		/*if (debug) std::cout << "check1: " << row0[0] << " " << row0[1] << " " << row0[2] << std::endl;
+		if (debug) std::cout << "check2: " << row1[0] << " " << row1[1] << " " << row1[2] << std::endl;
+		if (debug) std::cout << "check3: " << row2[0] << " " << row2[1] << " " << row2[2] << std::endl;*/
+		// Calculating the cross-product between each two row
+		std::vector<float> r0xr1 = {
+			row0[1] * row1[2] - row0[2] * row1[1],
+			row0[2] * row1[0] - row0[0] * row1[2],
+			row0[0] * row1[1] - row0[1] * row1[0]
+		};
 
-			std::vector<float> r0xr2 = {
-				row0[1] * row2[2] - row0[2] * row2[1],
-				row0[2] * row2[0] - row0[0] * row2[2],
-				row0[0] * row2[1] - row0[1] * row2[0]
-			};
+		std::vector<float> r0xr2 = {
+			row0[1] * row2[2] - row0[2] * row2[1],
+			row0[2] * row2[0] - row0[0] * row2[2],
+			row0[0] * row2[1] - row0[1] * row2[0]
+		};
 
-			std::vector<float> r1xr2 = {
-				row1[1] * row2[2] - row1[2] * row2[1],
-				row1[2] * row2[0] - row1[0] * row2[2],
-				row1[0] * row2[1] - row1[1] * row2[0]
-			};
+		std::vector<float> r1xr2 = {
+			row1[1] * row2[2] - row1[2] * row2[1],
+			row1[2] * row2[0] - row1[0] * row2[2],
+			row1[0] * row2[1] - row1[1] * row2[0]
+		};
 
-			float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
-			float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
-			float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
-			int imax = 0;
-			float dmax = d0;
+		float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
+		float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
+		float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
+		int imax = 0;
+		float dmax = d0;
 
-			if (d1 > dmax) {
-				dmax = d1;
-				imax = 1;
-			}
-			if (d2 > dmax)
-				imax = 2;
-			
-			if (debug) std::cout << "\nds:\t" << d0 << " " << d1 << " " << d2 << std::endl;
-			if (debug) std::cout << "\nr0xr1:\t" << r0xr1[0] << " " << r0xr1[1] << " " << r0xr1[2] << std::endl;
-			if (debug) std::cout << "r0xr2: " << r0xr2[0] << " " << r0xr2[1] << " " << r0xr2[2] << std::endl;
-			if (debug) std::cout << "r1xr2: " << r1xr2[0] << " " << r1xr2[1] << " " << r1xr2[2] << std::endl;
-			if (imax == 0) {
-				vecs.push_back({ r0xr1[0] / std::sqrtf(d0), r0xr1[1] / std::sqrtf(d0), r0xr1[2] / std::sqrtf(d0) });
-			}
-			if (imax == 1) {
-				vecs.push_back({ r0xr2[0] / std::sqrtf(d1), r0xr2[1] / std::sqrtf(d1), r0xr2[2] / std::sqrtf(d1) });
-			}
-			if (imax == 2) {
-				vecs.push_back({ r1xr2[0] / std::sqrtf(d2), r1xr2[1] / std::sqrtf(d2), r1xr2[2] / std::sqrtf(d2) });
-			}
-			if (debug) std::cout << "\nimax was: " << imax << std::endl;
-			if (debug) std::cout << "\nif imax0: " << r0xr1[0] / std::sqrtf(d0) << ", " << r0xr1[1] / std::sqrtf(d0) << ", " << r0xr1[2] / std::sqrtf(d0) << std::endl;
-			if (debug) std::cout << "if imax1: " << r0xr2[0] / std::sqrtf(d1) << ", " << r0xr2[1] / std::sqrtf(d1) << ", " << r0xr2[2] / std::sqrtf(d1) << std::endl;
-			if (debug) std::cout << "if imax2: " << r1xr2[0] / std::sqrtf(d2) << ", " << r1xr2[1] / std::sqrtf(d2) << ", " << r1xr2[2] / std::sqrtf(d2) << std::endl;
+		if (d1 > dmax) {
+			dmax = d1;
+			imax = 1;
 		}
+		if (d2 > dmax)
+			imax = 2;
+
+		if (debug) std::cout << "\nds:\t" << d0 << " " << d1 << " " << d2 << std::endl;
+		if (debug) std::cout << "\nr0xr1:\t" << r0xr1[0] << " " << r0xr1[1] << " " << r0xr1[2] << std::endl;
+		if (debug) std::cout << "r0xr2: " << r0xr2[0] << " " << r0xr2[1] << " " << r0xr2[2] << std::endl;
+		if (debug) std::cout << "r1xr2: " << r1xr2[0] << " " << r1xr2[1] << " " << r1xr2[2] << std::endl;
+		if (imax == 0) {
+			vecs.push_back({ r0xr1[0] / std::sqrtf(d0), r0xr1[1] / std::sqrtf(d0), r0xr1[2] / std::sqrtf(d0) });
+		}
+		if (imax == 1) {
+			vecs.push_back({ r0xr2[0] / std::sqrtf(d1), r0xr2[1] / std::sqrtf(d1), r0xr2[2] / std::sqrtf(d1) });
+		}
+		if (imax == 2) {
+			vecs.push_back({ r1xr2[0] / std::sqrtf(d2), r1xr2[1] / std::sqrtf(d2), r1xr2[2] / std::sqrtf(d2) });
+		}
+		if (debug) std::cout << "\nimax was: " << imax << std::endl;
+		if (debug) std::cout << "\nif imax0: " << r0xr1[0] / std::sqrtf(d0) << ", " << r0xr1[1] / std::sqrtf(d0) << ", " << r0xr1[2] / std::sqrtf(d0) << std::endl;
+		if (debug) std::cout << "if imax1: " << r0xr2[0] / std::sqrtf(d1) << ", " << r0xr2[1] / std::sqrtf(d1) << ", " << r0xr2[2] / std::sqrtf(d1) << std::endl;
+		if (debug) std::cout << "if imax2: " << r1xr2[0] / std::sqrtf(d2) << ", " << r1xr2[1] / std::sqrtf(d2) << ", " << r1xr2[2] / std::sqrtf(d2) << std::endl;
+	}
+
+	if (vecs[1] == vecs[2]) {
+		std::cout << "ERROR: last two eigenvectors are identical." << std::endl;
 	}
 	return vecs;
 }
@@ -391,11 +393,13 @@ glm::vec3 CalculateEigenvalues(glm::mat3 T){
 		else
 			phi = std::acosf(r) / 3.0f;
 			
-			// the eigenvalues satisfy eig3 <= eig2 <= eig1
-		l[0] = q + 2 * p * std::cosf(phi);
-		l[2] = q + 2 * p * std::cosf(phi + (2 * PI / 3.0f));
-		l[1] = 3 * q - l[0] - l[2]; // since trace(A) = eig1 + eig2 + eig3
+			// the eigenvalues satisfy l[0] <= l[1] <= l[2]
+		l[2] = q + 2 * p * std::cosf(phi);
+		l[0] = q + 2 * p * std::cosf(phi + (2 * PI / 3.0f));
+		l[1] = 3 * q - l[2] - l[0]; // since trace(A) = eig1 + eig2 + eig3
 	}
+
+
 	
 	return l;
 }
