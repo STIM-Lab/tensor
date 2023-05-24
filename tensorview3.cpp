@@ -72,11 +72,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 	if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_PRESS) {
 		ctrl = true;
-		std::cout << "true" << std::endl;
 	}
 	if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_RELEASE) {
 		ctrl = false;
-		std::cout << "false" << std::endl;
 	}
 	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS && ctrl) {
 		zoom -= 0.1;
@@ -274,145 +272,133 @@ void InitGLEW() {
 	}
 }
 
-float determinant(glm::mat3 T, int n) {
-	float det = 0.0f;
-	glm::mat3 submatrix(0.0f);
-	if (n == 2)
-		return ((T[0][0] * T[1][1]) - (T[1][0] * T[0][1]));
-	else {
-		for (int x = 0; x < n; x++) {
-			int subi = 0;
-			for (int i = 1; i < n; i++) {
-				int subj = 0;
-				for (int j = 0; j < n; j++) {
-					if (j == x)
-						continue;
-					submatrix[subi][subj] = T[i][j];
-					subj++;
-				}
-				subi++;
-			}
-			det = det + (pow(-1, x) * T[0][x] * determinant(submatrix, n - 1));
-		}
-	}
-	return det;
-}
-
-std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, std::vector<float> eigvals) {
+std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, glm::vec3 eigvals, bool debug) {
 	std::vector<std::vector<float>> vecs;
+	float a, b, c, d, e, f, g, h, i;
+	a = matrix[0][0]; b = matrix[0][1]; c = matrix[0][2];
+	d = matrix[1][0]; e = matrix[1][1]; f = matrix[1][2];
+	g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
 
-	for (const float& v : eigvals) {
-		float a, b, c, d, e, f, g, h, i;
-		a = matrix[0][0]; b = matrix[0][1]; c = matrix[0][2];
-		d = matrix[1][0]; e = matrix[1][1]; f = matrix[1][2];
-		g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
+	float p1 = b * b + c * c + f * f;
+	if (p1 == 0) {
+		vecs.push_back({ 1.0f, 0.0f, 0.0f });
+		vecs.push_back({ 0.0f, 1.0f, 0.0f });
+		vecs.push_back({ 0.0f, 0.0f, 1.0f });
+	}
+	//if (debug) std::cout << "p1: " << p1 << std::endl;
+	else
+	{
+		for (int j = 0; j < 3; j++) {
+			float v = eigvals[j];
+			if(debug) std::cout << "################################   Eigenvalue " << j+1 << "  ################################" << std::endl;
+			std::vector<float> row0 = { a - v, b, c };
+			std::vector<float> row1 = { d, e - v, f };
+			std::vector<float> row2 = { g, h, i - v };
 
-		std::vector<float> row0 = { a - v, b, c };
-		std::vector<float> row1 = { d, e - v, f };
-		std::vector<float> row2 = { g, h, i - v };
+			/*if (debug) std::cout << "check1: " << row0[0] << " " << row0[1] << " " << row0[2] << std::endl;
+			if (debug) std::cout << "check2: " << row1[0] << " " << row1[1] << " " << row1[2] << std::endl;
+			if (debug) std::cout << "check3: " << row2[0] << " " << row2[1] << " " << row2[2] << std::endl;*/
+			// Calculating the cross-product between each two row
+			std::vector<float> r0xr1 = {
+				row0[1] * row1[2] - row0[2] * row1[1],
+				row0[2] * row1[0] - row0[0] * row1[2],
+				row0[0] * row1[1] - row0[1] * row1[0]
+			};
 
-		std::vector<float> r0xr1 = {
-			row0[1] * row1[2] - row0[2] * row1[1],
-			row0[2] * row1[0] - row0[0] * row1[2],
-			row0[0] * row1[1] - row0[1] * row1[0]
-		};
+			std::vector<float> r0xr2 = {
+				row0[1] * row2[2] - row0[2] * row2[1],
+				row0[2] * row2[0] - row0[0] * row2[2],
+				row0[0] * row2[1] - row0[1] * row2[0]
+			};
 
-		std::vector<float> r0xr2 = {
-			row0[1] * row2[2] - row0[2] * row2[1],
-			row0[2] * row2[0] - row0[0] * row2[2],
-			row0[0] * row2[1] - row0[1] * row2[0]
-		};
+			std::vector<float> r1xr2 = {
+				row1[1] * row2[2] - row1[2] * row2[1],
+				row1[2] * row2[0] - row1[0] * row2[2],
+				row1[0] * row2[1] - row1[1] * row2[0]
+			};
 
-		std::vector<float> r1xr2 = {
-			row1[1] * row2[2] - row1[2] * row2[1],
-			row1[2] * row2[0] - row1[0] * row2[2],
-			row1[0] * row2[1] - row1[1] * row2[0]
-		};
+			float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
+			float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
+			float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
+			int imax = 0;
+			float dmax = d0;
 
-		float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
-		float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
-		float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
-		int imax = 0;
-		float dmax = d0;
-
-		if (d1 > dmax) {
-			dmax = d1;
-			imax = 1;
-		}
-		if (d2 > dmax) {
-			imax = 2;
-		}
-		
-		if (d0 == 0.0f) d0 = epsilon;
-		if (d1 == 0.0f) d1 = epsilon;
-		if (d2 == 0.0f) d2 = epsilon;
-
-		if (imax == 0) {
-			vecs.push_back({ r0xr1[0] / std::sqrt(d0), r0xr1[1] / std::sqrt(d0), r0xr1[2] / std::sqrt(d0) });
-		}
-		if (imax == 1) {
-			vecs.push_back({ r0xr2[0] / std::sqrt(d1), r0xr2[1] / std::sqrt(d1), r0xr2[2] / std::sqrt(d1) });
-		}
-		if (imax == 2) {
-			vecs.push_back({ r1xr2[0] / std::sqrt(d2), r1xr2[1] / std::sqrt(d2), r1xr2[2] / std::sqrt(d2) });
+			if (d1 > dmax) {
+				dmax = d1;
+				imax = 1;
+			}
+			if (d2 > dmax)
+				imax = 2;
+			
+			if (debug) std::cout << "\nds:\t" << d0 << " " << d1 << " " << d2 << std::endl;
+			if (debug) std::cout << "\nr0xr1:\t" << r0xr1[0] << " " << r0xr1[1] << " " << r0xr1[2] << std::endl;
+			if (debug) std::cout << "r0xr2: " << r0xr2[0] << " " << r0xr2[1] << " " << r0xr2[2] << std::endl;
+			if (debug) std::cout << "r1xr2: " << r1xr2[0] << " " << r1xr2[1] << " " << r1xr2[2] << std::endl;
+			if (imax == 0) {
+				vecs.push_back({ r0xr1[0] / std::sqrtf(d0), r0xr1[1] / std::sqrtf(d0), r0xr1[2] / std::sqrtf(d0) });
+			}
+			if (imax == 1) {
+				vecs.push_back({ r0xr2[0] / std::sqrtf(d1), r0xr2[1] / std::sqrtf(d1), r0xr2[2] / std::sqrtf(d1) });
+			}
+			if (imax == 2) {
+				vecs.push_back({ r1xr2[0] / std::sqrtf(d2), r1xr2[1] / std::sqrtf(d2), r1xr2[2] / std::sqrtf(d2) });
+			}
+			if (debug) std::cout << "\nimax was: " << imax << std::endl;
+			if (debug) std::cout << "\nif imax0: " << r0xr1[0] / std::sqrtf(d0) << ", " << r0xr1[1] / std::sqrtf(d0) << ", " << r0xr1[2] / std::sqrtf(d0) << std::endl;
+			if (debug) std::cout << "if imax1: " << r0xr2[0] / std::sqrtf(d1) << ", " << r0xr2[1] / std::sqrtf(d1) << ", " << r0xr2[2] / std::sqrtf(d1) << std::endl;
+			if (debug) std::cout << "if imax2: " << r1xr2[0] / std::sqrtf(d2) << ", " << r1xr2[1] / std::sqrtf(d2) << ", " << r1xr2[2] / std::sqrtf(d2) << std::endl;
 		}
 	}
 	return vecs;
 }
 
-std::vector<float> cubic(float a, float b, float c, float d) {
-
-	std::vector<float> roots(3);
-
-	//float q = (c / 3.0f) - ((b * b) / 9.0f);
-	//float r = ((c * b - 3.0f * d) / 6.0f) - (b * b * b / 27.0f);
-	//
-	//float discrim = (r * r) + (q * q * q);
-	//// Case 1: only one real solution
-	//if (discrim > 0) {
-	//	float A = std::cbrtf(abs(r) + std::sqrt(discrim));
-	//	float term1 = 0.0f;
-	//	if (r >= 0) term1 = A - (q / A);
-	//	else term1 = (q / A) - A;
-	// 
-	//	roots[0] = term1 - (b / 3.0f);
-	//	roots[1] = -(term1 / 2.0f) - (b / 3.0f);
-	//	roots[2] = roots[1];
-	//	//std::cout << "case 1 happened" << std::endl;
-	//}
-	//// Case 2: All roots are real
-	//else if (discrim <= 0.0f) {
-	//	float theta = 0.0f;
-	//	if (q == 0.0f) theta = 0.0f;
-	//	else theta = std::acosf(r / std::sqrt(-q * -q * -q));
-	//	roots[0] = 2 * std::sqrt(-q) * std::cosf(theta / 3.0f) - b / 3.0f;
-	//	roots[1] = 2 * std::sqrt(-q) * std::cosf((theta / 3.0f) + (120.0f * (PI / 180.0f))) - b / 3.0f;
-	//	roots[2] = 2 * std::sqrt(-q) * std::cosf((theta / 3.0f) + (240 * (PI / 180.0f))) - b / 3.0f;
-	//}
+glm::vec3 CalculateEigenvalues(glm::mat3 T){
+	// HELIA: calculate the eigenvalues and return them as a vector
+	glm::vec3 l;
+	glm::mat3 vectors(T);
 	
-
-	float p = b * b - (3.0f * a * c);
-	float q = (9.0f * a * b * c) - (2 * b * b * b) - 27.0f * a * a * d;
-	
-	if (p == 0.0f) {
-		roots = { -b / (3.0f * a), -b / (3.0f * a) , -b / (3.0f * a) };
-		std::cout << "p is zero" << std::endl;
+	float a, b, c, d, e, f, g, h, i;
+	a = T[0][0]; b = T[0][1]; c = T[0][2];
+	d = T[1][0]; e = T[1][1]; f = T[1][2];
+	g = T[2][0]; h = T[2][1]; i = T[2][2];
+	//Tridiagonalize(l, imag, vectors);
+	//Diagonalize(l, imag, vectors);
+	float p1 = b*b + c*c + f*f;
+	if (p1 == 0)
+	{
+		// A is diagonal.
+		l[0] = a;
+		l[1] = e;
+		l[2] = i;
 	}
-	else {
-		float discrim = 27.0f * (p * p * p) / (q * q);
-		float theta = 0.0f;
-		if (q / (2.0f * p * std::sqrt(p)) > 1.0f) theta = std::acosf(1.0f);// std::cout << "bigger than 1 " << p << " " << q << std::endl;
-		else
-			theta = std::acosf(q / (2.0f * p * std::sqrt(p)));
+	else
+	{
+		float q = (a + e + i) / 3.0f;
+		float p2 = (a - q) * (a - q) + (e - q) * (e - q) + (i - q) * (i - q) + 2 * p1;
+		float p = sqrtf(p2 / 6.0f);
+		glm::mat3 qm = glm::mat3(q);
+		glm::mat3 B = (1 / p) * (T - qm);
+		float r = determinant(B) / 2.0f;
+
+		// In exact arithmetic for a symmetric matrix - 1 <= r <= 1
+		// but computation error can leave it slightly outside this range.
 		
-		roots[0] = (-b + 2.0f * std::cosf(theta / 3.0f) * std::sqrt(p)) / (3.0f * a);
-		roots[1] = (-b + 2.0f * std::cosf((theta / 3.0f) + (120.0f * (PI / 180.0f))) * std::sqrt(p)) / (3.0f * a);
-		roots[2] = (-b + 2.0f * std::cosf((theta / 3.0f) + (240.0f * (PI / 180.0f))) * std::sqrt(p)) / (3.0f * a);
+		float phi = 0.0f;
+		if (r <= -1)
+			phi = PI / 3.0f;
+		else if (r >= 1)
+			phi = 0.0f;
+		else
+			phi = std::acosf(r) / 3.0f;
+			
+			// the eigenvalues satisfy eig3 <= eig2 <= eig1
+		l[0] = q + 2 * p * std::cosf(phi);
+		l[2] = q + 2 * p * std::cosf(phi + (2 * PI / 3.0f));
+		l[1] = 3 * q - l[0] - l[2]; // since trace(A) = eig1 + eig2 + eig3
 	}
-
-	return roots;
+	
+	return l;
 }
-
 void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
 	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
@@ -422,31 +408,15 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 			for (size_t xi = 0; xi < T.X(); xi++) {
 
 				glm::mat3 A = T(xi, yi, zi);
+				glm::vec3 lambdas = CalculateEigenvalues(A);
+				std::vector<std::vector<float>> eigvecs;
 				
-				std::vector<float> lambdas(3);
-				std::vector<std::vector<float>> eigvecs(3, std::vector<float>(3));
+				if (xi == 8 && yi == 10 && zi == 2)
+					eigvecs = ComputeEigenvectors(A, lambdas, true);
+				else
+					eigvecs = ComputeEigenvectors(A, lambdas, false);
 
-				float a, b, c, d, e, f, g, h, i;
-				a = A[0][0]; b = A[0][1]; c = A[0][2];
-				d = A[1][0]; e = A[1][1]; f = A[1][2];
-				g = A[2][0]; h = A[2][1]; i = A[2][2];
-
-				if ((b * b + c * c + f * f) == 0.0f)
-					lambdas = { a, e, i };
-				else {
-					float trace = a + e + i;
-					float trace2 = (a * a + b * d + c * g) + (d * b + e * e + f * h) + (g * c + h * f + i * i);
-					float det = determinant(A, 3); //(a * e * i - a * f * h) + (b * f * g - b * d * i) + (c * d * h - c * e * g);
-					lambdas = cubic(1.0f, -trace, 0.5f * (trace * trace - trace2), -det);
-					//if (xi == 10 && yi == 11)
-					//	std::cout << trace << " " << -0.5f * (trace * trace - trace2) << " " << det << std::endl;
-				}
-					
-
-				// calculating eigenvectors
-				eigvecs = ComputeEigenvectors(A, lambdas);
-
-				// sort the eignevalues
+				// sort the eigenvalues and eigenvectors from largest to smallest
 				if (lambdas[0] < lambdas[1]) {
 					std::swap(lambdas[0], lambdas[1]);
 					std::swap(eigvecs[0], eigvecs[1]);
@@ -459,7 +429,18 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 					std::swap(lambdas[1], lambdas[2]);
 					std::swap(eigvecs[1], eigvecs[2]);
 				}
-					
+
+				if (xi == 8 && yi == 10 && zi == 2) {
+					std::cout << "Lambdas:\t" << lambdas[0] << " " << lambdas[1] << " " << lambdas[2] << std::endl;
+					std::cout << "Matrix:\n";
+					std::cout << "\t" << A[0][0] << "\t" << A[0][1] << "\t" << A[0][2] << std::endl;
+					std::cout << "\t" << A[1][0] << "\t" << A[1][1] << "\t" << A[1][2] << std::endl;
+					std::cout << "\t" << A[2][0] << "\t" << A[2][1] << "\t" << A[2][2] << std::endl;
+					std::cout << "Eigenvectors:\n";
+					std::cout << "\t" << eigvecs[0][0] << " " << eigvecs[0][1] << " " << eigvecs[0][2] << std::endl;
+					std::cout << "\t" << eigvecs[1][0] << " " << eigvecs[1][1] << " " << eigvecs[1][2] << std::endl;
+					std::cout << "\t" << eigvecs[2][0] << " " << eigvecs[2][1] << " " << eigvecs[2][2] << std::endl;
+				}
 
 				lambda(xi, yi, zi, 0) = lambdas[0];
 				eigenvectors(xi, yi, zi)[0][0] = eigvecs[0][0];
@@ -479,11 +460,6 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 		}
 	}
 }
-
-glm::vec3 CalculateEigenvalues(glm::mat3 T){
-	// HELIA: calculate the eigenvalues and return them as a vector
-}
-
 void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 
 	/// I'm looking for better methods to do this, and eventually have to put it on the GPU
@@ -509,14 +485,22 @@ void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 				A(2, 0) = t[2][0];
 				A(2, 1) = t[2][1];
 				A(2, 2) = t[2][2];
+				bool issymmetric;
 
+				for (int j = 0; (j < 3); j++) {
+					for (int i = 0; (i < 3); i++) {
+						issymmetric = (t[i][j] == t[j][i]);
+					}
+				}
+				if (!issymmetric) std::cout << "Not symmetric" << std::endl;
 				Eigen::EigenSolver<Eigen::Matrix3f> es;
 				es.compute(A, true);
 
 				Eigen::Vector3f l = es.eigenvalues().real();
-				glm::vec3 = CalculateEigenvalues(t);
+				
 				// HELIA: compare the eigenvalues to make sure they are identical
-
+				glm::vec3 lambdas = CalculateEigenvalues(t);
+				std::vector<std::vector<float>> eigvecs;
 				Eigen::Matrix3f V = es.eigenvectors().real();
 
 				Eigen::Vector3f evecs[3];
@@ -537,7 +521,28 @@ void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 					std::swap(l[1], l[2]);
 					std::swap(evecs[1], evecs[2]);
 				}
-				
+				if (xi == 8 && yi == 10 && zi == 2)
+					eigvecs = ComputeEigenvectors(t, lambdas, true);
+				else
+					eigvecs = ComputeEigenvectors(t, lambdas, false);
+
+				if (xi == 8 && yi == 10 && zi == 2) {
+					std::cout << "\nMatrix:\n";
+					std::cout << "\t" << t[0][0] << "\t" << t[0][1] << "\t" << t[0][2] << std::endl;
+					std::cout << "\t" << t[1][0] << "\t" << t[1][1] << "\t" << t[1][2] << std::endl;
+					std::cout << "\t" << t[2][0] << "\t" << t[2][1] << "\t" << t[2][2] << std::endl;
+					std::cout << "Mine - Lambdas:\t" << lambdas[0] << " " << lambdas[1] << " " << lambdas[2] << std::endl;
+					std::cout << "Mine - Eigenvectors:\n";
+					std::cout << "\t" << eigvecs[0][0] << " " << eigvecs[0][1] << " " << eigvecs[0][2] << std::endl;
+					std::cout << "\t" << eigvecs[1][0] << " " << eigvecs[1][1] << " " << eigvecs[1][2] << std::endl;
+					std::cout << "\t" << eigvecs[2][0] << " " << eigvecs[2][1] << " " << eigvecs[2][2] << std::endl;
+					std::cout << "\nEigen - Lambdas:\t" << l[0] << " " << l[1] << " " << l[2] << std::endl;
+					std::cout << "Eigen - Eigenvectors:\n";
+					std::cout << "\t" << evecs[0][0] << " " << evecs[0][1] << " " << evecs[0][2] << std::endl;
+					std::cout << "\t" << evecs[1][0] << " " << evecs[1][1] << " " << evecs[1][2] << std::endl;
+					std::cout << "\t" << evecs[2][0] << " " << evecs[2][1] << " " << evecs[2][2] << std::endl;
+				}
+
 
 				lambda(xi, yi, zi, 0) = l[0];
 				eigenvectors(xi, yi, zi)[0][0] = evecs[0][0];
@@ -564,7 +569,7 @@ void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
 int main(int argc, char** argv) {
 
 	// Declare the supported options.
-	boost::program_options::options_description desc("Allowed options");
+	/*boost::program_options::options_description desc("Allowed options");
 	desc.add_options()
 		("input", boost::program_options::value<std::string>(&in_filename)->default_value("psf.cw"), "output filename for the coupled wave structure")
 		("help", "produce help message")
@@ -592,16 +597,19 @@ int main(int argc, char** argv) {
 	if (in_cmap != 0 && in_cmap != 2) {
 		std::cout << "ERROR: invalid colormap component" << std::endl;
 		return 1;
-	}
+	}*/
 	
+	in_gamma = 3;
+	in_cmap = 2;
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	T.load_npy<float>(in_filename);
+	//T.load_npy<float>(in_filename);
+	T.load_npy<float>("oval3d.npy");
 	std::cout << "done." << std::endl;
 
 	// Perform the eigendecomposition
-	std::cout << "eigendecomposition...";
+	std::cout << "eigendecomposition...\n";
 	CalculateEigendecomposition(T);
 	std::cout << "done." << std::endl;
 
@@ -670,13 +678,6 @@ int main(int argc, char** argv) {
 
 		for (size_t xi = 0; xi < T.X(); xi++) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
-				/*if (xi == 10 && yi == 11) 
-				{
-					for(int i = 0 ; i < 3; i++)
-						std::cout << eigenvectors(xi, yi, zi)[i][0] << " " << eigenvectors(xi, yi, zi)[i][1] << " " << eigenvectors(xi, yi, zi)[i][2] << std::endl;
-					std::cout << lambda(xi, yi, zi, 0) << " " << lambda(xi, yi, zi, 1) << " " << lambda(xi, yi, zi, 2) << std::endl;
-				}*/
-
 				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 
 				//glm::mat3 evmatrix = glm::transpose(eigenvectors(xi, yi, zi));
