@@ -26,7 +26,6 @@ double xprev, yprev;
 tira::volume<glm::mat3> T;
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
-float epsilon = 0.001;
 
 int zi = 0;
 
@@ -272,27 +271,28 @@ void InitGLEW() {
 	}
 }
 
-// If we have two identical eigenvalues, the rank of (A-lambda*I) is 1, and the cross product of any pair of rows is zero.
-// We use the Orthogonal complement, that is the computation of U and V for a specified W
+
+// uses orthogonal complement to compute the eigenvectors correspoinding to the two identical eigenvalues W = U x V
 void ComputeOrthogonalComplement(glm::vec3& U, glm::vec3& V, glm::vec3& W) {
 	
 	float invLength;
 	if (fabs(W[0]) > fabs(W[1])) {
-		// the component of maximu absolute value is either W[0] or W[2]
+		// the component of maximum absolute value is either W[0] or W[2]
 		invLength = 1 / (sqrtf(W[0] * W[0] + W[2] * W[2]));
 		U = glm::vec3(-W[2] * invLength, 0.0f, W[0] * invLength);
 	}
 	else {
-		// the component of maximu absolute value is either W[1] or W[2]
+		// the component of maximum absolute value is either W[1] or W[2]
 		invLength = 1 / (sqrtf(W[1] * W[1] + W[2] * W[2]));
 		U = glm::vec3(0.0f, W[2] * invLength, -W[1] * invLength);
 	}
 	
 	// vector V is the cross-product of W and U
-	// if W = [a b c] and U = [x y z] -> then V = W x U = [(bz-cy) (cx-az) (ay-bx)]
+	// cross-product: W = [a b c] and U = [x y z] -> V = W x U = [(bz-cy) (cx-az) (ay-bx)]
 	V = glm::vec3(W[1] * U[2] - W[2] * U[1], W[2] * U[0] - W[0] * U[2], W[0] * U[1] - W[1] * U[0]);
 
 }
+
 glm::vec3 ComputeEigenvector(glm::mat3 matrix, float eigvalue) {
 
 	glm::vec3 eigvec;
@@ -300,11 +300,15 @@ glm::vec3 ComputeEigenvector(glm::mat3 matrix, float eigvalue) {
 	a = matrix[0][0]; b = matrix[0][1]; c = matrix[0][2];
 	d = matrix[1][0]; e = matrix[1][1]; f = matrix[1][2];
 	g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
-
+	
+	// rows of (A - lambda*I)
+	// all the rows multiplied by the eigenvector yield zero vector => eigenvector is prependicular to at least two of the rows
 	std::vector<float> row0 = { a - eigvalue, b, c };
 	std::vector<float> row1 = { d, e - eigvalue, f };
 	std::vector<float> row2 = { g, h, i - eigvalue };
 
+	// calculate the cross-product of each two rows
+	// v is parallel to the cross product of two of these rows
 	std::vector<float> r0xr1 = {
 		row0[1] * row1[2] - row0[2] * row1[1],
 		row0[2] * row1[0] - row0[0] * row1[2],
@@ -323,6 +327,7 @@ glm::vec3 ComputeEigenvector(glm::mat3 matrix, float eigvalue) {
 		row1[0] * row2[1] - row1[1] * row2[0]
 	};
 
+	// dot product - to find out which cross-product has the largest length
 	float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
 	float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
 	float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
@@ -348,113 +353,31 @@ glm::vec3 ComputeEigenvector(glm::mat3 matrix, float eigvalue) {
 
 	return eigvec;
 }
-std::vector<std::vector<float>> ComputeEigenvectors(glm::mat3 matrix, glm::vec3 eigvals, bool debug) {
-	std::vector<std::vector<float>> vecs;
-	float a, b, c, d, e, f, g, h, i;
-	a = matrix[0][0]; b = matrix[0][1]; c = matrix[0][2];
-	d = matrix[1][0]; e = matrix[1][1]; f = matrix[1][2];
-	g = matrix[2][0]; h = matrix[2][1]; i = matrix[2][2];
 
-	float p1 = b * b + c * c + f * f;
-	if (p1 == 0) {												// if the matrix is diagonal
-		vecs.push_back({ 1.0f, 0.0f, 0.0f });					// align the eigenvectors with the current basis
-		vecs.push_back({ 0.0f, 1.0f, 0.0f });
-		vecs.push_back({ 0.0f, 0.0f, 1.0f });
-		return vecs;
-	}
-	for (int j = 0; j < 3; j++) {								// for each eigenvalue
-		float v = eigvals[j];									// store the eigenvalue in v
-		if (debug)
-			std::cout << "################################   Eigenvalue " << j + 1 << "  ################################" << std::endl;
-		std::vector<float> row0 = { a - v, b, c };
-		std::vector<float> row1 = { d, e - v, f };
-		std::vector<float> row2 = { g, h, i - v };
-
-		/*if (debug) std::cout << "check1: " << row0[0] << " " << row0[1] << " " << row0[2] << std::endl;
-		if (debug) std::cout << "check2: " << row1[0] << " " << row1[1] << " " << row1[2] << std::endl;
-		if (debug) std::cout << "check3: " << row2[0] << " " << row2[1] << " " << row2[2] << std::endl;*/
-		// Calculating the cross-product between each two row
-		std::vector<float> r0xr1 = {
-			row0[1] * row1[2] - row0[2] * row1[1],
-			row0[2] * row1[0] - row0[0] * row1[2],
-			row0[0] * row1[1] - row0[1] * row1[0]
-		};
-
-		std::vector<float> r0xr2 = {
-			row0[1] * row2[2] - row0[2] * row2[1],
-			row0[2] * row2[0] - row0[0] * row2[2],
-			row0[0] * row2[1] - row0[1] * row2[0]
-		};
-
-		std::vector<float> r1xr2 = {
-			row1[1] * row2[2] - row1[2] * row2[1],
-			row1[2] * row2[0] - row1[0] * row2[2],
-			row1[0] * row2[1] - row1[1] * row2[0]
-		};
-
-		float d0 = r0xr1[0] * r0xr1[0] + r0xr1[1] * r0xr1[1] + r0xr1[2] * r0xr1[2];
-		float d1 = r0xr2[0] * r0xr2[0] + r0xr2[1] * r0xr2[1] + r0xr2[2] * r0xr2[2];
-		float d2 = r1xr2[0] * r1xr2[0] + r1xr2[1] * r1xr2[1] + r1xr2[2] * r1xr2[2];
-		int imax = 0;
-		float dmax = d0;
-
-		if (d1 > dmax) {
-			dmax = d1;
-			imax = 1;
-		}
-		if (d2 > dmax)
-			imax = 2;
-
-		if (debug) std::cout << "\nds:\t" << d0 << " " << d1 << " " << d2 << std::endl;
-		if (debug) std::cout << "\nr0xr1:\t" << r0xr1[0] << " " << r0xr1[1] << " " << r0xr1[2] << std::endl;
-		if (debug) std::cout << "r0xr2: " << r0xr2[0] << " " << r0xr2[1] << " " << r0xr2[2] << std::endl;
-		if (debug) std::cout << "r1xr2: " << r1xr2[0] << " " << r1xr2[1] << " " << r1xr2[2] << std::endl;
-		if (imax == 0) {
-			vecs.push_back({ r0xr1[0] / std::sqrtf(d0), r0xr1[1] / std::sqrtf(d0), r0xr1[2] / std::sqrtf(d0) });
-		}
-		if (imax == 1) {
-			vecs.push_back({ r0xr2[0] / std::sqrtf(d1), r0xr2[1] / std::sqrtf(d1), r0xr2[2] / std::sqrtf(d1) });
-		}
-		if (imax == 2) {
-			vecs.push_back({ r1xr2[0] / std::sqrtf(d2), r1xr2[1] / std::sqrtf(d2), r1xr2[2] / std::sqrtf(d2) });
-		}
-		if (debug) std::cout << "\nimax was: " << imax << std::endl;
-		if (debug) std::cout << "\nif imax0: " << r0xr1[0] / std::sqrtf(d0) << ", " << r0xr1[1] / std::sqrtf(d0) << ", " << r0xr1[2] / std::sqrtf(d0) << std::endl;
-		if (debug) std::cout << "if imax1: " << r0xr2[0] / std::sqrtf(d1) << ", " << r0xr2[1] / std::sqrtf(d1) << ", " << r0xr2[2] / std::sqrtf(d1) << std::endl;
-		if (debug) std::cout << "if imax2: " << r1xr2[0] / std::sqrtf(d2) << ", " << r1xr2[1] / std::sqrtf(d2) << ", " << r1xr2[2] / std::sqrtf(d2) << std::endl;
-	}
-
-	if (vecs[1] == vecs[2]) {
-		std::cout << "ERROR: last two eigenvectors are identical." << std::endl;
-	}
-	return vecs;
-}
-
-glm::vec3 CalculateEigenvalues(glm::mat3 T, bool debug){
-	// HELIA: calculate the eigenvalues and return them as a vector
+glm::vec3 ComputeEigenvalues(glm::mat3 A){
 	glm::vec3 l;
-	glm::mat3 vectors(T);
+
+	// to avoid precision loss, cast from float to double
+	double a, b, c, d, e, f, g, h, i;
+	a = static_cast<double>(A[0][0]); b = static_cast<double>(A[0][1]); c = static_cast<double>(A[0][2]);
+	d = static_cast<double>(A[1][0]); e = static_cast<double>(A[1][1]); f = static_cast<double>(A[1][2]);
+	g = static_cast<double>(A[2][0]); h = static_cast<double>(A[2][1]); i = static_cast<double>(A[2][2]);
 	
-	float a, b, c, d, e, f, g, h, i;
-	a = T[0][0]; b = T[0][1]; c = T[0][2];
-	d = T[1][0]; e = T[1][1]; f = T[1][2];
-	g = T[2][0]; h = T[2][1]; i = T[2][2];
-	//Tridiagonalize(l, imag, vectors);
-	//Diagonalize(l, imag, vectors);
-	float p1 = b*b + c*c + f*f;
+	// Case: matrix is diagonal
+	double p1 = b * b + c * c + f * f;
+	
 	if (p1 == 0)
 	{
-		// A is diagonal.
 		l[0] = a;
 		l[1] = e;
 		l[2] = i;
 	}
 	else
 	{
-		float q = (a + e + i) / 3.0f;
-		float p2 = (a - q) * (a - q) + (e - q) * (e - q) + (i - q) * (i - q) + 2 * p1;
-		float p = sqrtf(p2 / 6.0f);
-		glm::mat3 B = (1 / p) * (T - glm::mat3(q));
+		double q = (a + e + i) / 3.0f;
+		double p2 = (a - q) * (a - q) + (e - q) * (e - q) + (i - q) * (i - q) + 2 * p1;
+		double p = std::sqrtf(p2 / 6.0f);
+		glm::mat3 B = (float)(1 / p) * glm::mat3(glm::vec3(a - q, d, g), glm::vec3(b, e - q, h), glm::vec3(c, f, i - q));
 		float r = determinant(B) / 2.0f;
 
 		// In exact arithmetic for a symmetric matrix - 1 <= r <= 1
@@ -463,20 +386,20 @@ glm::vec3 CalculateEigenvalues(glm::mat3 T, bool debug){
 		float phi = 0.0f;
 		if (r <= -1)
 			phi = PI / 3.0f;
-		else if (r >= 1)
+		else if (r > 1)
 			phi = 0.0f;
 		else
 			phi = std::acosf(r) / 3.0f;
-		if (debug) std::cout << "r: " << r << "\n";
+
 		// the eigenvalues satisfy l[0] <= l[1] <= l[2]
 		l[2] = q + 2 * p * std::cosf(phi);
 		l[0] = q + 2 * p * std::cosf(phi + (2 * PI / 3.0f));
-		l[1] = 3 * q - l[2] - l[0]; // since trace(A) = eig1 + eig2 + eig3
+		l[1] = 3 * q - l[2] - l[0];					// since trace(A) = eig1 + eig2 + eig3
 	}
-
 	
 	return l;
 }
+
 void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
 	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
@@ -486,17 +409,18 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 			for (size_t xi = 0; xi < T.X(); xi++) {
 
 				glm::mat3 A = T(xi, yi, zi);
-				glm::vec3 lambdas = CalculateEigenvalues(A, false);			// l[0] <= l[1] <= l[2]
+				glm::vec3 lambdas = ComputeEigenvalues(A);			// l[0] <= l[1] <= l[2]
 				glm::mat3 eigvecs;
 				
-				// Case 1: the matrix is diagonal
+				// case 1: input matrix is diagonal
 				if (A[0][1] * A[0][1] + A[0][2] * A[0][2] + A[1][2] * A[1][2] == 0) {
 					eigvecs[0] = { 1.0f, 0.0f, 0.0f };
 					eigvecs[1] = { 0.0f, 1.0f, 0.0f };
 					eigvecs[2] = { 0.0f, 0.0f, 1.0f };
 				}
 					
-				// Case 2: an eigenvalue is repeated
+				// case 2: two identical eigenvalues
+				// with two identical eigenvalues, the rank of (A-lambda*I) is 1, and the cross product of any pair of rows is zero.
 				else if (lambdas[0] == lambdas[1]) {
 					eigvecs[2] = ComputeEigenvector(A, lambdas[2]);
 					ComputeOrthogonalComplement(eigvecs[0], eigvecs[1], eigvecs[2]);
@@ -522,6 +446,7 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 					std::swap(eigvecs[1], eigvecs[2]);
 				}
 
+				// assign the values to the main variables
 				lambda(xi, yi, zi, 0) = lambdas[0];
 				eigenvectors(xi, yi, zi)[0][0] = eigvecs[0][0];
 				eigenvectors(xi, yi, zi)[0][1] = eigvecs[0][1];
@@ -540,150 +465,13 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 		}
 	}
 }
-void CalculateEigendecomposition_old(tira::volume< glm::mat3 > T) {
-
-	/// I'm looking for better methods to do this, and eventually have to put it on the GPU
-	/// Unstable (roots method): https://en.wikipedia.org/wiki/Eigenvalue_algorithm#3.C3.973_matrices
-	/// Quaternion method: https://stackoverflow.com/questions/4372224/fast-method-for-computing-3x3-symmetric-matrix-spectral-decomposition
-
-	lambda = tira::volume<float>(T.X(), T.Y(), T.Z(), 3);
-	eigenvectors = tira::volume<glm::mat3>(T.X(), T.Y(), T.Z());
-
-	float lambda0, lambda1, lambda2;
-	for (size_t zi = 0; zi < T.Z(); zi++) {
-		for (size_t yi = 0; yi < T.Y(); yi++) {
-			for (size_t xi = 0; xi < T.X(); xi++) {
-				glm::mat3 t = T(xi, yi, zi);
-
-				Eigen::Matrix3f A;
-				A(0, 0) = t[0][0];
-				A(0, 1) = t[0][1];
-				A(0, 2) = t[0][2];
-				A(1, 0) = t[1][0];
-				A(1, 1) = t[1][1];
-				A(1, 2) = t[1][2];
-				A(2, 0) = t[2][0];
-				A(2, 1) = t[2][1];
-				A(2, 2) = t[2][2];
-				bool issymmetric;
-
-				for (int j = 0; (j < 3); j++) {
-					for (int i = 0; (i < 3); i++) {
-						issymmetric = (t[i][j] == t[j][i]);
-					}
-				}
-				if (!issymmetric) std::cout << "Not symmetric" << std::endl;
-				Eigen::EigenSolver<Eigen::Matrix3f> es;
-				es.compute(A, true);
-				Eigen::Vector3f l = es.eigenvalues().real();
-				
-				// HELIA: compare the eigenvalues to make sure they are identical
-				glm::vec3 lambdas;
-				if (xi == 9 && yi == 9 && zi == 2)
-					lambdas = CalculateEigenvalues(t, true);
-				else lambdas = CalculateEigenvalues(t, false);
-				glm::mat3 eigvecs;
-				
-				// Case 1: the matrix is diagonal
-				if (t[0][1] * t[0][1] + t[0][2] * t[0][2] + t[1][2] * t[1][2] == 0) {
-					eigvecs[0] = { 1.0f, 0.0f, 0.0f };
-					eigvecs[1] = { 0.0f, 1.0f, 0.0f };
-					eigvecs[2] = { 0.0f, 0.0f, 1.0f };
-				}
-
-				// Case 2: an eigenvalue is repeated
-				else if (lambdas[0] == lambdas[1]) {
-					eigvecs[2] = ComputeEigenvector(t, lambdas[2]);
-					ComputeOrthogonalComplement(eigvecs[0], eigvecs[1], eigvecs[2]);
-				}
-
-				else {
-					eigvecs[0] = ComputeEigenvector(t, lambdas[0]);
-					eigvecs[1] = ComputeEigenvector(t, lambdas[1]);
-					eigvecs[2] = ComputeEigenvector(t, lambdas[2]);
-				}
-				
-				
-				
-				Eigen::Matrix3f V = es.eigenvectors().real();
-				Eigen::Vector3f evecs[3];
-				evecs[0] = V.col(0).real();
-				evecs[1] = V.col(1).real();
-				evecs[2] = V.col(2).real();
-
-				// sort the eigenvalues and eigenvectors from largest to smallest
-				if (l[0] < l[1]) {
-					std::swap(l[0], l[1]);
-					std::swap(evecs[0], evecs[1]);
-				}
-				if (l[0] < l[2]) {
-					std::swap(l[0], l[2]);
-					std::swap(evecs[0], evecs[2]);
-				}
-				if (l[1] < l[2]) {
-					std::swap(l[1], l[2]);
-					std::swap(evecs[1], evecs[2]);
-				}
-				// sort the eigenvalues and eigenvectors from largest to smallest
-				if (lambdas[0] < lambdas[1]) {
-					std::swap(lambdas[0], lambdas[1]);
-					std::swap(eigvecs[0], eigvecs[1]);
-				}
-				if (lambdas[0] < lambdas[2]) {
-					std::swap(lambdas[0], lambdas[2]);
-					std::swap(eigvecs[0], eigvecs[2]);
-				}
-				if (lambdas[1] < lambdas[2]) {
-					std::swap(lambdas[1], lambdas[2]);
-					std::swap(eigvecs[1], eigvecs[2]);
-				}
-
-				if (xi == 9 && yi == 9 && zi == 2) {
-					std::cout << "\nMatrix:\n";
-					std::cout << "\t" << t[0][0] << "\t" << t[0][1] << "\t" << t[0][2] << std::endl;
-					std::cout << "\t" << t[1][0] << "\t" << t[1][1] << "\t" << t[1][2] << std::endl;
-					std::cout << "\t" << t[2][0] << "\t" << t[2][1] << "\t" << t[2][2] << std::endl;
-					std::cout << "\nMine - Lambdas:\t" << lambdas[0] << " " << lambdas[1] << " " << lambdas[2] << std::endl;
-					std::cout << "Eigen - Lambdas:\t" << l[0] << " " << l[1] << " " << l[2] << std::endl;
-					std::cout << std::endl;
-					std::cout << "Mine - Eigenvectors:\n";
-					std::cout << "\t" << eigvecs[0][0] << " " << eigvecs[0][1] << " " << eigvecs[0][2] << std::endl;
-					std::cout << "\t" << eigvecs[1][0] << " " << eigvecs[1][1] << " " << eigvecs[1][2] << std::endl;
-					std::cout << "\t" << eigvecs[2][0] << " " << eigvecs[2][1] << " " << eigvecs[2][2] << std::endl;
-					
-					std::cout << "Eigen - Eigenvectors:\n";
-					std::cout << "\t" << evecs[0][0] << " " << evecs[0][1] << " " << evecs[0][2] << std::endl;
-					std::cout << "\t" << evecs[1][0] << " " << evecs[1][1] << " " << evecs[1][2] << std::endl;
-					std::cout << "\t" << evecs[2][0] << " " << evecs[2][1] << " " << evecs[2][2] << std::endl;
-				}
-
-
-				lambda(xi, yi, zi, 0) = l[0];
-				eigenvectors(xi, yi, zi)[0][0] = evecs[0][0];
-				eigenvectors(xi, yi, zi)[0][1] = evecs[0][1];
-				eigenvectors(xi, yi, zi)[0][2] = evecs[0][2];
-
-				lambda(xi, yi, zi, 1) = l[1];
-				eigenvectors(xi, yi, zi)[1][0] = evecs[1][0];
-				eigenvectors(xi, yi, zi)[1][1] = evecs[1][1];
-				eigenvectors(xi, yi, zi)[1][2] = evecs[1][2];
-
-				lambda(xi, yi, zi, 2) = l[2];
-				eigenvectors(xi, yi, zi)[2][0] = evecs[2][0];
-				eigenvectors(xi, yi, zi)[2][1] = evecs[2][1];
-				eigenvectors(xi, yi, zi)[2][2] = evecs[2][2];
-			}
-		}
-	}
-
-}
 
 
 
 int main(int argc, char** argv) {
 
 	// Declare the supported options.
-	/*boost::program_options::options_description desc("Allowed options");
+	boost::program_options::options_description desc("Allowed options");
 	desc.add_options()
 		("input", boost::program_options::value<std::string>(&in_filename)->default_value("psf.cw"), "output filename for the coupled wave structure")
 		("help", "produce help message")
@@ -711,20 +499,17 @@ int main(int argc, char** argv) {
 	if (in_cmap != 0 && in_cmap != 2) {
 		std::cout << "ERROR: invalid colormap component" << std::endl;
 		return 1;
-	}*/
-	
-	in_gamma = 3;
-	in_cmap = 2;
+	}
+
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	//T.load_npy<float>(in_filename);
-	T.load_npy<float>("oval3d.npy");
+	T.load_npy<float>(in_filename);
 	std::cout << "done." << std::endl;
 
 	// Perform the eigendecomposition
-	std::cout << "eigendecomposition...\n";
-	CalculateEigendecomposition_old(T);
+	std::cout << "eigendecomposition...";
+	CalculateEigendecomposition(T);
 	std::cout << "done." << std::endl;
 
 	// Initialize OpenGL
