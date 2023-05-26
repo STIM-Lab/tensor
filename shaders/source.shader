@@ -2,15 +2,17 @@
 # version 330 core
 
 layout(location = 0) in vec3 V;
-layout(location = 1) in vec3 N;
+layout(location = 2) in vec3 N;
 
-uniform mat4 ModelMat;
+const float PI = 3.14159265358979323846;
+
+uniform mat4 Model;
 uniform mat4 ViewMat;
 uniform mat4 ProjMat;
 uniform vec3 lambda;
 uniform float gamma;
 uniform int ColorComponent;
-uniform uint voxel;
+uniform uvec3 voxel;
 
 uniform sampler3D Diagonal;
 uniform sampler3D Upper_trian;
@@ -129,24 +131,20 @@ vec3 ComputeEigenvector(mat3 matrix, float eigvalue) {
 };
 
 void main() {
-
-	//float l0 = lambda[0];
-	//float l1 = lambda[1];
-	//float l2 = lambda[2];
 	
 	// Find texture coordinate
-	vec3 textureCoords = vec3(voxel) / vec3(textureSize(Diagonal));
-	vec3 DiagValue = texture(Diagonal, textureCoords).xyz;
-	vec3 OffDiag = texture(Upper_trian, textureCoords).xyz;
+	vec3 Coords = vec3(voxel) / vec3(textureSize(Diagonal, 0));
+	vec3 DiagValue = texture(Diagonal, Coords).xyz;
+	vec3 OffDiag = texture(Upper_trian, Coords).xyz;
 
 	// Take the tensor field values from Diagonal and Upper traingular texture maps
 	mat3 tensor;
 	tensor[0][0] = DiagValue[0]; 	tensor[0][1] = OffDiag[0]; 		tensor[0][2] = OffDiag[1];
-	tensor[1][0] = tensor[0][1]; 	tensor[1][1] = DiagValue[1]; 		tensor[1][2] = OffDiag[2];
-	tensor[2][0] = tensor[0][2];	tensor[2][1] = tensor[1][2];		tensor[2][2] = DiagValue[2];
+	tensor[1][0] = tensor[0][1]; 	tensor[1][1] = DiagValue[1]; 	tensor[1][2] = OffDiag[2];
+	tensor[2][0] = tensor[0][2];	tensor[2][1] = tensor[1][2];	tensor[2][2] = DiagValue[2];
 	
 	// Compute eigenvalues and eigenvectors using the 3x3 matrix of tensor field
-	vec3 eigenvals = ComputeEigenvalues(tensor);
+	vec3 eigvals = ComputeEigenvalues(tensor);
 	mat3 eigvecs;
 	
 	// Case 1: input matrix is diagonal
@@ -165,7 +163,7 @@ void main() {
 			eigvecs[0] = vec3(-eigvecs[2][2] * invLength, 0.0, eigvecs[2][0] * invLength);
 		}
 		else {
-			invLength = 1 / (sqrtf(eigvecs[2][1] * eigvecs[2][1] + eigvecs[2][2] * eigvecs[2][2]));
+			invLength = 1 / (sqrt(eigvecs[2][1] * eigvecs[2][1] + eigvecs[2][2] * eigvecs[2][2]));
 			eigvecs[0] = vec3(0.0, eigvecs[2][2] * invLength, -eigvecs[2][1] * invLength);
 		}
 
@@ -191,7 +189,7 @@ void main() {
 	mat4 Mrot = mat4(eigvecs);
 	Mrot[3][3] = 1.0;
 
-	ModelMat *= Mrot;
+	mat4 ModelMat = Model * Mrot;
 	
 	float l0 = eigvals[0];
 	float l1 = eigvals[1];

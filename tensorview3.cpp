@@ -648,27 +648,31 @@ int main(int argc, char** argv) {
 				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 
 				//glm::mat3 evmatrix = glm::transpose(eigenvectors(xi, yi, zi));
-				glm::mat3 evmatrix = eigenvectors(xi, yi, zi);
-				glm::mat4 Mrot = glm::mat4(evmatrix);
-				Mrot[3][3] = 1.0f;
+				//glm::mat3 evmatrix = eigenvectors(xi, yi, zi);
+				//glm::mat4 Mrot = glm::mat4(evmatrix);
+				//Mrot[3][3] = 1.0f;
 
 				glm::mat4 Mmodel = Mtran; // *Mrot;
 				/// Render Something Here
-				shader.Bind();
-				shader.SetUniformMat4f("ProjMat", Mprojection);
-				shader.SetUniformMat4f("ViewMat", Mview);
-				shader.SetUniformMat4f("ModelMat", Mmodel);
-				shader.SetUniform4f("light0", light0);
-				shader.SetUniform4f("light1", light1);
-				shader.SetUniform1f("ambient", ambient);
-				shader.SetUniform1i("ColorComponent", component_color);
-				//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
-				//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
-				glm::uvec3 voxel(xi, yi, zi);
-				shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
-				shader.SetUniform1f("gamma", gamma);
+				shader.Begin();
+				{
+					shader.SetUniformMat4f("ProjMat", Mprojection);
+					shader.SetUniformMat4f("ViewMat", Mview);
+					shader.SetUniformMat4f("Model", Mmodel);
+					shader.SetUniform4f("light0", light0);
+					shader.SetUniform4f("light1", light1);
+					shader.SetUniform1f("ambient", ambient);
+					shader.SetUniform1i("ColorComponent", component_color);
+					//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
+					//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
+					glm::uvec3 voxel(xi, yi, zi);
+					shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
+					shader.SetUniform1f("gamma", gamma);
 
-				glyph.Draw();
+					glyph.Draw(); 
+				}
+				shader.End();
+				
 
 			}
 		}
