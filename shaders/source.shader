@@ -134,18 +134,23 @@ void main() {
 	//float l1 = lambda[1];
 	//float l2 = lambda[2];
 	
+	// Find texture coordinate
+	vec3 textureCoords = vec3(voxel) / vec3(textureSize(Diagonal));
+	vec3 DiagValue = texture(Diagonal, textureCoords).xyz;
+	vec3 OffDiag = texture(Upper_trian, textureCoords).xyz;
+
 	// Take the tensor field values from Diagonal and Upper traingular texture maps
 	mat3 tensor;
-	tensor[0][0] = Diagonal[0]; 		tensor[0][1] = Upper_trian[0]; 		tensor[0][2] = Upper_trian[1];
-	tensor[1][0] = tensor[0][1]; 	tensor[1][1] = Diagonal[1]; 		tensor[1][2] = Upper_trian[2];
-	tensor[2][0] = tensor[0][2];	tensor[2][1] = tensor[1][2];	tensor[2][2] = Diagonal[2];
+	tensor[0][0] = DiagValue[0]; 	tensor[0][1] = OffDiag[0]; 		tensor[0][2] = OffDiag[1];
+	tensor[1][0] = tensor[0][1]; 	tensor[1][1] = DiagValue[1]; 		tensor[1][2] = OffDiag[2];
+	tensor[2][0] = tensor[0][2];	tensor[2][1] = tensor[1][2];		tensor[2][2] = DiagValue[2];
 	
 	// Compute eigenvalues and eigenvectors using the 3x3 matrix of tensor field
 	vec3 eigenvals = ComputeEigenvalues(tensor);
 	mat3 eigvecs;
 	
 	// Case 1: input matrix is diagonal
-	if (Upper_trian[0]*Upper_trian[0] + Upper_trian[1]*Upper_trian[1] + Upper_trian[2]*Upper_trian[2] == 0.0) {
+	if (OffDiag[0]*OffDiag[0] + OffDiag[1]*OffDiag[1] + OffDiag[2]*OffDiag[2] == 0.0) {
 		eigvecs[0] = vec3(1.0, 0.0, 0.0);
 		eigvecs[1] = vec3(0.0, 1.0, 0.0);
 		eigvecs[2] = vec3(0.0, 0.0, 1.0);
