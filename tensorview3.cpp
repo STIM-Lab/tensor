@@ -127,6 +127,7 @@ std::string vertex_shader_source = R"(
 	uniform vec3 lambda;
 	uniform float gamma;
 	uniform int ColorComponent;
+	uniform mat3 tensor;
 	out vec4 vertexColor;
 	out vec3 vertexNorm;
 
@@ -147,8 +148,48 @@ std::string vertex_shader_source = R"(
 		float z = signpow(cos_theta, alpha) * signpow(sin_phi, beta);
 		return vec3(x, y, z);
 	}
+	
+vec3 ComputeEigenvalues(mat3 A) {
+		vec3 l;
 
+		float a, b, c, d, e, f, g, h, i;
+		a = (A[0][0]); b = (A[0][1]); c = (A[0][2]);
+		d = (A[1][0]); e = (A[1][1]); f = (A[1][2]);
+		g = (A[2][0]); h = (A[2][1]); i = (A[2][2]);
+	
+		float p1 = b * b + c * c + f * f;
+	
+		if (p1 == 0.0)
+		{
+			l[0] = a;
+			l[1] = e;
+			l[2] = i;
+		}
+		else
+		{
+			float q = (a + e + i) / 3.0;
+			float p2 = (a - q) * (a - q) + (e - q) * (e - q) + (i - q) * (i - q) + 2.0 * p1;
+			float p = sqrt(p2 / 6.0);
+			mat3 B = (1 / p) * mat3(vec3(a - q, d, g),
+									vec3(b, e - q, h),
+									vec3(c, f, i - q));
+			float r = determinant(B) / 2.0;
+		
+			float phi = 0.0;
+			if (r <= -1.0)
+				phi = PI / 3.0;
+			else if (r > 1.0)
+				phi = 0.0;
+			else
+				phi = acos(r) / 3.0;
 
+			l[2] = q + 2.0 * p * cos(phi);
+			l[0] = q + 2.0 * p * cos(phi + (2.0 * PI / 3.0));
+			l[1] = 3.0 * q - l[2] - l[0];
+		}
+	
+		return l;
+	}
 	void main() {
 
 		float l0 = lambda[0];
@@ -420,7 +461,7 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 				}
 					
 				// case 2: two identical eigenvalues
-				// with two identical eigenvalues, the rank of (A-lambda*I) is 1, and the cross product of any pair of rows is zero.
+				// with two identical eigenvalues, the rank of (A-lambda*I) is 1 -> cross-product of any two rows is zero.
 				else if (lambdas[0] == lambdas[1]) {
 					eigvecs[2] = ComputeEigenvector(A, lambdas[2]);
 					ComputeOrthogonalComplement(eigvecs[0], eigvecs[1], eigvecs[2]);
@@ -446,7 +487,7 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 					std::swap(eigvecs[1], eigvecs[2]);
 				}
 
-				// assign the values to the main variables
+				// assign the values to the global variables
 				lambda(xi, yi, zi, 0) = lambdas[0];
 				eigenvectors(xi, yi, zi)[0][0] = eigvecs[0][0];
 				eigenvectors(xi, yi, zi)[0][1] = eigvecs[0][1];
@@ -504,14 +545,39 @@ int main(int argc, char** argv) {
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	T.load_npy<float>(in_filename);
+	T.load_npy<float>("oval3d.npy");
 	std::cout << "done." << std::endl;
+
+	// Set two separate RGB volumes with diagonal tensor values and off-diagonal values
+	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);				// each RGB channel contains one diagonal element
+	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);				// each RGB channel contains one upper triangular element (matrix is symmetric)
+
+	// matrix = [ a		b		c]
+	//			[ d		e		f]
+	//			[g		h		i]
+	//	diagonal =		a, e, i
+	//	triangular =	b, c, f
+	for (size_t xi = 0; xi < T.X(); xi++) {
+		for (size_t yi = 0; yi < T.Y(); yi++) {
+			for (size_t zi = 0; zi < T.Z(); zi++) {
+				glm::mat3 tensor = T(xi, yi, zi);
+				diagonal_elem(xi, yi, zi, 0) = tensor[0][0];		// a
+				diagonal_elem(xi, yi, zi, 1) = tensor[1][1];		// e
+				diagonal_elem(xi, yi, zi, 2) = tensor[2][2];		// i
+
+				triangular_elem(xi, yi, zi, 0) = tensor[0][1];		// b
+				triangular_elem(xi, yi, zi, 1) = tensor[0][2];		// c
+				triangular_elem(xi, yi, zi, 2) = tensor[1][2];		// f
+			}
+		}
+	}
+
 
 	// Perform the eigendecomposition
 	std::cout << "eigendecomposition...";
-	CalculateEigendecomposition(T);
+	//CalculateEigendecomposition(T);
 	std::cout << "done." << std::endl;
-
+	in_cmap = 2;
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
 	InitUI(window, glsl_version);
@@ -525,7 +591,6 @@ int main(int argc, char** argv) {
 	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
 	camera.LookAt(frame / 2.0f, frame / 2.0f, 0);
 
-
 	glm::vec3 l(1.0f, 0.5f, 0.5f);
 	float suml = l[0] + l[1] + l[2];
 	float gamma = in_gamma;
@@ -533,13 +598,16 @@ int main(int argc, char** argv) {
 	
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
-	tira::glShader shader(vertex_shader_source, fragment_shader_source);
-
+	//tira::glShader shader(vertex_shader_source, fragment_shader_source);
+	//tira::glShader shader("source.shader");
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;	
 
-	
+	// Assign each volume to texture
+	tira::glMaterial shader("source.shader");
+	shader.SetTexture("Diagonal", diagonal_elem, GL_RGB, GL_NEAREST);
+	shader.SetTexture("Upper_trian", triangular_elem, GL_RGB, GL_NEAREST);
 
 	while (!glfwWindowShouldClose(window)){
 
@@ -584,7 +652,7 @@ int main(int argc, char** argv) {
 				glm::mat4 Mrot = glm::mat4(evmatrix);
 				Mrot[3][3] = 1.0f;
 
-				glm::mat4 Mmodel = Mtran * Mrot;
+				glm::mat4 Mmodel = Mtran; // *Mrot;
 				/// Render Something Here
 				shader.Bind();
 				shader.SetUniformMat4f("ProjMat", Mprojection);
@@ -594,9 +662,10 @@ int main(int argc, char** argv) {
 				shader.SetUniform4f("light1", light1);
 				shader.SetUniform1f("ambient", ambient);
 				shader.SetUniform1i("ColorComponent", component_color);
-				glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
-				shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
-				//shader.SetUniform3f("lambda", l * 0.5f);
+				//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
+				//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
+				glm::uvec3 voxel(xi, yi, zi);
+				shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
 				shader.SetUniform1f("gamma", gamma);
 
 				glyph.Draw();

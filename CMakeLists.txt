@@ -53,6 +53,8 @@ configure_file(data/damaged_shape.npy
 
 configure_file(shaders/glyph2d.shader 
 				glyph2d.shader COPYONLY)
+configure_file(shaders/source.shader 
+				source.shader COPYONLY)
 				
 #set the include directories
 include_directories(
@@ -82,6 +84,7 @@ add_executable(tensorview3
 				tensorview3.cpp
 				gui.cpp
 				gui.h
+				
 )
 
 target_link_libraries(tensorview3
