@@ -117,162 +117,6 @@ void resetPlane(float frame) {
 	zi = 0;
 }
 
-std::string vertex_shader_source = R"(
-	#version 330 core
-	layout(location = 0) in vec3 V;
-	layout(location = 1) in vec3 N;
-	uniform mat4 ModelMat;
-	uniform mat4 ViewMat;
-	uniform mat4 ProjMat;
-	uniform vec3 lambda;
-	uniform float gamma;
-	uniform int ColorComponent;
-	uniform mat3 tensor;
-	out vec4 vertexColor;
-	out vec3 vertexNorm;
-
-	float signpow(float x, float exponent) {
-		if (x < 0) return -pow(abs(x), exponent);
-		else return pow(abs(x), exponent);
-	}
-
-	vec3 sq_vertex(float alpha, float beta, float theta, float phi) {
-
-		float cos_phi = cos(phi);
-		float sin_theta = sin(theta);
-		float sin_phi = sin(phi);
-		float cos_theta = cos(theta);
-
-		float x = signpow(cos_phi, beta);
-		float y = -signpow(sin_theta, alpha) * signpow(sin_phi, beta);
-		float z = signpow(cos_theta, alpha) * signpow(sin_phi, beta);
-		return vec3(x, y, z);
-	}
-	
-vec3 ComputeEigenvalues(mat3 A) {
-		vec3 l;
-
-		float a, b, c, d, e, f, g, h, i;
-		a = (A[0][0]); b = (A[0][1]); c = (A[0][2]);
-		d = (A[1][0]); e = (A[1][1]); f = (A[1][2]);
-		g = (A[2][0]); h = (A[2][1]); i = (A[2][2]);
-	
-		float p1 = b * b + c * c + f * f;
-	
-		if (p1 == 0.0)
-		{
-			l[0] = a;
-			l[1] = e;
-			l[2] = i;
-		}
-		else
-		{
-			float q = (a + e + i) / 3.0;
-			float p2 = (a - q) * (a - q) + (e - q) * (e - q) + (i - q) * (i - q) + 2.0 * p1;
-			float p = sqrt(p2 / 6.0);
-			mat3 B = (1 / p) * mat3(vec3(a - q, d, g),
-									vec3(b, e - q, h),
-									vec3(c, f, i - q));
-			float r = determinant(B) / 2.0;
-		
-			float phi = 0.0;
-			if (r <= -1.0)
-				phi = PI / 3.0;
-			else if (r > 1.0)
-				phi = 0.0;
-			else
-				phi = acos(r) / 3.0;
-
-			l[2] = q + 2.0 * p * cos(phi);
-			l[0] = q + 2.0 * p * cos(phi + (2.0 * PI / 3.0));
-			l[1] = 3.0 * q - l[2] - l[0];
-		}
-	
-		return l;
-	}
-	void main() {
-
-		float l0 = lambda[0];
-		float l1 = lambda[1];
-		float l2 = lambda[2];
-
-		// calculate the linear and planar anisotropy
-		float suml = l0 + l1 + l2;
-		float Cl = (l0 - l1) / suml;
-		float Cp = 2 * (l1 - l2) / suml;
-		float Cs = 3 * l2 / suml;
-
-		
-		float x = V.x;
-		float y = V.y;
-		float z = V.z;
-
-		float theta = atan(y, x);
-		float phi = atan(sqrt(x * x + y * y), z);
-
-		vec3 sq_v, sq_n;
-
-		if (Cl >= Cp) {
-			float alpha = pow(1 - Cp, gamma);
-			float beta = pow(1 - Cl, gamma);
-			sq_v = sq_vertex(alpha, beta, theta, phi);
-			sq_n = sq_vertex(2.0f - alpha, 2.0f - beta, theta, phi);
-		}
-		else {
-			float alpha = pow(1 - Cl, gamma);
-			float beta = pow(1 - Cp, gamma);
-			sq_v = sq_vertex(alpha, beta, theta, phi);
-			sq_v = sq_v.zyx;
-			sq_v.y = -sq_v.y;
-			sq_n = sq_vertex(2.0f - alpha, 2.0f - beta, theta, phi);
-			sq_n = sq_n.zyx;
-			sq_n.y = -sq_n.y;					
-		}
-
-		sq_v = vec3(l0 * sq_v.x, l1 * sq_v.y, l2 * sq_v.z);
-
-		float sx = 1.0f / l0;
-		float sy = 1.0f / l1;
-		float sz = 1.0f / l2;
-
-		sq_n = normalize(vec3(sx * sq_n.x, sy * sq_n.y, sz * sq_n.z));
-		
-		//mat4 VM = ViewMat * ModelMat;
-		mat3 NormMat = transpose(inverse(mat3(ModelMat)));
-		vertexNorm = NormMat * sq_n;
-
-		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
-		//vertexColor = vec4(1.0, 0.0, 0.0, 1.0);
-		vec3 dirColor;
-		vec3 glyphColor;
-		if(ColorComponent == 0){
-			dirColor = vec3(abs(ModelMat[0][0]), abs(ModelMat[0][1]), abs(ModelMat[0][2]));
-			glyphColor = Cp + Cs + (1.0f - Cp - Cs) * dirColor;
-		}
-		if(ColorComponent == 2){
-			dirColor = vec3(abs(ModelMat[2][0]), abs(ModelMat[2][1]), abs(ModelMat[2][2]));
-			glyphColor = Cl + Cs + (1.0f - Cl - Cs) * dirColor;
-		}
-		vertexColor = vec4(glyphColor, 1.0f);
-	};
-)";
-
-std::string fragment_shader_source = R"(
-	#version 330 core
-	uniform vec4 light0;
-	uniform vec4 light1;
-	uniform float ambient;
-	out vec4 FragColor;
-	in vec4 vertexColor;
-	in vec3 vertexNorm;
-	void main() {
-		float l0 = max(0, dot(vertexNorm, normalize(vec3(light0)))) * light0.a;
-		float l1 = max(0, dot(vertexNorm, normalize(vec3(light1)))) * light1.a;
-		float l = min(l0 + l1 + ambient, 1.0);
-		FragColor = vertexColor * (l0 + l1 + ambient);
-		//FragColor = vec4(abs(vertexNorm) * l, 1.0);
-	};
-)";
 
 GLFWwindow* InitGLFW() {
 	GLFWwindow* window;
@@ -302,7 +146,6 @@ GLFWwindow* InitGLFW() {
 	glfwSetKeyCallback(window, key_callback);
 	return window;
 }
-
 void InitGLEW() {
 	GLenum err = glewInit();
 	if (GLEW_OK != err) {
@@ -570,7 +413,7 @@ int main(int argc, char** argv) {
 
 	// Perform the eigendecomposition
 	std::cout << "eigendecomposition...";
-	CalculateEigendecomposition(T);
+	//CalculateEigendecomposition(T);
 	std::cout << "done." << std::endl;
 	in_cmap = 2;
 	// Initialize OpenGL
@@ -593,16 +436,11 @@ int main(int argc, char** argv) {
 	
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
-	//tira::glShader shader(vertex_shader_source, fragment_shader_source);
 	tira::glShader shader("source.shader");
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;	
 
-	// Assign each volume to texture
-	//tira::glMaterial shader("source.shader");
-	//shader.SetTexture("Diagonal", diagonal_elem, GL_RGB, GL_NEAREST);
-	//shader.SetTexture("Upper_trian", triangular_elem, GL_RGB, GL_NEAREST);
 
 	while (!glfwWindowShouldClose(window)){
 
@@ -641,45 +479,21 @@ int main(int argc, char** argv) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 
-				//glm::mat3 evmatrix = glm::transpose(eigenvectors(xi, yi, zi));
-				glm::mat3 evmatrix = eigenvectors(xi, yi, zi);
-				glm::mat4 Mrot = glm::mat4(evmatrix);
-				Mrot[3][3] = 1.0f;
-				glm::mat4 Mmodel = Mtran * Mrot;
-
 				glm::mat3 A = T(xi, yi, zi);
-				if (xi == 10 && yi == 10 && zi == 22) {
-					std::cout << "Matrix:\n";
-					std::cout << "\t" << A[0][0] << "\t" << A[0][1] << "\t" << A[0][2] << std::endl;
-					std::cout << "\t" << A[1][0] << "\t" << A[1][1] << "\t" << A[1][2] << std::endl;
-					std::cout << "\t" << A[2][0] << "\t" << A[2][1] << "\t" << A[2][2] << std::endl;
-					std::cout << std::endl;
-					std::cout << "Lambdas: \t" << lambda(xi, yi, zi, 0) << "\t" << lambda(xi, yi, zi, 1) << "\t" << lambda(xi, yi, zi, 2);
-				}
-				/// Render Something Here
-				/*shader.Begin();
-				{*/
+				
 				shader.Bind();
 				shader.SetUniformMat4f("ProjMat", Mprojection);
 				shader.SetUniformMat4f("ViewMat", Mview);
-				shader.SetUniformMat4f("ModelMat", Mmodel);
+				shader.SetUniformMat4f("Trans", Mtran);
 				shader.SetUniform4f("light0", light0);
 				shader.SetUniform4f("light1", light1);
 				shader.SetUniform1f("ambient", ambient);
 				shader.SetUniform1i("ColorComponent", component_color);
-
-				shader.SetUniformMat3f("tensor", A);
-				//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
-				//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
-				//glm::uvec3 voxel(xi, yi, zi);
-				//shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
 				shader.SetUniform1f("gamma", gamma);
 
-				glyph.Draw(); 
-				/*}
-				shader.End();*/
-				
+				shader.SetUniformMat3f("tensor", A);
 
+				glyph.Draw();
 			}
 		}
 
