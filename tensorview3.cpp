@@ -549,33 +549,28 @@ int main(int argc, char** argv) {
 	std::cout << "done." << std::endl;
 
 	// Set two separate RGB volumes with diagonal tensor values and off-diagonal values
-	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);				// each RGB channel contains one diagonal element
-	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);				// each RGB channel contains one upper triangular element (matrix is symmetric)
+	//tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one diagonal element
+	//tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one upper triangular element (matrix is symmetric)
 
-	// matrix = [ a		b		c]
-	//			[ d		e		f]
-	//			[g		h		i]
-	//	diagonal =		a, e, i
-	//	triangular =	b, c, f
-	for (size_t xi = 0; xi < T.X(); xi++) {
-		for (size_t yi = 0; yi < T.Y(); yi++) {
-			for (size_t zi = 0; zi < T.Z(); zi++) {
-				glm::mat3 tensor = T(xi, yi, zi);
-				diagonal_elem(xi, yi, zi, 0) = tensor[0][0];		// a
-				diagonal_elem(xi, yi, zi, 1) = tensor[1][1];		// e
-				diagonal_elem(xi, yi, zi, 2) = tensor[2][2];		// i
+	//for (size_t xi = 0; xi < T.X(); xi++) {
+	//	for (size_t yi = 0; yi < T.Y(); yi++) {
+	//		for (size_t zi = 0; zi < T.Z(); zi++) {
+	//			glm::mat3 tensor = T(xi, yi, zi);
+	//			diagonal_elem(xi, yi, zi, 0) = tensor[0][0];		// a
+	//			diagonal_elem(xi, yi, zi, 1) = tensor[1][1];		// e
+	//			diagonal_elem(xi, yi, zi, 2) = tensor[2][2];		// i
 
-				triangular_elem(xi, yi, zi, 0) = tensor[0][1];		// b
-				triangular_elem(xi, yi, zi, 1) = tensor[0][2];		// c
-				triangular_elem(xi, yi, zi, 2) = tensor[1][2];		// f
-			}
-		}
-	}
+	//			triangular_elem(xi, yi, zi, 0) = tensor[0][1];		// b
+	//			triangular_elem(xi, yi, zi, 1) = tensor[0][2];		// c
+	//			triangular_elem(xi, yi, zi, 2) = tensor[1][2];		// f
+	//		}
+	//	}
+	//}
 
 
 	// Perform the eigendecomposition
 	std::cout << "eigendecomposition...";
-	//CalculateEigendecomposition(T);
+	CalculateEigendecomposition(T);
 	std::cout << "done." << std::endl;
 	in_cmap = 2;
 	// Initialize OpenGL
@@ -599,15 +594,15 @@ int main(int argc, char** argv) {
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
 	//tira::glShader shader(vertex_shader_source, fragment_shader_source);
-	//tira::glShader shader("source.shader");
+	tira::glShader shader("source.shader");
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;	
 
 	// Assign each volume to texture
-	tira::glMaterial shader("source.shader");
-	shader.SetTexture("Diagonal", diagonal_elem, GL_RGB, GL_NEAREST);
-	shader.SetTexture("Upper_trian", triangular_elem, GL_RGB, GL_NEAREST);
+	//tira::glMaterial shader("source.shader");
+	//shader.SetTexture("Diagonal", diagonal_elem, GL_RGB, GL_NEAREST);
+	//shader.SetTexture("Upper_trian", triangular_elem, GL_RGB, GL_NEAREST);
 
 	while (!glfwWindowShouldClose(window)){
 
@@ -642,36 +637,47 @@ int main(int argc, char** argv) {
 		glClearColor(0, 0, 0, 0);
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		for (size_t xi = 0; xi < T.X(); xi++) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 
 				//glm::mat3 evmatrix = glm::transpose(eigenvectors(xi, yi, zi));
-				//glm::mat3 evmatrix = eigenvectors(xi, yi, zi);
-				//glm::mat4 Mrot = glm::mat4(evmatrix);
-				//Mrot[3][3] = 1.0f;
+				glm::mat3 evmatrix = eigenvectors(xi, yi, zi);
+				glm::mat4 Mrot = glm::mat4(evmatrix);
+				Mrot[3][3] = 1.0f;
+				glm::mat4 Mmodel = Mtran * Mrot;
 
-				glm::mat4 Mmodel = Mtran; // *Mrot;
-				/// Render Something Here
-				shader.Begin();
-				{
-					shader.SetUniformMat4f("ProjMat", Mprojection);
-					shader.SetUniformMat4f("ViewMat", Mview);
-					shader.SetUniformMat4f("Model", Mmodel);
-					shader.SetUniform4f("light0", light0);
-					shader.SetUniform4f("light1", light1);
-					shader.SetUniform1f("ambient", ambient);
-					shader.SetUniform1i("ColorComponent", component_color);
-					//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
-					//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
-					glm::uvec3 voxel(xi, yi, zi);
-					shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
-					shader.SetUniform1f("gamma", gamma);
-
-					glyph.Draw(); 
+				glm::mat3 A = T(xi, yi, zi);
+				if (xi == 10 && yi == 10 && zi == 22) {
+					std::cout << "Matrix:\n";
+					std::cout << "\t" << A[0][0] << "\t" << A[0][1] << "\t" << A[0][2] << std::endl;
+					std::cout << "\t" << A[1][0] << "\t" << A[1][1] << "\t" << A[1][2] << std::endl;
+					std::cout << "\t" << A[2][0] << "\t" << A[2][1] << "\t" << A[2][2] << std::endl;
+					std::cout << std::endl;
+					std::cout << "Lambdas: \t" << lambda(xi, yi, zi, 0) << "\t" << lambda(xi, yi, zi, 1) << "\t" << lambda(xi, yi, zi, 2);
 				}
-				shader.End();
+				/// Render Something Here
+				/*shader.Begin();
+				{*/
+				shader.Bind();
+				shader.SetUniformMat4f("ProjMat", Mprojection);
+				shader.SetUniformMat4f("ViewMat", Mview);
+				shader.SetUniformMat4f("ModelMat", Mmodel);
+				shader.SetUniform4f("light0", light0);
+				shader.SetUniform4f("light1", light1);
+				shader.SetUniform1f("ambient", ambient);
+				shader.SetUniform1i("ColorComponent", component_color);
+
+				shader.SetUniformMat3f("tensor", A);
+				//glm::vec3 eval(lambda(xi, yi, zi, 0), lambda(xi, yi, zi, 1), lambda(xi, yi, zi, 2));
+				//shader.SetUniform3f("lambda", glm::normalize(eval) * 0.5f);
+				//glm::uvec3 voxel(xi, yi, zi);
+				//shader.SetUniform3ui("voxel", voxel[0], voxel[1], voxel[2]);
+				shader.SetUniform1f("gamma", gamma);
+
+				glyph.Draw(); 
+				/*}
+				shader.End();*/
 				
 
 			}
