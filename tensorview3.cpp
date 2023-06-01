@@ -392,23 +392,23 @@ int main(int argc, char** argv) {
 	std::cout << "done." << std::endl;
 
 	// Set two separate RGB volumes with diagonal tensor values and off-diagonal values
-	//tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one diagonal element
-	//tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one upper triangular element (matrix is symmetric)
+	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one diagonal element
+	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), T.C());				// each RGB channel contains one upper triangular element (matrix is symmetric)
 
-	//for (size_t xi = 0; xi < T.X(); xi++) {
-	//	for (size_t yi = 0; yi < T.Y(); yi++) {
-	//		for (size_t zi = 0; zi < T.Z(); zi++) {
-	//			glm::mat3 tensor = T(xi, yi, zi);
-	//			diagonal_elem(xi, yi, zi, 0) = tensor[0][0];		// a
-	//			diagonal_elem(xi, yi, zi, 1) = tensor[1][1];		// e
-	//			diagonal_elem(xi, yi, zi, 2) = tensor[2][2];		// i
+	for (size_t xi = 0; xi < T.X(); xi++) {
+		for (size_t yi = 0; yi < T.Y(); yi++) {
+			for (size_t zi = 0; zi < T.Z(); zi++) {
+				glm::mat3 tensor = T(xi, yi, zi);
+				diagonal_elem(xi, yi, zi, 0) = tensor[0][0];
+				diagonal_elem(xi, yi, zi, 1) = tensor[1][1];
+				diagonal_elem(xi, yi, zi, 2) = tensor[2][2];
 
-	//			triangular_elem(xi, yi, zi, 0) = tensor[0][1];		// b
-	//			triangular_elem(xi, yi, zi, 1) = tensor[0][2];		// c
-	//			triangular_elem(xi, yi, zi, 2) = tensor[1][2];		// f
-	//		}
-	//	}
-	//}
+				triangular_elem(xi, yi, zi, 0) = tensor[0][1];
+				triangular_elem(xi, yi, zi, 1) = tensor[0][2];
+				triangular_elem(xi, yi, zi, 2) = tensor[1][2];
+			}
+		}
+	}
 
 
 	// Perform the eigendecomposition
@@ -436,7 +436,14 @@ int main(int argc, char** argv) {
 	
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
-	tira::glShader shader("source.shader");
+	//tira::glShader shader("source.shader");
+
+	// Copy the tensor field (comprising diagonal and off-diagonal RGB volumes) to GPU as texture maps
+	tira::glMaterial shader("source.shader");
+	shader.SetTexture("Diagonal", diagonal_elem, GL_RGB, GL_LINEAR);
+	//shader.SetTexture("Upper_trian", triangular_elem, GL_RGB, GL_LINEAR);
+
+	// Set light position
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;	
@@ -481,19 +488,23 @@ int main(int argc, char** argv) {
 
 				glm::mat3 A = T(xi, yi, zi);
 				
-				shader.Bind();
-				shader.SetUniformMat4f("ProjMat", Mprojection);
-				shader.SetUniformMat4f("ViewMat", Mview);
-				shader.SetUniformMat4f("Trans", Mtran);
-				shader.SetUniform4f("light0", light0);
-				shader.SetUniform4f("light1", light1);
-				shader.SetUniform1f("ambient", ambient);
-				shader.SetUniform1i("ColorComponent", component_color);
-				shader.SetUniform1f("gamma", gamma);
+				shader.Begin();
+				{
+					shader.SetUniformMat4f("ProjMat", Mprojection);
+					shader.SetUniformMat4f("ViewMat", Mview);
+					shader.SetUniformMat4f("Trans", Mtran);
+					shader.SetUniform4f("light0", light0);
+					shader.SetUniform4f("light1", light1);
+					shader.SetUniform1f("ambient", ambient);
+					shader.SetUniform1i("ColorComponent", component_color);
+					shader.SetUniform1f("gamma", gamma);
 
-				shader.SetUniformMat3f("tensor", A);
+					shader.SetUniformMat3f("tensor", A);
+					shader.SetUniform3ui("position", xi, yi, zi);
 
-				glyph.Draw();
+					glyph.Draw();
+				}
+				shader.End();
 			}
 		}
 
