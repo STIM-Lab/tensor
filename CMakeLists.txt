@@ -84,7 +84,7 @@ add_executable(tensorview3
 				tensorview3.cpp
 				gui.cpp
 				gui.h
-				
+				source.shader
 )
 
 target_link_libraries(tensorview3
