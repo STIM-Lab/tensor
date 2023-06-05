@@ -499,7 +499,6 @@ int main(int argc, char** argv) {
 					shader.SetUniform1i("ColorComponent", component_color);
 					shader.SetUniform1f("gamma", gamma);
 
-					//shader.SetUniform3ui("size", T.X(), T.Y(), T.Z());
 					shader.SetUniform3ui("position", xi, yi, zi);
 					//shader.SetUniformMat3f("field", A);
 					glyph.Draw();

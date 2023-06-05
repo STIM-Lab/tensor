@@ -2,7 +2,6 @@
 # version 330 core
 
 layout(location = 0) in vec3 V;
-layout(location = 2) in vec3 N;
 
 const float PI = 3.14159265358979323846;
 const float epsilon = 0.0000001;
@@ -10,8 +9,12 @@ uniform mat4 Trans;
 uniform mat4 ViewMat;
 uniform mat4 ProjMat;
 uniform int ColorComponent;
-uniform mat3 tensor;
+//uniform mat3 tensor;
 uniform float gamma;
+
+uniform uvec3 position;
+uniform sampler3D Diagonal;
+uniform sampler3D Upper_trian;
 
 out vec4 vertexColor;
 out vec3 vertexNorm;
@@ -132,6 +135,17 @@ vec3 ComputeEigenvector(mat3 matrix, float eigvalue) {
 
 void main() {
 	
+	// Find the texture coordinate
+	vec3 Coords = vec3(position) / vec3(textureSize(Diagonal, 0));
+	vec3 DiagValue = texture(Diagonal, Coords).rgb;
+	vec3 OffDiag = texture(Upper_trian, Coords).rgb;
+
+	// Take the tensor field values from Diagonal and Upper traingular texture maps
+	mat3 tensor;
+	tensor[0][0] = DiagValue[0]; 	tensor[0][1] = OffDiag[0]; 		tensor[0][2] = OffDiag[1];
+	tensor[1][0] = tensor[0][1]; 	tensor[1][1] = DiagValue[1]; 	tensor[1][2] = OffDiag[2];
+	tensor[2][0] = tensor[0][2];	tensor[2][1] = tensor[1][2];	tensor[2][2] = DiagValue[2];
+
 	// Compute eigenvalues and eigenvectors using the 3x3 matrix of tensor field
 	vec3 eigvals = ComputeEigenvalues(tensor);
 	mat3 eigvecs;
