@@ -22,12 +22,15 @@ float up = 0.0f;
 bool ctrl = false;
 bool dragging = false;
 double xprev, yprev;
+size_t axes[] = { 0, 0, 0 };
+int scroll_value = 0;
 
 tira::volume<glm::mat3> T;
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
 
 int zi = 0;
+int step = 1;
 
 // input variables for arguments
 std::string in_filename;
@@ -59,10 +62,10 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	zi += yoffset;
-	if (zi < 0) zi = 0;
-	if (zi >= T.Z()) zi = T.Z() - 1;
-	std::cout << zi << std::endl;
+	scroll_value += yoffset * step;
+	if (scroll_value < 0) scroll_value = 0;
+	if (scroll_value >= T.Z()) scroll_value = T.Z() - 1;
+	std::cout << scroll_value << std::endl;
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -114,7 +117,9 @@ void resetPlane(float frame) {
 	right = 0.0f;
 	up = 0.0f;
 	zoom = 1.0f;
-	zi = 0;
+	axes[0] = 0; axes[1] = 0; axes[2] = 0;
+	scroll_axis = 2;
+	step = 1;
 }
 
 
@@ -350,6 +355,26 @@ void CalculateEigendecomposition(tira::volume< glm::mat3 > T) {
 	}
 }
 
+glm::mat4 GetCameraView() {
+	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
+	if (scroll_axis == 2 && axis_change)
+	{
+		camera.setPosition(frame / 2.0f, frame / 2.0f, frame);				// adjust the eye position
+		camera.LookAt(frame / 2.0f, frame / 2.0f, 0, 0.0f, 1.0f, 0.0f);
+	}
+	else if (scroll_axis == 1 && axis_change)
+	{
+		camera.setPosition(frame / 2.0f, -frame, frame / 2.0f);
+		camera.LookAt(frame / 2.0f, 0, frame / 2.0f, 0.0f, 0.0f, 1.0f);
+	}
+	else if (scroll_axis == 0 && axis_change)
+	{
+		camera.setPosition(frame, frame / 2.0f, frame / 2.0f);
+		camera.LookAt(0, frame / 2.0f, frame / 2.0f, 0.0f, 0.0f, 1.0f);
+	}
+	axis_change = false;
+	return camera.getMatrix();
+}
 
 
 int main(int argc, char** argv) {
@@ -388,7 +413,8 @@ int main(int argc, char** argv) {
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	T.load_npy<float>("oval3d.npy");
+	//T.load_npy<float>("oval3d.npy");
+	T.load_npy<float>("tensor_gradient5.npy");
 	std::cout << "done." << std::endl;
 
 	// Set two separate RGB volumes with diagonal tensor values and off-diagonal values
@@ -409,12 +435,11 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
-	
-
+	std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
 	// Perform the eigendecomposition
-	std::cout << "eigendecomposition...";
+	//std::cout << "eigendecomposition...";
 	//CalculateEigendecomposition(T);
-	std::cout << "done." << std::endl;
+	//std::cout << "done." << std::endl;
 	in_cmap = 2;
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
@@ -425,10 +450,8 @@ int main(int argc, char** argv) {
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	
-	float frame = std::max(T.X(), T.Y());
-	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
-	camera.LookAt(frame / 2.0f, frame / 2.0f, 0);
-
+	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
+	
 	glm::vec3 l(1.0f, 0.5f, 0.5f);
 	float suml = l[0] + l[1] + l[2];
 	float gamma = in_gamma;
@@ -475,36 +498,46 @@ int main(int argc, char** argv) {
 				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
 		}
 
-		glm::mat4 Mview = camera.getMatrix();								// generate a view matrix from the camera
+		glm::mat4 Mview = GetCameraView(); // camera.getMatrix();								// generate a view matrix from the camera
 
 		glViewport(0, 0, display_w, display_h);								// specifies the area of the window where OpenGL can render
 		
 		glClearColor(0, 0, 0, 0);
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		for (size_t xi = 0; xi < T.X(); xi++) {
-			for (size_t yi = 0; yi < T.Y(); yi++) {
-				glm::mat4 Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
-
-				//glm::mat3 A = T(xi, yi, zi);
-				
-				shader.Begin();
+		for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
+			for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
+				for (axes[2] = 0; axes[2] < T.Z(); axes[2] += step)
 				{
-					shader.SetUniformMat4f("ProjMat", Mprojection);
-					shader.SetUniformMat4f("ViewMat", Mview);
-					shader.SetUniformMat4f("Trans", Mtran);
-					shader.SetUniform4f("light0", light0);
-					shader.SetUniform4f("light1", light1);
-					shader.SetUniform1f("ambient", ambient);
-					shader.SetUniform1i("ColorComponent", component_color);
-					shader.SetUniform1f("gamma", gamma);
+					size_t xi, yi, zi;
+					xi = (scroll_axis == 0) ? scroll_value : axes[0];
+					yi = (scroll_axis == 1) ? scroll_value : axes[1];
+					zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
-					shader.SetUniform3ui("position", xi, yi, zi);
-					//shader.SetUniformMat3f("field", A);
-					glyph.Draw();
+					glm::mat4 Mtran;
+					if (scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
+					else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
+					else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
+					shader.Begin();
+					{
+						shader.SetUniformMat4f("ProjMat", Mprojection);
+						shader.SetUniformMat4f("ViewMat", Mview);
+						shader.SetUniformMat4f("Trans", Mtran);
+						shader.SetUniform4f("light0", light0);
+						shader.SetUniform4f("light1", light1);
+						shader.SetUniform1f("ambient", ambient);
+						shader.SetUniform1i("ColorComponent", component_color);
+						shader.SetUniform1f("gamma", gamma);
+						shader.SetUniform3ui("position", xi, yi, zi);
+						shader.SetUniform1i("size", step);
+						glyph.Draw();
+					}
+					shader.End();
+					if (scroll_axis == 2) break;
 				}
-				shader.End();
+				if (scroll_axis == 1) break;
 			}
+			if (scroll_axis == 0) break;
 		}
 		
 

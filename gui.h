@@ -4,7 +4,9 @@
 
 
 extern bool reset;
+extern int scroll_axis;
 extern bool window_focused;
+extern bool axis_change;
 
 
 void InitUI(GLFWwindow* window, const char* glsl_version);

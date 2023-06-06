@@ -9,7 +9,7 @@ uniform mat4 Trans;
 uniform mat4 ViewMat;
 uniform mat4 ProjMat;
 uniform int ColorComponent;
-//uniform mat3 tensor;
+uniform int size;
 uniform float gamma;
 
 uniform uvec3 position;
@@ -223,7 +223,7 @@ void main() {
 	mat4 ModelMat = Trans * Mrot;
 
 	//////////////////////
-	eigvals = normalize(eigvals) * 0.5;
+	eigvals = normalize(eigvals) * 0.5 * size;
 	float l0 = eigvals[0];
 	float l1 = eigvals[1];
 	float l2 = eigvals[2];

@@ -3,10 +3,11 @@
 
 
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
-
 bool reset = false;
 bool window_focused = true;
-
+bool axis_change = true;
+extern int step;
+int scroll_axis = 2;				                    // default axis is Z
 
 /// <summary>
 /// Initialize the GUI
@@ -91,30 +92,27 @@ void RenderUI() {
         }*/
 
         // Adjusting the size of the volume along each axis
-        /*ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(230, 0, 0, 255));
-        ImGui::Text("\tX\t");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 153, 51, 255));
-        ImGui::Text("\tY\t");
-        ImGui::SameLine();
-        ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(0, 102, 255, 255));
-        ImGui::Text("\tZ");
-        ImGui::PopStyleColor(3);
-        ImGui::Spacing();*/
+        ImGui::SliderInt("Size", &step, 1, 5);
         reset = ImGui::Button("Reset", ImVec2(70, 35));
+        
+        if (ImGui::RadioButton("xi ", &scroll_axis, 0)) {
+            std::cout << "x selected" << std::endl;
+            axis_change = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("yi ", &scroll_axis, 1)) {
+            std::cout << "y selected" << std::endl;
+            axis_change = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("zi ", &scroll_axis, 2)) {
+            std::cout << "z selected" << std::endl;
+            axis_change = true;
+        }
+        
+
         //ImGui::Spacing();
 
-
-        /*if (ImGui::BeginTable("Coordinates", 2, ImGuiTableFlags_Resizable + ImGuiTableFlags_Borders, ImVec2(0.0f, 5.0f), 2.0f))
-        {
-            ImGui::TableSetupColumn("Axis");
-            ImGui::TableSetupColumn("Value");
-            ImGui::TableHeadersRow();
-            ImGui::TableNextRow();
-            ImGui::TableNextColumn();
-            ImGui::Text("X");
-            ImGui::EndTable();
-        }*/
 
         ImGui::GetFont()->Scale = old_size;
         ImGui::PopFont();
