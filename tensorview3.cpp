@@ -114,6 +114,7 @@ void resetPlane(float frame) {
 	scroll_value = 0;
 	step = 1;
 	anisotropy = 0;
+	accuracy = 0.1f;
 }
 
 
@@ -532,6 +533,8 @@ int main(int argc, char** argv) {
 		
 		if (image_plane)
 		{
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			size_t xi, yi, zi;
 			xi = (scroll_axis == 0) ? scroll_value : axes[0];
 			yi = (scroll_axis == 1) ? scroll_value : axes[1];
@@ -548,9 +551,11 @@ int main(int argc, char** argv) {
 			{
 				material.SetUniformMat4f("MVP", Mprojection * Mview * Mtran * scale);
 				material.SetUniform1f("slider", mappep_scroll_value);
+				material.SetUniform1f("opacity", opacity);
 				rect.Draw();
 			}
 			material.End();
+			glDisable(GL_BLEND);
 		}
 
 		glClear(GL_DEPTH_BUFFER_BIT);

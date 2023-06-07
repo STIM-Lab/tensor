@@ -15,6 +15,7 @@ float zoom = 1.0f;
 bool cmap = true;
 bool menu_open = false;
 bool image_plane = false;
+float opacity = 1.0f;
 
 /// <summary>
 /// Initialize the GUI
@@ -124,6 +125,8 @@ void RenderUI() {
         ImGui::Separator();
 
         ImGui::Checkbox("Image Plane", &image_plane);
+        ImGui::Spacing();
+        ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
         ImGui::Separator();
 
         ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
