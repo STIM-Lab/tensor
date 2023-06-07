@@ -502,13 +502,13 @@ int main(int argc, char** argv) {
 			if (!perspective)
 				Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + right, aspect * frame / 2.0f / zoom + right, -frame / 2.0f / zoom + up, frame / 2.0f / zoom + up, -2.0f * frame, 2.0f * frame);
 			else
-				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
+				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 		}
 		else {
 			if(!perspective)
 				Mprojection = glm::ortho(-frame/2.0f, frame/2.0f, -frame/2.0f/aspect, frame/2.0f/aspect, -2.0f * frame, 2.0f * frame);
 			else
-				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
+				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 		}
 
 		glm::mat4 Mview = GetCameraView(); // camera.getMatrix();								// generate a view matrix from the camera
@@ -519,6 +519,11 @@ int main(int argc, char** argv) {
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+		/// HELIA: Render the plane with texture-mapped image here
+
+
+
+		glClear(GL_DEPTH_BUFFER_BIT);
 		// Rendering the tensor field for the selected axis
 		for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
 			for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
