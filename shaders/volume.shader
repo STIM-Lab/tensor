@@ -7,7 +7,6 @@ layout(location = 2) in vec3 texcoords;
 
 uniform mat4 MVP;
 uniform float slider;
-uniform mat4 view;
 //uniform int axis;
 
 

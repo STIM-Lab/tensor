@@ -12,6 +12,7 @@ extern float accuracy;
 extern float zoom;
 extern bool cmap;
 extern bool menu_open;
+extern bool image_plane;
 
 void InitUI(GLFWwindow* window, const char* glsl_version);
 void DestroyUI();

@@ -14,6 +14,7 @@ float accuracy = 0.1f;
 float zoom = 1.0f;
 bool cmap = true;
 bool menu_open = false;
+bool image_plane = false;
 
 /// <summary>
 /// Initialize the GUI
@@ -120,6 +121,9 @@ void RenderUI() {
         ImGui::Separator();
 
         ImGui::Checkbox("Colormaped eigenvector", &cmap);
+        ImGui::Separator();
+
+        ImGui::Checkbox("Image Plane", &image_plane);
         ImGui::Separator();
 
         ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
