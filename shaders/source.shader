@@ -11,8 +11,9 @@ uniform mat4 ProjMat;
 uniform int ColorComponent;
 uniform int size;
 uniform float gamma;
-
+uniform int anisotropy;
 uniform uvec3 position;
+uniform float accuracy;
 uniform sampler3D Diagonal;
 uniform sampler3D Upper_trian;
 
@@ -222,13 +223,15 @@ void main() {
 
 	mat4 ModelMat = Trans * Mrot;
 
-	//////////////////////
+	////////////////////////////////////////////////////////////////
+	////////////////////// DR.MAYERICH'S CODE //////////////////////
+	////////////////////////////////////////////////////////////////
+
 	eigvals = normalize(eigvals) * 0.5 * size;
 	float l0 = eigvals[0];
 	float l1 = eigvals[1];
 	float l2 = eigvals[2];
 
-	// calculate the linear and planar anisotropy
 	float suml = l0 + l1 + l2;
 	float Cl = (l0 - l1) / suml;
 	float Cp = 2 * (l1 - l2) / suml;
@@ -268,11 +271,22 @@ void main() {
 
 	sq_n = normalize(vec3(sx * sq_n.x, sy * sq_n.y, sz * sq_n.z));
 		
-	//mat4 VM = ViewMat * ModelMat;
 	mat3 NormMat = transpose(inverse(mat3(ModelMat)));
 	vertexNorm = NormMat * sq_n;
 
-	gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
+	// Calculating and separating by anisotropy
+
+	float anisotropy_value;
+	if (anisotropy == 1) anisotropy_value = (l0 - l1) / (l0 + l1 + l2);						// linear
+	if (anisotropy == 2) anisotropy_value = 2 * (l1 - l2) / (l0 + l1 + l2);					// Planar
+	if (anisotropy == 3) anisotropy_value = 3 * l2 / (l0 + l1 + l2);						// Spherical
+
+
+	if (anisotropy_value > accuracy || anisotropy == 0)
+		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
+	else
+		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+
 	//vertexColor = vec4(1.0, 0.0, 0.0, 1.0);
 	vec3 dirColor;
 	vec3 glyphColor;

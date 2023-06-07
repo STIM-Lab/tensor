@@ -5,9 +5,14 @@
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
 bool reset = false;
 bool window_focused = true;
-bool axis_change = true;
-extern int step;
+bool axis_change = true;                                // gets true when the axis plane is changes
+extern int step;                                        // the steps between each glyph along all axis
 int scroll_axis = 2;				                    // default axis is Z
+int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
+                                                        // 2: planar tensors only       3: spherical tensors only
+float accuracy = 0.1f;
+float zoom = 1.0f;
+bool cmap = true;
 
 /// <summary>
 /// Initialize the GUI
@@ -66,16 +71,13 @@ void RenderUI() {
         ImGui::GetFont()->Scale *= 0.5;
         ImGui::PushFont(ImGui::GetFont());
 
-        static float f = 0.0f;
-        static int counter = 0;
-
         ImGui::Begin("Tensor");
 
         window_focused = (ImGui::IsWindowHovered()) ? false : true;
         
 
         //opnes ImGui File Dialog
-        /*if (ImGui::Button("Open File Dialog"))
+        if (ImGui::Button("Open File Dialog"))
         {
             ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".npy,.cpp,.h,.hpp,.pdf,.bmp", ".");
             button_click = true;
@@ -89,30 +91,42 @@ void RenderUI() {
                 std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
             }
             ImGuiFileDialog::Instance()->Close();
-        }*/
+        }
 
         // Adjusting the size of the volume along each axis
         ImGui::SliderInt("Size", &step, 1, 5);
+        ImGui::Separator();
+
+        ImGui::Text("Plane");
+        if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("yi ", &scroll_axis, 1)) axis_change = true;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("zi ", &scroll_axis, 2)) axis_change = true;
+
+        ImGui::Separator();
+
+        ImGui::Text("Select Anisotropy");
+        ImGui::Columns(2);
+        ImGui::RadioButton("ALL", &anisotropy, 0);
+        ImGui::RadioButton("Linear", &anisotropy, 1);       ImGui::NextColumn();
+        ImGui::RadioButton("Planar", &anisotropy, 2);       
+        ImGui::RadioButton("Spherical", &anisotropy, 3);    
+
+        ImGui::Columns(1);
+        ImGui::Spacing();
+        ImGui::SliderFloat("Accuracy", &accuracy, 0.1f, 1.0f);
+        ImGui::Separator();
+
+        ImGui::Checkbox("Colormaped eigenvector", &cmap);
+        ImGui::Separator();
+
+        ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
+        if (zoom < 1.0f) zoom = 1.0f;
+        if (zoom > 3) zoom = 3;
+        ImGui::Separator();
+
         reset = ImGui::Button("Reset", ImVec2(70, 35));
-        
-        if (ImGui::RadioButton("xi ", &scroll_axis, 0)) {
-            std::cout << "x selected" << std::endl;
-            axis_change = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("yi ", &scroll_axis, 1)) {
-            std::cout << "y selected" << std::endl;
-            axis_change = true;
-        }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("zi ", &scroll_axis, 2)) {
-            std::cout << "z selected" << std::endl;
-            axis_change = true;
-        }
-        
-
-        //ImGui::Spacing();
-
 
         ImGui::GetFont()->Scale = old_size;
         ImGui::PopFont();

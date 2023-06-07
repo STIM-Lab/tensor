@@ -16,7 +16,6 @@ const char* glsl_version = "#version 130";              // specify the version o
 tira::camera camera;
 
 bool perspective = false;
-float zoom = 1.0f;
 float right = 0.0f;
 float up = 0.0f;
 bool ctrl = false;
@@ -29,7 +28,6 @@ tira::volume<glm::mat3> T;
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
 
-int zi = 0;
 int step = 1;
 
 // input variables for arguments
@@ -78,35 +76,29 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	if (key == GLFW_KEY_LEFT_CONTROL && action == GLFW_RELEASE) {
 		ctrl = false;
 	}
-	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS && ctrl) {
+	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS && ctrl) {
 		zoom -= 0.1;
 		if (zoom < 0.1) zoom = 0.1;
-		std::cout << "zoom=" << zoom << std::endl;
 	}
-	if (key == GLFW_KEY_KP_SUBTRACT && action == GLFW_PRESS && ctrl) {
+	if (key == GLFW_KEY_KP_ADD && action == GLFW_PRESS && ctrl) {
 		zoom += 0.1;
 		if (zoom > 2) zoom = 2;
-		std::cout << "zoom=" << zoom << std::endl;
 	}
 	if (key == GLFW_KEY_UP && action == GLFW_PRESS) {
 		up += 5;
 		if (up > 100) up = 100;
-		std::cout << "up=" << up << std::endl;
 	}
 	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) {
 		up -= 5;
 		if (up < -100) up = -100;
-		std::cout << "up=" << up << std::endl;
 	}
 	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
 		right += 5;
 		if (right > 100) right = 100;
-		std::cout << "right=" << right << std::endl;
 	}
 	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
 		right -= 5;
 		if (right < -100) right = -100;
-		std::cout << "right=" << right << std::endl;
 	}
 }
 
@@ -119,7 +111,9 @@ void resetPlane(float frame) {
 	zoom = 1.0f;
 	axes[0] = 0; axes[1] = 0; axes[2] = 0;
 	scroll_axis = 2;
+	scroll_value = 0;
 	step = 1;
+	anisotropy = 0;
 }
 
 
@@ -413,13 +407,13 @@ int main(int argc, char** argv) {
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	//T.load_npy<float>("oval3d.npy");
-	T.load_npy<float>("tensor_gradient5.npy");
+	T.load_npy<float>("oval3d.npy");
+	//T.load_npy<float>("tensor_gradient5.npy");
 	std::cout << "done." << std::endl;
 
-	// Set two separate RGB volumes with diagonal tensor values and off-diagonal values
-	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);					// RGB channel contains the diagonal elements
-	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);				// RGB channel contains the upper triangular elements (matrix is symmetric)
+	// Set two separate RGB volumes with diagonal and off-diagonal values of the tensor (tensor is symmetric)
+	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);					
+	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);
 	glm::mat3 tensor;
 	for (size_t m = 0; m < T.X(); m++) {
 		for (size_t n = 0; n < T.Y(); n++) {
@@ -435,12 +429,12 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
+
+
 	std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
-	// Perform the eigendecomposition
-	//std::cout << "eigendecomposition...";
-	//CalculateEigendecomposition(T);
-	//std::cout << "done." << std::endl;
+	
 	in_cmap = 2;
+
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
 	InitUI(window, glsl_version);
@@ -455,11 +449,12 @@ int main(int argc, char** argv) {
 	glm::vec3 l(1.0f, 0.5f, 0.5f);
 	float suml = l[0] + l[1] + l[2];
 	float gamma = in_gamma;
-	int component_color = in_cmap;
+	int component_color;	// = in_cmap;
 	
+	bool planar = true;
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
-	//tira::glShader shader("source.shader");
+	
 
 	// Copy the tensor field (comprising diagonal and off-diagonal RGB volumes) to GPU as texture maps
 	tira::glMaterial shader("source.shader");
@@ -487,7 +482,7 @@ int main(int argc, char** argv) {
 		glm::mat4 Mprojection;
 		if (aspect > 1) {
 			if (!perspective)
-				Mprojection = glm::ortho(-aspect * frame / 2.0f * zoom + right, aspect * frame / 2.0f * zoom + right, -frame / 2.0f * zoom + up, frame / 2.0f * zoom + up, -2.0f * frame, 2.0f * frame);
+				Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + right, aspect * frame / 2.0f / zoom + right, -frame / 2.0f / zoom + up, frame / 2.0f / zoom + up, -2.0f * frame, 2.0f * frame);
 			else
 				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 200.0f);
 		}
@@ -505,6 +500,8 @@ int main(int argc, char** argv) {
 		glClearColor(0, 0, 0, 0);
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// Rendering the tensor field for the selected axis
 		for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
 			for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
 				for (axes[2] = 0; axes[2] < T.Z(); axes[2] += step)
@@ -518,6 +515,9 @@ int main(int argc, char** argv) {
 					if (scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 					else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
 					else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
+
+					component_color = (cmap) ? 2 : 0;
+
 					shader.Begin();
 					{
 						shader.SetUniformMat4f("ProjMat", Mprojection);
@@ -530,6 +530,9 @@ int main(int argc, char** argv) {
 						shader.SetUniform1f("gamma", gamma);
 						shader.SetUniform3ui("position", xi, yi, zi);
 						shader.SetUniform1i("size", step);
+						shader.SetUniform1f("accuracy", accuracy);
+						shader.SetUniform1i("anisotropy", anisotropy);
+
 						glyph.Draw();
 					}
 					shader.End();
@@ -540,7 +543,33 @@ int main(int argc, char** argv) {
 			if (scroll_axis == 0) break;
 		}
 		
+		//Load the tensor field (numpy files only) from ImGui File Dialog
+		/*if (ImGuiFileDialog::Instance()->IsOk() && button_click)
+		{
+			std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
+			std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
+			std::string extension = filePathName.substr(filePathName.find_last_of(".") + 1);
 
+			if (extension == "npy")
+			{
+				std::cout << "Loading Numpy File" << std::endl;
+				vol1.load_npy(filePathName);
+				material.SetTexture("volumeTexture", vol1, GL_RGB, GL_NEAREST);
+				fileLoaded = true;
+				button_click = false;
+				ImGuiFileDialog::Instance()->Close();
+			}
+
+			else if (extension == "bmp")
+			{
+				std::cout << "Loading stack of images" << std::endl;
+				vol2.load("data/*.bmp");
+				material.SetTexture("volumeTexture", vol2, GL_RGB, GL_NEAREST);
+				fileLoaded1 = true;
+				button_click = false;
+				ImGuiFileDialog::Instance()->Close();
+			}
+		}*/
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 
