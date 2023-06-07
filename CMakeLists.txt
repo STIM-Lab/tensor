@@ -84,6 +84,7 @@ add_executable(tensorview3
 				tensorview3.cpp
 				gui.cpp
 				gui.h
+				lib/ImGuiFileDialog/ImGuiFileDialog.cpp
 				
 )
 
