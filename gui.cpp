@@ -123,8 +123,9 @@ void RenderUI() {
         ImGui::Separator();
 
         ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
-        if (zoom < 1.0f) zoom = 1.0f;
-        if (zoom > 3) zoom = 3;
+        zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
+        ImGui::SameLine();
+        if(ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;
         ImGui::Separator();
 
         reset = ImGui::Button("Reset", ImVec2(70, 35));
