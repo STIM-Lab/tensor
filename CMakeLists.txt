@@ -55,6 +55,8 @@ configure_file(shaders/glyph2d.shader
 				glyph2d.shader COPYONLY)
 configure_file(shaders/source.shader 
 				source.shader COPYONLY)
+configure_file(shaders/volume.shader 
+				volume.shader COPYONLY)
 				
 #set the include directories
 include_directories(

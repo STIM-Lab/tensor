@@ -450,7 +450,12 @@ int main(int argc, char** argv) {
 
 	std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
 	
-	in_cmap = 2;
+	// Load the volume for texture-map image
+	tira::glVolume<unsigned char> volume;
+	volume.load_npy("volume.npy");
+
+	tira::glMaterial material("volume.shader");
+	material.SetTexture("volumeTexture", volume, GL_RGB, GL_NEAREST);
 
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
@@ -471,7 +476,7 @@ int main(int argc, char** argv) {
 	bool planar = true;
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
-	
+	tira::glGeometry rect = tira::glGeometry::GenerateRectangle<float>();           // create a rectangle for rendering volume
 
 	// Copy the tensor field (comprising diagonal and off-diagonal RGB volumes) to GPU as texture maps
 	tira::glMaterial shader("source.shader");
@@ -518,9 +523,23 @@ int main(int argc, char** argv) {
 		glClearColor(0, 0, 0, 0);
 		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glm::mat4 Mtran;
 
 		/// HELIA: Render the plane with texture-mapped image here
-
+		size_t xi, yi, zi;
+		xi = (scroll_axis == 0) ? scroll_value : axes[0];
+		yi = (scroll_axis == 1) ? scroll_value : axes[1];
+		zi = (scroll_axis == 2) ? scroll_value : axes[2];
+		if (scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
+		else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
+		else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
+		material.Begin();
+		{
+			material.SetUniformMat4f("MVP", Mtran* Mview * Mprojection);
+			material.SetUniform1f("slider", scroll_value);
+			rect.Draw();
+		}
+		material.End();
 
 
 		glClear(GL_DEPTH_BUFFER_BIT);
@@ -534,8 +553,8 @@ int main(int argc, char** argv) {
 					yi = (scroll_axis == 1) ? scroll_value : axes[1];
 					zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
-					glm::mat4 Mtran;
-					if (scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
+					
+					if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 					else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
 					else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
 
@@ -573,10 +592,7 @@ int main(int argc, char** argv) {
 			std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
 			std::string extension = filePathName.substr(filePathName.find_last_of(".") + 1);
 
-			if (extension != "npy")
-			{
-				std::cout << "ERROR: Only numpy files." << std::endl;
-			}
+			if (extension != "npy")	std::cout << "ERROR: Only numpy files." << std::endl;
 
 			else
 			{
