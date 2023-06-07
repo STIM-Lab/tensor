@@ -11,6 +11,7 @@ extern int anisotropy;
 extern float accuracy;
 extern float zoom;
 extern bool cmap;
+extern bool menu_open;
 
 void InitUI(GLFWwindow* window, const char* glsl_version);
 void DestroyUI();

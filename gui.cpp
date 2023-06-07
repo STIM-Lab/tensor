@@ -13,6 +13,7 @@ int anisotropy = 0;                                     // 0: all tensors       
 float accuracy = 0.1f;
 float zoom = 1.0f;
 bool cmap = true;
+bool menu_open = false;
 
 /// <summary>
 /// Initialize the GUI
@@ -80,7 +81,7 @@ void RenderUI() {
         if (ImGui::Button("Open File Dialog"))
         {
             ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".npy,.cpp,.h,.hpp,.pdf,.bmp", ".");
-            button_click = true;
+            menu_open = true;
         }
 
         if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey"))

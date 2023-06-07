@@ -370,6 +370,38 @@ glm::mat4 GetCameraView() {
 	return camera.getMatrix();
 }
 
+tira::volume<float> GetDiagValues(tira::volume<glm::mat3> T) {
+	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);
+	glm::mat3 tensor;
+	for (size_t m = 0; m < T.X(); m++) {
+		for (size_t n = 0; n < T.Y(); n++) {
+			for (size_t p = 0; p < T.Z(); p++) {
+				tensor = T(m, n, p);
+				diagonal_elem(m, n, p, 0) = tensor[0][0];
+				diagonal_elem(m, n, p, 1) = tensor[1][1];
+				diagonal_elem(m, n, p, 2) = tensor[2][2];
+			}
+		}
+	}
+
+	return diagonal_elem;
+}
+tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
+	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);
+	glm::mat3 tensor;
+	for (size_t m = 0; m < T.X(); m++) {
+		for (size_t n = 0; n < T.Y(); n++) {
+			for (size_t p = 0; p < T.Z(); p++) {
+				tensor = T(m, n, p);
+				triangular_elem(m, n, p, 0) = tensor[0][1];
+				triangular_elem(m, n, p, 1) = tensor[0][2];
+				triangular_elem(m, n, p, 2) = tensor[1][2];
+			}
+		}
+	}
+
+	return triangular_elem;
+}
 
 int main(int argc, char** argv) {
 
@@ -407,28 +439,13 @@ int main(int argc, char** argv) {
 
 	// Load the tensor field
 	std::cout << "loading file...";
-	T.load_npy<float>("oval3d.npy");
-	//T.load_npy<float>("tensor_gradient5.npy");
+	//T.load_npy<float>("oval3d.npy");
+	T.load_npy<float>("tensor_gradient5.npy");
 	std::cout << "done." << std::endl;
 
 	// Set two separate RGB volumes with diagonal and off-diagonal values of the tensor (tensor is symmetric)
-	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);					
-	tira::volume<float> triangular_elem(T.X(), T.Y(), T.Z(), 3);
-	glm::mat3 tensor;
-	for (size_t m = 0; m < T.X(); m++) {
-		for (size_t n = 0; n < T.Y(); n++) {
-			for (size_t p = 0; p < T.Z(); p++) {
-				tensor = T(m, n, p);
-				diagonal_elem(m, n, p, 0) = tensor[0][0];
-				diagonal_elem(m, n, p, 1) = tensor[1][1];
-				diagonal_elem(m, n, p, 2) = tensor[2][2];
-
-				triangular_elem(m, n, p, 0) = tensor[0][1];
-				triangular_elem(m, n, p, 1) = tensor[0][2];
-				triangular_elem(m, n, p, 2) = tensor[1][2];
-			}
-		}
-	}
+	tira::volume<float> diagonal_elem = GetDiagValues(T);
+	tira::volume<float> triangular_elem = GetOffDiagValues(T);
 
 
 	std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
@@ -466,6 +483,7 @@ int main(int argc, char** argv) {
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;	
 
+	bool file_loaded = false;
 
 	while (!glfwWindowShouldClose(window)){
 
@@ -543,33 +561,34 @@ int main(int argc, char** argv) {
 			if (scroll_axis == 0) break;
 		}
 		
-		//Load the tensor field (numpy files only) from ImGui File Dialog
-		/*if (ImGuiFileDialog::Instance()->IsOk() && button_click)
+		//Load Numpy File or Stack of Images (.bmp) from ImGui File Dialog
+		if (ImGuiFileDialog::Instance()->IsOk() && menu_open)
 		{
 			std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
 			std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
 			std::string extension = filePathName.substr(filePathName.find_last_of(".") + 1);
 
-			if (extension == "npy")
+			if (extension != "npy")
 			{
-				std::cout << "Loading Numpy File" << std::endl;
-				vol1.load_npy(filePathName);
-				material.SetTexture("volumeTexture", vol1, GL_RGB, GL_NEAREST);
-				fileLoaded = true;
-				button_click = false;
-				ImGuiFileDialog::Instance()->Close();
+				std::cout << "ERROR: Only numpy files." << std::endl;
 			}
 
-			else if (extension == "bmp")
+			else
 			{
-				std::cout << "Loading stack of images" << std::endl;
-				vol2.load("data/*.bmp");
-				material.SetTexture("volumeTexture", vol2, GL_RGB, GL_NEAREST);
-				fileLoaded1 = true;
-				button_click = false;
+				std::cout << "Loading file..." << std::endl;
+				T = tira::volume<glm::mat3>();
+				T.load_npy(filePathName);
+				diagonal_elem = GetDiagValues(T);
+				triangular_elem = GetOffDiagValues(T);
+				shader.SetTexture("Diagonal", diagonal_elem, GL_RGBA32F, GL_LINEAR);
+				shader.SetTexture("Upper_trian", triangular_elem, GL_RGBA32F, GL_LINEAR);
+				file_loaded = true;
+				menu_open = false;
 				ImGuiFileDialog::Instance()->Close();
 			}
-		}*/
+		}
+
+
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 
