@@ -37,12 +37,12 @@ void main()
 # version 330 core
 
 in vec3 vertex_tex;
-
+uniform float opacity;
 out vec4 colors;
 
 uniform sampler3D volumeTexture;
 
 void main()
 {
-	colors = texture(volumeTexture, vertex_tex);
+	colors = vec4(1.0f, 1.0f, 1.0f, opacity) * texture(volumeTexture, vertex_tex);
 };

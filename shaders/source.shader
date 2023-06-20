@@ -13,7 +13,9 @@ uniform int size;
 uniform float gamma;
 uniform int anisotropy;
 uniform uvec3 position;
-uniform float accuracy;
+uniform float filter;
+//uniform float thresh;
+
 uniform sampler3D Diagonal;
 uniform sampler3D Upper_trian;
 
@@ -191,7 +193,7 @@ void main() {
 		eigvecs[2] = ComputeEigenvector(tensor, eigvals[2]);
 	}
 	
-	// Sort the eigenvalues and eigenvectors from largest to smallest
+	// Sort the eigenvalues and eigenvectors from largest to smallest (L0 = largest, L2 = smallest)
 	float temp0 = eigvals[0];
 	vec3 tempv0 = eigvecs[0];
 	if (eigvals[0] < eigvals[1]) {
@@ -274,6 +276,9 @@ void main() {
 	mat3 NormMat = transpose(inverse(mat3(ModelMat)));
 	vertexNorm = NormMat * sq_n;
 
+	/////////////// DR.MAYERICH'S CODE ENDED /////////////////////////
+	
+
 	// Calculating and separating by anisotropy
 
 	float anisotropy_value;
@@ -281,8 +286,11 @@ void main() {
 	if (anisotropy == 2) anisotropy_value = 2 * (l1 - l2) / (l0 + l1 + l2);					// Planar
 	if (anisotropy == 3) anisotropy_value = 3 * l2 / (l0 + l1 + l2);						// Spherical
 
+	// 1st condition: only draw tensor with anisotropy value above a filter value
+	// 2nd condition: if the option to show all tensors is selected
+	// 3rd condition: only draw tensor with their largest eigenvalue above a certain threshold
 
-	if (anisotropy_value > accuracy || anisotropy == 0)
+	if (anisotropy_value > filter || anisotropy == 0)
 		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
 	else
 		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);

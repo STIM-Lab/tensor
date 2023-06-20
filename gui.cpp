@@ -6,16 +6,30 @@ float ui_scale = 1.5f;                                  // scale value for the U
 bool reset = false;
 bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
-extern int step;                                        // the steps between each glyph along all axis
+extern int in_size;                                        // the steps between each glyph along all axis
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
                                                         // 2: planar tensors only       3: spherical tensors only
-float accuracy = 0.1f;
+float filter = 0.1f;
 float zoom = 1.0f;
-bool cmap = true;
+int cmap = 2;
 bool menu_open = false;
 bool image_plane = false;
 float opacity = 1.0f;
+float thresh = 0.0f;
+
+
+bool CenteredButton(const char* direc, ImGuiStyle& style) {
+    float size = ImGui::CalcTextSize(direc).x + style.FramePadding.x * 2.0f;
+    float avail = ImGui::GetContentRegionAvail().x;
+    float off = (avail - size) * 0.5f;
+    if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+    style.FrameRounding = 10.f;
+    if(direc == "D")
+        return ImGui::ArrowButton("D", 3);
+    else
+        return ImGui::ArrowButton("U", 2);
+}
 
 /// <summary>
 /// Initialize the GUI
@@ -78,28 +92,24 @@ void RenderUI() {
 
         window_focused = (ImGui::IsWindowHovered()) ? false : true;
         
-
-        //opnes ImGui File Dialog
-        if (ImGui::Button("Open File Dialog"))
-        {
-            ImGuiFileDialog::Instance()->OpenDialog("ChooseFileDlgKey", "Choose File", ".npy,.cpp,.h,.hpp,.pdf,.bmp", ".");
-            menu_open = true;
-        }
-
-        if (ImGuiFileDialog::Instance()->Display("ChooseFileDlgKey"))
-        {
-            if (ImGuiFileDialog::Instance()->IsOk())
-            {
-                std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-                std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-            }
-            ImGuiFileDialog::Instance()->Close();
-        }
+        ImGuiStyle& style = ImGui::GetStyle();
+        style.FrameRounding = 5.f;
+        style.GrabRounding = 3.f;
+        style.WindowRounding = 7.f;
 
         // Adjusting the size of the volume along each axis
-        ImGui::SliderInt("Size", &step, 1, 5);
-        ImGui::Separator();
+        ImGui::Text("Number of tensors:");      ImGui::SameLine();  ImGui::Text("%d", in_size);
+        if(ImGui::Button("-50", ImVec2(75, 25))) {
+            in_size -= 50;
+            if (in_size < 50)   in_size = 50;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("+50", ImVec2(75, 25))) {
+            in_size += 50;
+            if (in_size > 150) in_size = 150;
+        }
 
+        ImGui::Separator();
         ImGui::Text("Plane");
         if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
         ImGui::SameLine();
@@ -118,10 +128,16 @@ void RenderUI() {
 
         ImGui::Columns(1);
         ImGui::Spacing();
-        ImGui::SliderFloat("Accuracy", &accuracy, 0.1f, 1.0f);
+        ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
         ImGui::Separator();
 
-        ImGui::Checkbox("Colormaped eigenvector", &cmap);
+        ImGui::Columns(2);
+        ImGui::Text("Colormap:");       ImGui::SameLine();
+        ImGui::RadioButton("Shortest V", &cmap, 2);    ImGui::NextColumn();
+        ImGui::RadioButton("Longest V", &cmap, 0);
+        ImGui::Columns(1);
+        ImGui::Spacing();
+        ImGui::SliderFloat("Threshold", &thresh, 0.0f, 1.0f);
         ImGui::Separator();
 
         ImGui::Checkbox("Image Plane", &image_plane);
@@ -135,8 +151,21 @@ void RenderUI() {
         if(ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;
         ImGui::Separator();
 
+        style.FrameRounding = 10.f;
+        bool direction = CenteredButton("U", style);
+        float size = ImGui::CalcTextSize("\t\t\t\t").x + style.FramePadding.x * 2.f;
+        float avail = ImGui::GetContentRegionAvail().x;
+        float off = (avail - size) * 0.5f;
+        if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+        ImGui::ArrowButton("L", 0); ImGui::SameLine(); style.ItemSpacing = ImVec2(25, 1.0f);
+        ImGui::ArrowButton("R", 1);
+        direction = CenteredButton("D", style);
+        
+        style.FrameRounding = 5.f;
+        style.ItemSpacing = ImVec2(10.f, 10.0f);
+        ImGui::Separator();
         reset = ImGui::Button("Reset", ImVec2(70, 35));
-
+        
         ImGui::GetFont()->Scale = old_size;
         ImGui::PopFont();
         ImGui::End();
