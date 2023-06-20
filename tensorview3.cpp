@@ -28,12 +28,13 @@ tira::volume<glm::mat3> T;
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
 
-int step = 1;
 
 // input variables for arguments
 std::string in_filename;
 float in_gamma;
 int in_cmap;
+int in_size = 50;
+int step;
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -112,11 +113,10 @@ void resetPlane(float frame) {
 	axes[0] = 0; axes[1] = 0; axes[2] = 0;
 	scroll_axis = 2;
 	scroll_value = 0;
-	step = 1;
+	in_size = 50;
 	anisotropy = 0;
-	accuracy = 0.1f;
+	filter = 0.1f;
 }
-
 
 GLFWwindow* InitGLFW() {
 	GLFWwindow* window;
@@ -154,7 +154,6 @@ void InitGLEW() {
 		exit(1);
 	}
 }
-
 
 // uses orthogonal complement to compute the eigenvectors correspoinding to the two identical eigenvalues W = U x V
 void ComputeOrthogonalComplement(glm::vec3& U, glm::vec3& V, glm::vec3& W) {
@@ -413,6 +412,7 @@ int main(int argc, char** argv) {
 		("help", "produce help message")
 		("gamma,g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
 		("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
+		("size,s", boost::program_options::value<int>(&in_size)->default_value(50), "number of tensor along X axis (along Y and Z based on ratio)")
 		;
 	boost::program_options::variables_map vm;
 
@@ -441,7 +441,7 @@ int main(int argc, char** argv) {
 	// Load the tensor field
 	std::cout << "loading file...";
 	//T.load_npy<float>("oval3d.npy");
-	T.load_npy<float>("tensor_gradient5.npy");
+	T.load_npy<float>("blurred2_3D.npy");
 	std::cout << "done." << std::endl;
 
 	// Set two separate RGB volumes with diagonal and off-diagonal values of the tensor (tensor is symmetric)
@@ -453,7 +453,7 @@ int main(int argc, char** argv) {
 	
 	// Load the volume for texture-map image
 	tira::glVolume<unsigned char> volume;
-	volume.load_npy("cube.npy");
+	volume.load_npy("cube1.npy");
 
 	
 
@@ -472,7 +472,7 @@ int main(int argc, char** argv) {
 	float suml = l[0] + l[1] + l[2];
 	float gamma = in_gamma;
 	int component_color;	// = in_cmap;
-	
+	in_size = 50;
 	bool planar = true;
 
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
@@ -493,7 +493,7 @@ int main(int argc, char** argv) {
 	float ambient = 0.3;	
 
 	bool file_loaded = false;
-
+	
 	while (!glfwWindowShouldClose(window)){
 
 		
@@ -533,6 +533,7 @@ int main(int argc, char** argv) {
 		
 		if (image_plane)
 		{
+			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			size_t xi, yi, zi;
@@ -545,7 +546,7 @@ int main(int argc, char** argv) {
 			// Scale matrix
 			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(T.X(), T.Y(), 1.0f));
 
-			// Scroll value should be mapped from range [0, T.Z() - 1] to range [0, 1]
+			// Scroll_value should be mapped from range [0, T.Z() - 1] to range [0, 1]
 			float mappep_scroll_value = (float)scroll_value / (float)(T.Z() - 1);
 			material.Begin();
 			{
@@ -555,10 +556,13 @@ int main(int argc, char** argv) {
 				rect.Draw();
 			}
 			material.End();
+
 			glDisable(GL_BLEND);
 		}
 
 		glClear(GL_DEPTH_BUFFER_BIT);
+
+		step = T.X() / in_size;
 		// Rendering the tensor field for the selected axis
 		for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
 			for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
@@ -587,8 +591,9 @@ int main(int argc, char** argv) {
 						shader.SetUniform1f("gamma", gamma);
 						shader.SetUniform3ui("position", xi, yi, zi);
 						shader.SetUniform1i("size", step);
-						shader.SetUniform1f("accuracy", accuracy);
+						shader.SetUniform1f("filter", filter);
 						shader.SetUniform1i("anisotropy", anisotropy);
+						//shader.SetUniform1f("thresh", thresh);
 
 						glyph.Draw();
 					}
@@ -600,29 +605,6 @@ int main(int argc, char** argv) {
 			if (scroll_axis == 0) break;
 		}
 		
-		//Load Numpy File or Stack of Images (.bmp) from ImGui File Dialog
-		if (ImGuiFileDialog::Instance()->IsOk() && menu_open)
-		{
-			std::string filePathName = ImGuiFileDialog::Instance()->GetFilePathName();
-			std::string filePath = ImGuiFileDialog::Instance()->GetCurrentPath();
-			std::string extension = filePathName.substr(filePathName.find_last_of(".") + 1);
-
-			if (extension != "npy")	std::cout << "ERROR: Only numpy files." << std::endl;
-
-			else
-			{
-				std::cout << "Loading file..." << std::endl;
-				T = tira::volume<glm::mat3>();
-				T.load_npy(filePathName);
-				diagonal_elem = GetDiagValues(T);
-				triangular_elem = GetOffDiagValues(T);
-				shader.SetTexture("Diagonal", diagonal_elem, GL_RGBA32F, GL_LINEAR);
-				shader.SetTexture("Upper_trian", triangular_elem, GL_RGBA32F, GL_LINEAR);
-				file_loaded = true;
-				menu_open = false;
-				ImGuiFileDialog::Instance()->Close();
-			}
-		}
 
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer

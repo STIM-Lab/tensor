@@ -157,12 +157,12 @@ void RenderUI() {
         float avail = ImGui::GetContentRegionAvail().x;
         float off = (avail - size) * 0.5f;
         if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-        ImGui::ArrowButton("L", 0); ImGui::SameLine(); style.ItemSpacing = ImVec2(25, 1.0f);
+        ImGui::ArrowButton("L", 0); ImGui::SameLine(); style.ItemSpacing = ImVec2(45.0f, 5.0f);
         ImGui::ArrowButton("R", 1);
         direction = CenteredButton("D", style);
         
         style.FrameRounding = 5.f;
-        style.ItemSpacing = ImVec2(10.f, 10.0f);
+        style.ItemSpacing = ImVec2(8.f, 8.0f);
         ImGui::Separator();
         reset = ImGui::Button("Reset", ImVec2(70, 35));
         
