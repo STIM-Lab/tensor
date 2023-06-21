@@ -17,7 +17,7 @@ bool menu_open = false;
 bool image_plane = false;
 float opacity = 1.0f;
 float thresh = 0.0f;
-
+float move[];
 
 bool CenteredButton(const char* direc, ImGuiStyle& style) {
     float size = ImGui::CalcTextSize(direc).x + style.FramePadding.x * 2.0f;
@@ -97,7 +97,7 @@ void RenderUI() {
         style.GrabRounding = 3.f;
         style.WindowRounding = 7.f;
 
-        // Adjusting the size of the volume along each axis
+        // Select the number of tensors along X axis
         ImGui::Text("Number of tensors:");      ImGui::SameLine();  ImGui::Text("%d", in_size);
         if(ImGui::Button("-50", ImVec2(75, 25))) {
             in_size -= 50;
@@ -109,6 +109,7 @@ void RenderUI() {
             if (in_size > 150) in_size = 150;
         }
 
+        // Select which plane to render (view)
         ImGui::Separator();
         ImGui::Text("Plane");
         if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
@@ -119,52 +120,77 @@ void RenderUI() {
 
         ImGui::Separator();
 
+        // Filter anisotropy using a threshold filter option
         ImGui::Text("Select Anisotropy");
         ImGui::Columns(2);
         ImGui::RadioButton("ALL", &anisotropy, 0);
         ImGui::RadioButton("Linear", &anisotropy, 1);       ImGui::NextColumn();
         ImGui::RadioButton("Planar", &anisotropy, 2);       
         ImGui::RadioButton("Spherical", &anisotropy, 3);    
-
         ImGui::Columns(1);
         ImGui::Spacing();
         ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
         ImGui::Separator();
 
+        // Show colormapped image based on shortest/longest eigenvector
         ImGui::Columns(2);
         ImGui::Text("Colormap:");       ImGui::SameLine();
         ImGui::RadioButton("Shortest V", &cmap, 2);    ImGui::NextColumn();
         ImGui::RadioButton("Longest V", &cmap, 0);
         ImGui::Columns(1);
         ImGui::Spacing();
-        ImGui::SliderFloat("Threshold", &thresh, 0.0f, 1.0f);
+        // Adjust a threshold for eigenvalues corresponding to each tensor
+        ImGui::DragFloat("Threshold", &thresh, 0.00001f, 0.0f, 0.1f, "%.5f");
         ImGui::Separator();
 
+        // Render the plane with texture-mapped image
         ImGui::Checkbox("Image Plane", &image_plane);
         ImGui::Spacing();
+        // Adjust the image transparency
         ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
         ImGui::Separator();
 
+        // Zooming in and out option
         ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
         zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
         ImGui::SameLine();
-        if(ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;
+        if(ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
+
         ImGui::Separator();
 
+        // Reset button
+        reset = ImGui::Button("Reset", ImVec2(70, 35));
+
+        ImGui::Separator();
+
+        // Arrow buttons
         style.FrameRounding = 10.f;
-        bool direction = CenteredButton("U", style);
+        if (CenteredButton("U", style)) {
+            move[0] += 5;
+            if (move[0] > 100) move[0] = 100;
+        }
+        // Make sure the buttons are centered
         float size = ImGui::CalcTextSize("\t\t\t\t").x + style.FramePadding.x * 2.f;
         float avail = ImGui::GetContentRegionAvail().x;
         float off = (avail - size) * 0.5f;
         if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-        ImGui::ArrowButton("L", 0); ImGui::SameLine(); style.ItemSpacing = ImVec2(45.0f, 5.0f);
-        ImGui::ArrowButton("R", 1);
-        direction = CenteredButton("D", style);
+        if (ImGui::ArrowButton("L", 0)) {
+            move[1] -= 5;
+            if (move[1] < -100) move[1] = -100;
+        }
+        style.ItemSpacing = ImVec2(23.0f, 5.0f); ImGui::SameLine();
+        if (ImGui::ArrowButton("R", 1)) {
+            move[1] += 5;
+            if (move[1] > 100) move[1] = 100;
+        }
+        if (CenteredButton("D", style)) {
+            move[0] -= 5;
+            if (move[0] < -100) move[0] = -100;
+        }
         
         style.FrameRounding = 5.f;
         style.ItemSpacing = ImVec2(8.f, 8.0f);
-        ImGui::Separator();
-        reset = ImGui::Button("Reset", ImVec2(70, 35));
+        
         
         ImGui::GetFont()->Scale = old_size;
         ImGui::PopFont();

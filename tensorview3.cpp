@@ -16,8 +16,7 @@ const char* glsl_version = "#version 130";              // specify the version o
 tira::camera camera;
 
 bool perspective = false;
-float right = 0.0f;
-float up = 0.0f;
+extern float move[] = {0.0f, 0.0f};				// UP and RIGH, respectively
 bool ctrl = false;
 bool dragging = false;
 double xprev, yprev;
@@ -86,20 +85,20 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		if (zoom > 2) zoom = 2;
 	}
 	if (key == GLFW_KEY_UP && action == GLFW_PRESS) {
-		up += 5;
-		if (up > 100) up = 100;
+		move[0] += 5;
+		if (move[0] > 100) move[0] = 100;
 	}
 	if (key == GLFW_KEY_DOWN && action == GLFW_PRESS) {
-		up -= 5;
-		if (up < -100) up = -100;
+		move[0] -= 5;
+		if (move[0] < -100) move[0] = -100;
 	}
 	if (key == GLFW_KEY_RIGHT && action == GLFW_PRESS) {
-		right += 5;
-		if (right > 100) right = 100;
+		move[1] += 5;
+		if (move[1] > 100) move[1] = 100;
 	}
 	if (key == GLFW_KEY_LEFT && action == GLFW_PRESS) {
-		right -= 5;
-		if (right < -100) right = -100;
+		move[1] -= 5;
+		if (move[1] < -100) move[1] = -100;
 	}
 }
 
@@ -107,8 +106,8 @@ void resetPlane(float frame) {
 	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
 	camera.LookAt(frame / 2.0f, frame / 2.0f, 0.0f, 0.0f, 1.0f, 0.0f);
 
-	right = 0.0f;
-	up = 0.0f;
+	move[1] = 0.0f;
+	move[0] = 0.0f;
 	zoom = 1.0f;
 	axes[0] = 0; axes[1] = 0; axes[2] = 0;
 	scroll_axis = 2;
@@ -509,7 +508,7 @@ int main(int argc, char** argv) {
 		glm::mat4 Mprojection;
 		if (aspect > 1) {
 			if (!perspective)
-				Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + right, aspect * frame / 2.0f / zoom + right, -frame / 2.0f / zoom + up, frame / 2.0f / zoom + up, -2.0f * frame, 2.0f * frame);
+				Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + move[1], aspect * frame / 2.0f / zoom + move[1], -frame / 2.0f / zoom + move[0], frame / 2.0f / zoom + move[0], -2.0f * frame, 2.0f * frame);
 			else
 				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 		}
@@ -593,7 +592,7 @@ int main(int argc, char** argv) {
 						shader.SetUniform1i("size", step);
 						shader.SetUniform1f("filter", filter);
 						shader.SetUniform1i("anisotropy", anisotropy);
-						//shader.SetUniform1f("thresh", thresh);
+						shader.SetUniform1f("thresh", thresh);
 
 						glyph.Draw();
 					}

@@ -14,7 +14,7 @@ uniform float gamma;
 uniform int anisotropy;
 uniform uvec3 position;
 uniform float filter;
-//uniform float thresh;
+uniform float thresh;
 
 uniform sampler3D Diagonal;
 uniform sampler3D Upper_trian;
@@ -277,7 +277,7 @@ void main() {
 	vertexNorm = NormMat * sq_n;
 
 	/////////////// DR.MAYERICH'S CODE ENDED /////////////////////////
-	
+	//////////////////////////////////////////////////////////////////
 
 	// Calculating and separating by anisotropy
 
@@ -290,7 +290,7 @@ void main() {
 	// 2nd condition: if the option to show all tensors is selected
 	// 3rd condition: only draw tensor with their largest eigenvalue above a certain threshold
 
-	if (anisotropy_value > filter || anisotropy == 0)
+	if (anisotropy_value > filter || anisotropy == 0 && eigvals[0] >= thresh)
 		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
 	else
 		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
