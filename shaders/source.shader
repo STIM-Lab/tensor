@@ -290,9 +290,12 @@ void main() {
 	// 2nd condition: if the option to show all tensors is selected
 	// 3rd condition: only draw tensor with their largest eigenvalue above a certain threshold
 
-	if (anisotropy_value > filter || anisotropy == 0 && eigvals[0] >= thresh)
+	if (anisotropy_value > filter || anisotropy == 0)
 		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
 	else
+		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
+
+	if(eigvals[0] < thresh)
 		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
 
 	//vertexColor = vec4(1.0, 0.0, 0.0, 1.0);

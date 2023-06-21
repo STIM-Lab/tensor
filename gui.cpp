@@ -140,7 +140,7 @@ void RenderUI() {
         ImGui::Columns(1);
         ImGui::Spacing();
         // Adjust a threshold for eigenvalues corresponding to each tensor
-        ImGui::DragFloat("Threshold", &thresh, 0.00001f, 0.0f, 0.1f, "%.5f");
+        ImGui::DragFloat("Threshold", &thresh, 0.005f, 1.0f, 2.1f, "%.3f");
         ImGui::Separator();
 
         // Render the plane with texture-mapped image

@@ -115,6 +115,7 @@ void resetPlane(float frame) {
 	in_size = 50;
 	anisotropy = 0;
 	filter = 0.1f;
+	thresh = 0.0f;
 }
 
 GLFWwindow* InitGLFW() {
