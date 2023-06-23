@@ -8,7 +8,6 @@
 #include <glm/gtc/quaternion.hpp>
 #include <boost/program_options.hpp>
 #include <complex>
-#include <Eigen/Eigenvalues>
 #define PI 3.14159265358979323846
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
@@ -23,13 +22,16 @@ double xprev, yprev;
 size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
-tira::volume<glm::mat3> T;
+tira::volume<glm::mat3> T;						// 3D tensor field (3x3)
+tira::glVolume<unsigned char> I;				// 3D raw image volume
 tira::volume<float> lambda;
 tira::volume<glm::mat3> eigenvectors;
 
 
+
 // input variables for arguments
 std::string in_filename;
+std::string in_image;
 float in_gamma;
 int in_cmap;
 int in_size = 50;
@@ -403,12 +405,20 @@ tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
 	return triangular_elem;
 }
 
+// Load a tensor field from a NumPy file
+void LoadTensorField(std::string npy_filename) {
+	// actually load the tensor field
+	// separate the diagonal and off-diagonal elements
+	// save everything how it's supposed to be saved for rendering
+}
+
 int main(int argc, char** argv) {
 
 	// Declare the supported options.
 	boost::program_options::options_description desc("Allowed options");
 	desc.add_options()
-		("input", boost::program_options::value<std::string>(&in_filename)->default_value("psf.cw"), "output filename for the coupled wave structure")
+		("input", boost::program_options::value<std::string>(&in_filename), "output filename for the coupled wave structure")
+		("image", boost::program_options::value<std::string>(&in_image), "optional image field corresponding to the tensors")
 		("help", "produce help message")
 		("gamma,g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
 		("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
@@ -427,33 +437,27 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	if (!vm.count("input")) {
-		std::cout << "ERROR: input file required" << std::endl;
-		std::cout << desc << std::endl;
-		return 1;
-	}
+	
 	if (in_cmap != 0 && in_cmap != 2) {
 		std::cout << "ERROR: invalid colormap component" << std::endl;
 		return 1;
 	}
 
-
-	// Load the tensor field
-	std::cout << "loading file...";
-	//T.load_npy<float>("oval3d.npy");
-	T.load_npy<float>("blurred2_3D.npy");
-	std::cout << "done." << std::endl;
+	if (vm.count("input")) {
+		//T.load_npy<float>(in_filename);
+		LoadTensorField(in_filename);
+		std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
+	}
+	
 
 	// Set two separate RGB volumes with diagonal and off-diagonal values of the tensor (tensor is symmetric)
 	tira::volume<float> diagonal_elem = GetDiagValues(T);
 	tira::volume<float> triangular_elem = GetOffDiagValues(T);
 
 
-	std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
 	
-	// Load the volume for texture-map image
-	tira::glVolume<unsigned char> volume;
-	volume.load_npy("cube1.npy");
+	
+	
 
 	
 
@@ -478,9 +482,14 @@ int main(int argc, char** argv) {
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
 	tira::glGeometry rect = tira::glGeometry::GenerateRectangle<float>();           // create a rectangle for rendering volume
 
-	// Load texture-map image shader
+	// if an image volume is specified, load it as a texture
 	tira::glMaterial material("volume.shader");
-	material.SetTexture("volumeTexture", volume, GL_RGB, GL_NEAREST);
+	if (vm.count("image")) {
+		I.load_npy(in_image);
+		material.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
+	}
+	
+	
 
 	// Copy the tensor field (including diagonal and off-diagonal RGB volumes) to GPU as texture maps
 	tira::glMaterial shader("source.shader");
