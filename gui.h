@@ -11,11 +11,19 @@ extern int anisotropy;
 extern float filter;
 extern float zoom;
 extern int cmap;
-extern bool menu_open;
-extern bool image_plane;
 extern float opacity;
 extern float thresh;
-extern std::string FILE_NAME;
+
+extern bool OPEN_TENSOR;
+extern bool RENDER_GLYPHS;
+extern bool TENSOR_LOADED;
+extern std::string TensorFileName;
+
+extern bool OPEN_VOLUME;
+extern bool RENDER_IMAGE;
+extern bool VOLUME_LOADED;
+extern std::string VolumeFileName;
+
 
 void InitUI(GLFWwindow* window, const char* glsl_version);
 void DestroyUI();

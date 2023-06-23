@@ -23,12 +23,7 @@ size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
 tira::volume<glm::mat3> T;						// 3D tensor field (3x3)
-tira::glVolume<unsigned char> I;				// 3D raw image volume
-tira::volume<float> lambda;
-tira::volume<glm::mat3> eigenvectors;
-
-extern bool RENDER_GLYPHS;
-extern bool FILE_LOADED;
+tira::volume<unsigned char> I;				// 3D raw image volume
 
 
 // input variables for arguments
@@ -215,7 +210,7 @@ tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
 }
 
 // Load a tensor field from a NumPy file
-void LoadTensorField3(std::string npy_filename, tira::glMaterial shader) {
+void LoadTensorField3(std::string npy_filename, tira::glMaterial& shader) {
 	// Load the tensor field
 	T.load_npy<float>(npy_filename);
 
@@ -227,9 +222,19 @@ void LoadTensorField3(std::string npy_filename, tira::glMaterial shader) {
 	shader.SetTexture("Diagonal", diagonal_elem, GL_RGBA32F, GL_LINEAR);
 	shader.SetTexture("Upper_trian", triangular_elem, GL_RGBA32F, GL_LINEAR);
 
+	// save everything how it's supposed to be saved for rendering
+	TENSOR_LOADED = true;
+}
+
+// Load a tensor field from a NumPy file
+void LoadVolume3(std::string npy_filename, tira::glMaterial& material) {
+	// Load the tensor field
+	I.load_npy(npy_filename);
+
+	material.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
 
 	// save everything how it's supposed to be saved for rendering
-	FILE_LOADED = true;
+	VOLUME_LOADED = true;
 }
 
 int main(int argc, char** argv) {
@@ -262,13 +267,6 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	// If the tensor field is loaded using command-line argument
-	tira::glMaterial shader("source.shader");
-	if (vm.count("input")) {
-		LoadTensorField3(in_filename, shader);
-	}
-	
-
 	// Initialize OpenGL
 	window = InitGLFW();                                // create a GLFW window
 	InitUI(window, glsl_version);
@@ -278,74 +276,92 @@ int main(int argc, char** argv) {
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 	
-	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
-	
-	glm::vec3 l(1.0f, 0.5f, 0.5f);
-	float suml = l[0] + l[1] + l[2];
-	float gamma = in_gamma;
-	int component_color;	// = in_cmap;
-	in_size = 50;
-
 	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);	// create a square
 	tira::glGeometry rect = tira::glGeometry::GenerateRectangle<float>();           // create a rectangle for rendering volume
 
-	// if an image volume is specified, load it as a texture
-	tira::glMaterial material("volume.shader");
-	if (vm.count("image")) {
-		I.load_npy(in_image);
-		material.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
+	// If the tensor field is loaded using command-line argument
+	tira::glMaterial shader("source.shader");
+	if (vm.count("input")) {
+		LoadTensorField3(in_filename, shader);
 		std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
 	}
-	
+
+	// If an image volume is specified, load it as a texture
+	tira::glMaterial material("volume.shader");
+	if (vm.count("image")) {
+		LoadVolume3(in_image, material);
+		I.load_npy(in_image);
+		material.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
+	}
+
+	glm::vec3 l(1.0f, 0.5f, 0.5f);
+	float suml = l[0] + l[1] + l[2];
+	float gamma = in_gamma;
+	int component_color = in_cmap;
+	in_size = 50;
 
 	// Set light position
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
-	float ambient = 0.3;	
+	float ambient = 0.3;
 
-	// If the file was loaded using ImGui file dialog
-	if (FILE_LOADED) {
-		LoadTensorField3(FILE_NAME, shader);
-	}
-	
-	while (!glfwWindowShouldClose(window)){
+
+	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();													// Poll and handle events (inputs, window resize, etc.)
 		RenderUI();
 		int display_w, display_h;                                           // size of the frame buffer (openGL display)
 		glfwGetFramebufferSize(window, &display_w, &display_h);
-		
-		// Reset the visualization to initial state if reset button is pushed
-		if (reset) resetPlane(frame);
-
 		float aspect = (float)display_w / (float)display_h;
-		
 		glm::mat4 Mprojection;
-		if (aspect > 1) {
-			if (!perspective)
-				Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + move[1], aspect * frame / 2.0f / zoom + move[1], -frame / 2.0f / zoom + move[0], frame / 2.0f / zoom + move[0], -2.0f * frame, 2.0f * frame);
-			else
-				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
+		glm::mat4 Mview;
+
+		// If the load command for tensor field is from ImGui file dialog
+		if (OPEN_TENSOR) {
+			LoadTensorField3(TensorFileName, shader);								// Load the tensor field and set the texture-map
+			OPEN_TENSOR = false;
+			std::cout << "Tensor loaded successfully\n" << std::endl;
 		}
-		else {
-			if(!perspective)
-				Mprojection = glm::ortho(-frame/2.0f, frame/2.0f, -frame/2.0f/aspect, frame/2.0f/aspect, -2.0f * frame, 2.0f * frame);
-			else
-				Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
+		// If the load command for volume is from ImGui file dialog
+		if (OPEN_VOLUME) {
+			LoadVolume3(VolumeFileName, material);									// Load the volume and set the texture-map
+			OPEN_VOLUME = false;
+			std::cout << "Volume loaded successfully\n" << std::endl;
 		}
 
-		glm::mat4 Mview = GetCameraView(); // camera.getMatrix();				// generate a view matrix from the camera
+		float frame;
+		if (TENSOR_LOADED) {
+			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
+
+			// Reset the visualization to initial state if reset button is pushed
+			if (reset) resetPlane(frame);
+
+			if (aspect > 1) {
+				if (!perspective)
+					Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + move[1], aspect * frame / 2.0f / zoom + move[1], -frame / 2.0f / zoom + move[0], frame / 2.0f / zoom + move[0], -2.0f * frame, 2.0f * frame);
+				else
+					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
+			}
+			else {
+				if (!perspective)
+					Mprojection = glm::ortho(-frame / 2.0f, frame / 2.0f, -frame / 2.0f / aspect, frame / 2.0f / aspect, -2.0f * frame, 2.0f * frame);
+				else
+					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
+			}
+
+			Mview = GetCameraView(); // camera.getMatrix();						// generate a view matrix from the camera
+		}
+
 
 		glViewport(0, 0, display_w, display_h);									// specifies the area of the window where OpenGL can render
-		
+
 		glClearColor(0, 0, 0, 0);
-		
+
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glm::mat4 Mtran;
 
 		/// HELIA: Render the plane with texture-mapped image here
-		
-		if (image_plane)
-		{
+
+		if (VOLUME_LOADED && RENDER_IMAGE) {
 			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -355,12 +371,12 @@ int main(int argc, char** argv) {
 			zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
 			// Translation matrix
-			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(T.X() * 0.5f, T.Y() * 0.5f, 0.0f));
+			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(I.X() * 0.5f, I.Y() * 0.5f, 0.0f));
 			// Scale matrix
-			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(T.X(), T.Y(), 1.0f));
+			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(I.X(), I.Y(), 1.0f));
 
-			// Scroll_value should be mapped from range [0, T.Z() - 1] to range [0, 1]
-			float mappep_scroll_value = (float)scroll_value / (float)(T.Z() - 1);
+			// Scroll_value should get mapped from range [0, I.Z() - 1] to range [0, 1]
+			float mappep_scroll_value = (float)scroll_value / (float)(I.Z() - 1);
 			material.Begin();
 			{
 				material.SetUniformMat4f("MVP", Mprojection * Mview * Mtran * scale);
@@ -375,10 +391,9 @@ int main(int argc, char** argv) {
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		step = T.X() / in_size;
 		// Rendering the tensor field for the selected axis
-
-		if (FILE_LOADED && RENDER_GLYPHS) {
+		if (TENSOR_LOADED && RENDER_GLYPHS) {
+			step = T.X() / in_size;
 			for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
 				for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
 					for (axes[2] = 0; axes[2] < T.Z(); axes[2] += step)
@@ -420,14 +435,12 @@ int main(int argc, char** argv) {
 				if (scroll_axis == 0) break;
 			}
 		}
-		
 
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 
 	}
-
 	DestroyUI();
 	glfwDestroyWindow(window);                                      // Destroy the GLFW rendering window
 	glfwTerminate();                                                // Terminate GLFW
