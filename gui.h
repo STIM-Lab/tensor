@@ -15,6 +15,7 @@ extern bool menu_open;
 extern bool image_plane;
 extern float opacity;
 extern float thresh;
+extern std::string FILE_NAME;
 
 void InitUI(GLFWwindow* window, const char* glsl_version);
 void DestroyUI();

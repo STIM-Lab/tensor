@@ -6,7 +6,7 @@ float ui_scale = 1.5f;                                  // scale value for the U
 bool reset = false;
 bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
-extern int in_size;                                        // the steps between each glyph along all axis
+extern int in_size;                                     // the steps between each glyph along all axis
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
                                                         // 2: planar tensors only       3: spherical tensors only
@@ -18,6 +18,9 @@ bool image_plane = false;
 float opacity = 1.0f;
 float thresh = 0.0f;
 float move[];
+bool RENDER_GLYPHS = false;
+bool FILE_LOADED = false;
+std::string FILE_NAME;
 
 bool CenteredButton(const char* direc, ImGuiStyle& style) {
     float size = ImGui::CalcTextSize(direc).x + style.FramePadding.x * 2.0f;
@@ -81,9 +84,9 @@ void RenderUI() {
     // See https://pthom.github.io/imgui_manual_online/manual/imgui_manual.html for code details
     //ImGui::ShowDemoWindow();
 
-    // Hello World GUI Window
+    
     {
-
+        // Use smaller font size
         float old_size = ImGui::GetFont()->Scale;
         ImGui::GetFont()->Scale *= 0.5;
         ImGui::PushFont(ImGui::GetFont());
@@ -92,10 +95,31 @@ void RenderUI() {
 
         window_focused = (ImGui::IsWindowHovered()) ? false : true;
         
+        // Change style 
         ImGuiStyle& style = ImGui::GetStyle();
         style.FrameRounding = 5.f;
         style.GrabRounding = 3.f;
         style.WindowRounding = 7.f;
+
+        // Load option for tensor field
+        if (ImGui::Button("Load File"))					// create a button for loading the shader
+            ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
+        //ImGui::SameLine();
+        if (ImGuiFileDialog::Instance()->Display("ChooseNpyFile")) {				    // if the user opened a file dialog
+            if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+                std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+                std::string extension = filename.substr(filename.find_last_of(".") + 1);
+                if (extension == "npy") {
+                    FILE_LOADED = true;
+                    FILE_NAME = filename;
+                }
+            }
+            ImGuiFileDialog::Instance()->Close();									// close the file dialog box		
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Render", ImVec2(40, 25)) && FILE_LOADED) {
+            RENDER_GLYPHS = true;
+        }
 
         // Select the number of tensors along X axis
         ImGui::Text("Number of tensors:");      ImGui::SameLine();  ImGui::Text("%d", in_size);
