@@ -16,6 +16,7 @@ int cmap = 2;
 float opacity = 1.0f;
 float thresh = 0.0f;
 float move[];
+bool perspective = false;
 
 bool OPEN_TENSOR = false;
 bool RENDER_GLYPHS = false;
@@ -190,6 +191,14 @@ void RenderUI() {
         ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
         ImGui::Separator();
 
+        // Use perspective view instead of ortho view
+        if (ImGui::RadioButton("Ortho", !perspective))
+            perspective = false;
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Perspective", perspective))
+            perspective = true;
+        ImGui::Separator();
+
         // Show colormapped image based on shortest/longest eigenvector
         ImGui::Columns(2);
         ImGui::Text("Colormap:");       ImGui::SameLine();
@@ -197,10 +206,21 @@ void RenderUI() {
         ImGui::RadioButton("Longest V", &cmap, 0);
         ImGui::Columns(1);
         ImGui::Spacing();
-        // Adjust a threshold for eigenvalues corresponding to each tensor
-        ImGui::DragFloat("Threshold", &thresh, 0.005f, 1.0f, 2.1f, "%.3f");
-        ImGui::Separator();
 
+        // Adjust a threshold for eigenvalues corresponding to each tensor
+        static float begin = 0.f, end = 125.f;
+        //ImGui::PushItemWidth(50.f);
+        //ImGui::InputFloat("", &begin);  ImGui::SameLine();
+        //ImGui::PushItemWidth(200.f);
+        //ImGui::DragFloat("", &thresh, 0.5f, begin, end);    
+        ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
+        ImGui::DragFloat("Threshold", &thresh, 0.25f, begin, end);
+        //ImGui::SameLine();
+        //ImGui::PushItemWidth(50.f);
+        //ImGui::InputFloat("", &end);
+        //ImGui::PopItemWidth();
+        ImGui::Separator();
+        
         // Zooming in and out option
         ImGui::InputFloat("Zoom", &zoom, 0.1f, 2.0f);
         zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);

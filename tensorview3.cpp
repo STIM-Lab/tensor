@@ -14,7 +14,7 @@ GLFWwindow* window;                                     // pointer to the GLFW w
 const char* glsl_version = "#version 130";              // specify the version of GLSL
 tira::camera camera;
 
-bool perspective = false;
+extern bool perspective;
 extern float move[] = {0.0f, 0.0f};				// UP and RIGH, respectively
 bool ctrl = false;
 bool dragging = false;
@@ -337,7 +337,7 @@ int main(int argc, char** argv) {
 
 			if (aspect > 1) {
 				if (!perspective)
-					Mprojection = glm::ortho(-aspect * frame / 2.0f / zoom + move[1], aspect * frame / 2.0f / zoom + move[1], -frame / 2.0f / zoom + move[0], frame / 2.0f / zoom + move[0], -2.0f * frame, 2.0f * frame);
+					Mprojection = glm::ortho(-aspect * frame / (2.0f * zoom) + move[1], aspect * frame / (2.0f * zoom) + move[1], -frame / (2.0f * zoom) + move[0], frame / (2.0f * zoom) + move[0], -2.0f * frame, 2.0f * frame);
 				else
 					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 			}

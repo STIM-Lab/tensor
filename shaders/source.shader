@@ -229,10 +229,10 @@ void main() {
 	////////////////////// DR.MAYERICH'S CODE //////////////////////
 	////////////////////////////////////////////////////////////////
 
-	eigvals = normalize(eigvals) * 0.5 * size;
-	float l0 = eigvals[0];
-	float l1 = eigvals[1];
-	float l2 = eigvals[2];
+	vec3 evals = normalize(eigvals) * 0.5 * size;
+	float l0 = evals[0];
+	float l1 = evals[1];
+	float l2 = evals[2];
 
 	float suml = l0 + l1 + l2;
 	float Cl = (l0 - l1) / suml;
