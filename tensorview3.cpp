@@ -24,15 +24,14 @@ int scroll_value = 0;
 
 tira::volume<glm::mat3> T;						// 3D tensor field (3x3)
 tira::volume<unsigned char> I;				// 3D raw image volume
-
+int gui_VolumeSize[] = { 0, 0, 0 };
 
 // input variables for arguments
 std::string in_filename;
 std::string in_image;
 float in_gamma;
 int in_cmap;
-int in_size = 50;
-int step;
+int step = 4;
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -111,10 +110,10 @@ void resetPlane(float frame) {
 	axes[0] = 0; axes[1] = 0; axes[2] = 0;
 	scroll_axis = 2;
 	scroll_value = 0;
-	in_size = 50;
 	anisotropy = 0;
 	filter = 0.1f;
 	thresh = 0.0f;
+	step = 4;
 }
 
 GLFWwindow* InitGLFW() {
@@ -247,7 +246,6 @@ int main(int argc, char** argv) {
 		("help", "produce help message")
 		("gamma,g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
 		("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
-		("size,s", boost::program_options::value<int>(&in_size)->default_value(50), "number of tensor along X axis (along Y and Z based on ratio)")
 		;
 	boost::program_options::variables_map vm;
 
@@ -284,6 +282,9 @@ int main(int argc, char** argv) {
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename, shader);
 		std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
+		gui_VolumeSize[0] = T.X();
+		gui_VolumeSize[1] = T.Y();
+		gui_VolumeSize[2] = T.Z();
 	}
 
 	// If an image volume is specified, load it as a texture
@@ -298,7 +299,6 @@ int main(int argc, char** argv) {
 	float suml = l[0] + l[1] + l[2];
 	float gamma = in_gamma;
 	int component_color = in_cmap;
-	in_size = 50;
 
 	// Set light position
 	glm::vec4 light0(0.0f, 100.0f, 100.0f, 0.7f);
@@ -330,10 +330,14 @@ int main(int argc, char** argv) {
 
 		float frame;
 		if (TENSOR_LOADED) {
+			gui_VolumeSize[0] = T.X();
+			gui_VolumeSize[1] = T.Y();
+			gui_VolumeSize[2] = T.Z();
+
 			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
 
 			// Reset the visualization to initial state if reset button is pushed
-			if (reset) resetPlane(frame);
+			if (RESET) resetPlane(frame);
 
 			if (aspect > 1) {
 				if (!perspective)
@@ -393,7 +397,6 @@ int main(int argc, char** argv) {
 
 		// Rendering the tensor field for the selected axis
 		if (TENSOR_LOADED && RENDER_GLYPHS) {
-			step = T.X() / in_size;
 			for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
 				for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
 					for (axes[2] = 0; axes[2] < T.Z(); axes[2] += step)

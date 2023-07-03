@@ -3,7 +3,7 @@
 #include "imgui_impl_opengl3.h"
 #include "lib/ImGuiFileDialog/ImGuiFileDialog.h"
 
-extern bool reset;
+extern bool RESET;
 extern int scroll_axis;
 extern bool window_focused;
 extern bool axis_change;

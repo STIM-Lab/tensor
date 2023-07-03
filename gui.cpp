@@ -3,10 +3,11 @@
 
 
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
-bool reset = false;
+bool RESET = false;
 bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
-extern int in_size;                                     // the steps between each glyph along all axis
+extern int step;                                        // the steps between each glyph along all axis
+extern int gui_VolumeSize[];
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
                                                         // 2: planar tensors only       3: spherical tensors only
@@ -157,15 +158,17 @@ void RenderUI() {
         }
 
         // Select the number of tensors along X axis
-        ImGui::Text("Number of tensors:");      ImGui::SameLine();  ImGui::Text("%d", in_size);
-        if(ImGui::Button("-50", ImVec2(75, 25))) {
-            in_size -= 50;
-            if (in_size < 50)   in_size = 50;
+        int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
+        ImGui::Text("Number of pixels per tensor:");      
+        int test;
+        if (TENSOR_LOADED)
+        {
+            ImGui::SliderInt("", &step, 1, smallest_axis);
         }
-        ImGui::SameLine();
-        if (ImGui::Button("+50", ImVec2(75, 25))) {
-            in_size += 50;
-            if (in_size > 150) in_size = 150;
+        else
+        {
+            ImGui::SameLine();
+            ImGui::Text("0");
         }
 
         // Select which plane to render (view)
@@ -230,7 +233,7 @@ void RenderUI() {
         ImGui::Separator();
 
         // Reset button
-        reset = ImGui::Button("Reset", ImVec2(70, 35));
+        RESET = ImGui::Button("Reset", ImVec2(70, 35));
 
         ImGui::Separator();
 
