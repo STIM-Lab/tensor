@@ -217,7 +217,7 @@ void RenderUI() {
         //ImGui::PushItemWidth(200.f);
         //ImGui::DragFloat("", &thresh, 0.5f, begin, end);    
         ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
-        ImGui::DragFloat("Threshold", &thresh, 0.25f, begin, end);
+        ImGui::DragFloat("Threshold", &thresh, 0.005f, begin, end);
         //ImGui::SameLine();
         //ImGui::PushItemWidth(50.f);
         //ImGui::InputFloat("", &end);
