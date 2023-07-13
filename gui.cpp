@@ -8,6 +8,8 @@ bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
 extern int step;                                        // the steps between each glyph along all axis
 extern int gui_VolumeSize[];
+extern double gui_PixelSize[];
+
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
                                                         // 2: planar tensors only       3: spherical tensors only
@@ -31,6 +33,8 @@ std::string VolumeFileName;
 
 bool tensor_data;
 bool volume_data;
+imgui_addons::ImGuiFileBrowser file_dialog;
+
 
 bool CenteredButton(const char* direc, ImGuiStyle& style) {
     float size = ImGui::CalcTextSize(direc).x + style.FramePadding.x * 2.0f;
@@ -42,6 +46,26 @@ bool CenteredButton(const char* direc, ImGuiStyle& style) {
         return ImGui::ArrowButton("D", 3);
     else
         return ImGui::ArrowButton("U", 2);
+}
+
+void OpenFileDialog() {
+    
+
+    std::cout << "Loading \"" << file_dialog.selected_fn << "\" ..." << std::endl;
+
+    if (tensor_data) {
+        OPEN_TENSOR = true;
+        TensorFileName = file_dialog.selected_fn;
+    }
+    if (volume_data)
+    {
+        OPEN_VOLUME = true;
+        VolumeFileName = file_dialog.selected_fn;
+    }
+
+    tensor_data = false;
+    volume_data = false;
+
 }
 
 /// <summary>
@@ -104,12 +128,12 @@ void RenderUI() {
         style.FrameRounding = 5.f;
         style.GrabRounding = 3.f;
         style.WindowRounding = 7.f;
-
-
+        
+        
         ////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
         if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
         {
-            ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
+            ImGui::OpenPopup("Open File");
             tensor_data = true;
         }
         
@@ -121,7 +145,7 @@ void RenderUI() {
         ////////////////////////////////////////////////  Load volume  ////////////////////////////////////////////////////
         if (ImGui::Button("Load Volume"))					                                // create a button for loading the shader
         {
-            ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
+            ImGui::OpenPopup("Open File");
             volume_data = true;
         }
         ImGui::SameLine();
@@ -132,31 +156,10 @@ void RenderUI() {
         ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
         ImGui::Separator();
 
-        if (ImGuiFileDialog::Instance()->Display("ChooseNpyFile")) {				    // if the user opened a file dialog
-            if (ImGuiFileDialog::Instance()->IsOk())
-            {
-                std::string FileName = ImGuiFileDialog::Instance()->GetFilePathName();
-                std::cout << "Loading \"" << FileName.substr(FileName.find_last_of("\\") + 1) << "\" ..." << std::endl;
-                std::string extension = FileName.substr(FileName.find_last_of(".") + 1);
+        if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
+            OpenFileDialog();
 
-                if (extension == "npy")
-                {
-                    if (tensor_data) {
-                        OPEN_TENSOR = true;
-                        TensorFileName = FileName;
-                    }
-                    if (volume_data)
-                    {
-                        OPEN_VOLUME = true;
-                        VolumeFileName = FileName;
-                    }
-                }
-            }
-            ImGuiFileDialog::Instance()->Close();
-            tensor_data = false;
-            volume_data = false;
-        }
-
+        
         // Select the number of tensors along X axis
         int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
         ImGui::Text("Number of pixels per tensor:");      

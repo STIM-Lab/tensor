@@ -15,16 +15,17 @@ const char* glsl_version = "#version 130";              // specify the version o
 tira::camera camera;
 
 extern bool perspective;
-extern float move[] = {0.0f, 0.0f};				// UP and RIGH, respectively
+extern float move[] = {0.0f, 0.0f};						// UP and RIGH, respectively
 bool ctrl = false;
 bool dragging = false;
 double xprev, yprev;
 size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
-tira::volume<glm::mat3> T;						// 3D tensor field (3x3)
-tira::volume<unsigned char> I;				// 3D raw image volume
+tira::volume<glm::mat3> T;								// 3D tensor field (3x3)
+tira::volume<unsigned char> I;							// 3D raw image volume
 int gui_VolumeSize[] = { 0, 0, 0 };
+double gui_PixelSize[] = { 1, 1, 1 };
 
 // input variables for arguments
 std::string in_filename;
@@ -58,10 +59,12 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	scroll_value += yoffset;
-	if (scroll_value < 0) scroll_value = 0;
-	if (scroll_value >= T.Z()) scroll_value = T.Z() - 1;
-	std::cout << scroll_value << std::endl;
+	if(TENSOR_LOADED) {
+		scroll_value += yoffset;
+		if (scroll_value < 0) scroll_value = 0;
+		if (scroll_value >= T.Z()) scroll_value = T.Z() - 1;
+		std::cout << scroll_value << std::endl;
+	}
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -395,6 +398,21 @@ int main(int argc, char** argv) {
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
+		component_color = (cmap) ? 2 : 0;
+
+		shader.Begin();
+		shader.SetUniformMat4f("ProjMat", Mprojection);
+		shader.SetUniformMat4f("ViewMat", Mview);
+		shader.SetUniform4f("light0", light0);
+		shader.SetUniform4f("light1", light1);
+		shader.SetUniform1f("ambient", ambient);
+		shader.SetUniform1i("ColorComponent", component_color);
+		shader.SetUniform1f("gamma", gamma);
+		shader.SetUniform1i("size", step);
+		shader.SetUniform1f("filter", filter);
+		shader.SetUniform1i("anisotropy", anisotropy);
+		shader.SetUniform1f("thresh", thresh);
+
 		// Rendering the tensor field for the selected axis
 		if (TENSOR_LOADED && RENDER_GLYPHS) {
 			for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
@@ -406,31 +424,15 @@ int main(int argc, char** argv) {
 						yi = (scroll_axis == 1) ? scroll_value : axes[1];
 						zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
-						if (scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
+						if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 						else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
 						else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
 
-						component_color = (cmap) ? 2 : 0;
+						shader.SetUniformMat4f("Trans", Mtran);
+						shader.SetUniform3ui("position", xi, yi, zi);
 
-						shader.Begin();
-						{
-							shader.SetUniformMat4f("ProjMat", Mprojection);
-							shader.SetUniformMat4f("ViewMat", Mview);
-							shader.SetUniformMat4f("Trans", Mtran);
-							shader.SetUniform4f("light0", light0);
-							shader.SetUniform4f("light1", light1);
-							shader.SetUniform1f("ambient", ambient);
-							shader.SetUniform1i("ColorComponent", component_color);
-							shader.SetUniform1f("gamma", gamma);
-							shader.SetUniform3ui("position", xi, yi, zi);
-							shader.SetUniform1i("size", step);
-							shader.SetUniform1f("filter", filter);
-							shader.SetUniform1i("anisotropy", anisotropy);
-							shader.SetUniform1f("thresh", thresh);
+						glyph.Draw();
 
-							glyph.Draw();
-						}
-						shader.End();
 						if (scroll_axis == 2) break;
 					}
 					if (scroll_axis == 1) break;
@@ -439,7 +441,7 @@ int main(int argc, char** argv) {
 			}
 		}
 
-
+		shader.End();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 
