@@ -25,7 +25,7 @@ int scroll_value = 0;
 tira::volume<glm::mat3> T;								// 3D tensor field (3x3)
 tira::volume<unsigned char> I;							// 3D raw image volume
 int gui_VolumeSize[] = { 0, 0, 0 };
-double gui_PixelSize[] = { 1, 1, 1 };
+float gui_PixelSize[] = { 1.0f, 1.0f, 1.0f };
 
 // input variables for arguments
 std::string in_filename;
@@ -333,10 +333,11 @@ int main(int argc, char** argv) {
 
 		float frame;
 		if (TENSOR_LOADED) {
-			gui_VolumeSize[0] = T.X();
-			gui_VolumeSize[1] = T.Y();
-			gui_VolumeSize[2] = T.Z();
+			gui_VolumeSize[0] = T.sx();
+			gui_VolumeSize[1] = T.sy();
+			gui_VolumeSize[2] = T.sz();
 
+			T.set_size((double)gui_PixelSize[0], (double)gui_PixelSize[1], (double)gui_PixelSize[2]);
 			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
 
 			// Reset the visualization to initial state if reset button is pushed
@@ -364,9 +365,9 @@ int main(int argc, char** argv) {
 		glClearColor(0, 0, 0, 0);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glm::mat4 Mtran;
 
-		/// HELIA: Render the plane with texture-mapped image here
+		glm::mat4 ModelMat;
+		glm::mat4 Mtran;
 
 		if (VOLUME_LOADED && RENDER_IMAGE) {
 			// Enable alpha blending for transparency and set blending function
@@ -423,7 +424,7 @@ int main(int argc, char** argv) {
 						xi = (scroll_axis == 0) ? scroll_value : axes[0];
 						yi = (scroll_axis == 1) ? scroll_value : axes[1];
 						zi = (scroll_axis == 2) ? scroll_value : axes[2];
-
+						
 						if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
 						else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
 						else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
