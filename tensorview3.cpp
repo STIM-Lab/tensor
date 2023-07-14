@@ -156,7 +156,6 @@ void InitGLEW() {
 	}
 }
 
-
 glm::mat4 GetCameraView() {
 	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
 	if (scroll_axis == 2 && axis_change)
@@ -285,9 +284,9 @@ int main(int argc, char** argv) {
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename, shader);
 		std::cout << "Size of volume:\t" << T.X() << " x " << T.Y() << " x " << T.Z() << std::endl;
-		gui_VolumeSize[0] = T.X();
-		gui_VolumeSize[1] = T.Y();
-		gui_VolumeSize[2] = T.Z();
+		gui_VolumeSize[0] = T.sx();
+		gui_VolumeSize[1] = T.sy();
+		gui_VolumeSize[2] = T.sz();
 	}
 
 	// If an image volume is specified, load it as a texture
@@ -366,7 +365,14 @@ int main(int argc, char** argv) {
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		glm::mat4 ModelMat;
+		// We should map the volume sizes to (0
+		glm::mat4 Mscale;
+		if (TENSOR_LOADED) {
+			Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(gui_VolumeSize[0] / T.X(), gui_VolumeSize[1] / T.Y(), 1.0f));
+		}
+		else
+			Mscale = glm::mat4(1.0f);
+		
 		glm::mat4 Mtran;
 
 		if (VOLUME_LOADED && RENDER_IMAGE) {
@@ -379,9 +385,9 @@ int main(int argc, char** argv) {
 			zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
 			// Translation matrix
-			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(I.X() * 0.5f, I.Y() * 0.5f, 0.0f));
+			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(I.X() * 0.5f, I.Y() * 0.5f, scroll_value - (gui_VolumeSize[2] / 2.f)));
 			// Scale matrix
-			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(I.X(), I.Y(), 1.0f));
+			glm::mat4 scale = glm::scale(Mscale, glm::vec3(I.X(), I.Y(), 1.0f));
 
 			// Scroll_value should get mapped from range [0, I.Z() - 1] to range [0, 1]
 			float mappep_scroll_value = (float)scroll_value / (float)(I.Z() - 1);
@@ -402,8 +408,8 @@ int main(int argc, char** argv) {
 		component_color = (cmap) ? 2 : 0;
 
 		shader.Begin();
-		shader.SetUniformMat4f("ProjMat", Mprojection);
-		shader.SetUniformMat4f("ViewMat", Mview);
+		shader.SetUniformMat4f("MV", Mprojection * Mview);
+		shader.SetUniformMat4f("Mscale", Mscale);
 		shader.SetUniform4f("light0", light0);
 		shader.SetUniform4f("light1", light1);
 		shader.SetUniform1f("ambient", ambient);
@@ -413,7 +419,7 @@ int main(int argc, char** argv) {
 		shader.SetUniform1f("filter", filter);
 		shader.SetUniform1i("anisotropy", anisotropy);
 		shader.SetUniform1f("thresh", thresh);
-
+		
 		// Rendering the tensor field for the selected axis
 		if (TENSOR_LOADED && RENDER_GLYPHS) {
 			for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
@@ -425,11 +431,12 @@ int main(int argc, char** argv) {
 						yi = (scroll_axis == 1) ? scroll_value : axes[1];
 						zi = (scroll_axis == 2) ? scroll_value : axes[2];
 						
-						if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, 0.0f));
+						// scroll_value gies from 0 to T.Z(). We have to map it from -T.Z()/2 to T.Z()/2.
+						if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, scroll_value - (gui_VolumeSize[2]/2.f)));
 						else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
 						else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
 
-						shader.SetUniformMat4f("Trans", Mtran);
+						shader.SetUniformMat4f("Mtran", Mtran);
 						shader.SetUniform3ui("position", xi, yi, zi);
 
 						glyph.Draw();

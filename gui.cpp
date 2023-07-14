@@ -176,6 +176,12 @@ void RenderUI() {
 
         // Display and input the pixel size
         ImGui::DragFloat3("Pixel Size", gui_PixelSize, 0.001f, 0.f, 5.f, "%.3f");
+        ImGui::Spacing();
+        if (ImGui::SmallButton("Reset")) {
+            gui_PixelSize[0] = 1.f;
+            gui_PixelSize[1] = 1.f;
+            gui_PixelSize[2] = 1.f;
+        }
         ImGui::Spacing(); ImGui::Spacing();
 
 
@@ -223,10 +229,14 @@ void RenderUI() {
         zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
         ImGui::SameLine();
         if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
-
-        ImGui::Separator();
+        ImGui::Spacing(); ImGui::Spacing();
 
         // Reset button
+        ImGui::SeparatorText("Reset");
+        float avail = ImGui::GetContentRegionAvail().x;
+        float off = (avail - 50) * 0.5f;
+        if (off > 0.0f)
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
         RESET = ImGui::Button("Reset", ImVec2(50, 50));
 
         ImGui::GetFont()->Scale = old_size;

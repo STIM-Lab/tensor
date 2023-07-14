@@ -5,9 +5,11 @@ layout(location = 0) in vec3 V;
 
 const float PI = 3.14159265358979323846;
 const float epsilon = 0.0000001;
-uniform mat4 Trans;
-uniform mat4 ViewMat;
-uniform mat4 ProjMat;
+
+uniform mat4 MV;
+uniform mat4 Mtran;
+uniform mat4 Mscale;
+
 uniform int ColorComponent;
 uniform int size;
 uniform float gamma;
@@ -223,7 +225,7 @@ void main() {
 	mat4 Mrot = mat4(eigvecs);
 	Mrot[3][3] = 1.0;
 
-	mat4 ModelMat = Trans * Mrot;
+	mat4 ModelMat = Mtran * Mscale * Mrot;
 
 	////////////////////////////////////////////////////////////////
 	////////////////////// DR.MAYERICH'S CODE //////////////////////
@@ -291,7 +293,7 @@ void main() {
 	// 3rd condition: only draw tensor with their largest eigenvalue above a certain threshold
 
 	if (anisotropy_value > filter || anisotropy == 0)
-		gl_Position = ProjMat * ViewMat * ModelMat * vec4(sq_v, 1.0);
+		gl_Position = MV * ModelMat * vec4(sq_v, 1.0);
 	else
 		gl_Position = vec4(0.0, 0.0, 0.0, 0.0);
 
