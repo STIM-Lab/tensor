@@ -156,7 +156,8 @@ void InitGLEW() {
 	}
 }
 
-glm::mat4 GetCameraView() {
+/*glm::mat4 GetCameraView() {
+
 	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
 	if (scroll_axis == 2 && axis_change)
 	{
@@ -175,7 +176,7 @@ glm::mat4 GetCameraView() {
 	}
 	axis_change = false;
 	return camera.getMatrix();
-}
+}*/
 
 tira::volume<float> GetDiagValues(tira::volume<glm::mat3> T) {
 	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);
@@ -355,7 +356,7 @@ int main(int argc, char** argv) {
 					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 			}
 
-			Mview = GetCameraView(); // camera.getMatrix();						// generate a view matrix from the camera
+			Mview = camera.getMatrix();						// generate a view matrix from the camera
 		}
 
 
@@ -367,16 +368,17 @@ int main(int argc, char** argv) {
 
 		glm::mat4 Mtran;
 
+		// --------- Render the volume slice (image) ----------------------
 		if (VOLUME_LOADED && RENDER_IMAGE) {
 			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-			// Translation matrix - the glyphs are rendered from (0,0) position to (Volume_size.x, .y)
-			// The rectangle location is at (-0.5, 0.5), so a 0.5 should be deducted from the final translation
-			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(I.X() * 0.5f, I.Y() * 0.5f, scroll_value - (gui_VolumeSize[2] / 2.f)));
+			float z = scroll_value * T.dz() - T.sz() / 2.0f;
+			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z));
+
 			// Scale matrix
-			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(gui_PixelSize[0] * I.X(), gui_PixelSize[1] * I.Y(), 1.0f));
+			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(T.sx(), T.sy(), 1.0f));
 
 			// Scroll_value should get mapped from range [0, I.Z() - 1] to range [0, 1]
 			float mappep_scroll_value = (float)scroll_value / (float)(I.Z() - 1);
@@ -410,30 +412,23 @@ int main(int argc, char** argv) {
 		
 		// Rendering the tensor field for the selected axis
 		if (TENSOR_LOADED && RENDER_GLYPHS) {
-			size_t xi, yi, zi;
-			for (axes[0] = 0; axes[0] < gui_VolumeSize[0]; axes[0] += step) {
-				for (axes[1] = 0; axes[1] < gui_VolumeSize[1]; axes[1] += step) {
-					for (axes[2] = 0; axes[2] < gui_VolumeSize[2]; axes[2] += step)
-					{
-						xi = (scroll_axis == 0) ? scroll_value : axes[0];
-						yi = (scroll_axis == 1) ? scroll_value : axes[1];
-						zi = (scroll_axis == 2) ? scroll_value : axes[2];
-						
-						// scroll_value gies from 0 to T.Z(). We have to map it from -T.Z()/2 to T.Z()/2.
-						if		(scroll_axis == 2) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, (float)yi + 0.5f, scroll_value - (gui_VolumeSize[2]/2.f)));
-						else if (scroll_axis == 1) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3((float)xi + 0.5f, 0.0f, (float)zi + 0.5f));
-						else if (scroll_axis == 0) Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, (float)yi + 0.5f, (float)zi + 0.5f));
 
-						shader.SetUniformMat4f("Mtran", Mtran);
-						shader.SetUniform3ui("position", xi, yi, zi);
+			for (size_t yi = 0; yi < T.Y(); yi += step) {
+				for (size_t xi = 0; xi < T.X(); xi += step) {
 
-						glyph.Draw();
+					// calculate the position of the current glyph
+					float y = yi * T.dy() - T.sy() / 2.0f + (T.dy() * step) / 2.0f;
+					float x = xi * T.dx() - T.sx() / 2.0f + (T.dx() * step) / 2.0f;
+					float z = scroll_value * T.dz() - T.sz() / 2.0f;
 
-						if (scroll_axis == 2) break;
-					}
-					if (scroll_axis == 1) break;
+					// render the glyph at position (x, y, z)
+					Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
+					shader.SetUniformMat4f("Mtran", Mtran);
+					shader.SetUniform3ui("position", xi, yi, scroll_value);
+
+					glyph.Draw();
+
 				}
-				if (scroll_axis == 0) break;
 			}
 		}
 

@@ -50,15 +50,14 @@ bool CenteredButton(const char* direc, ImGuiStyle& style) {
 
 void OpenFileDialog() {
     std::cout << "Loading \"" << file_dialog.selected_fn << "\" ..." << std::endl;
-
     if (tensor_data) {
         OPEN_TENSOR = true;
-        TensorFileName = file_dialog.selected_fn;
+        TensorFileName = file_dialog.selected_path;
     }
     if (volume_data)
     {
         OPEN_VOLUME = true;
-        VolumeFileName = file_dialog.selected_fn;
+        VolumeFileName = file_dialog.selected_path;
     }
 
     tensor_data = false;
@@ -221,9 +220,10 @@ void RenderUI() {
 
         // Adjust a threshold for eigenvalues corresponding to each tensor
         ImGui::SeparatorText("Largest Eigenvalue Threshold");
-        static float begin = 0.f, end = 125.f;
+        static float begin = 0.f, end = 125.f, step = 0.005f;
         ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
-        ImGui::DragFloat("Threshold", &thresh, 0.005f, begin, end);
+        ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
+        ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
         ImGui::Spacing(); ImGui::Spacing();
 
         // Zooming in and out option

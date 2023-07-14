@@ -1,7 +1,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "ImGuiFileBrowser.h"
+#include "ImGuiFileBrowser/ImGuiFileBrowser.h"
 
 extern bool RESET;
 extern int scroll_axis;
