@@ -128,6 +128,7 @@ void RenderUI() {
 
 
         ////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
+        ImGui::SeparatorText("Load");
         if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
         {
             ImGui::OpenPopup("Open File");
@@ -151,15 +152,16 @@ void RenderUI() {
         ImGui::Spacing();
         // Adjust the image transparency
         ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
-        ImGui::Separator();
+        
 
         if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
             OpenFileDialog();
-
+        ImGui::Spacing(); ImGui::Spacing();
         ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
         // Select the number of tensors along X axis
+        ImGui::SeparatorText("Pixel/Tensor");
         int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
         ImGui::Text("Number of pixels per tensor:");
         int test;
@@ -169,15 +171,16 @@ void RenderUI() {
             ImGui::SameLine();
             ImGui::Text("0");
         }
-        ImGui::Separator();
+        ImGui::Spacing(); ImGui::Spacing();
 
         // Display the volume size (text only)
+        ImGui::SeparatorText("Size");
         ImGui::DragInt3("Volume Size", gui_VolumeSize, 1, 0, 1500, "%d", ImGuiSliderFlags_NoInput);
 
         // Display and input the pixel size
         ImGui::DragFloat3("Pixel Size", gui_PixelSize, 0.001f, 0.f, 5.f, "%.3f");
         ImGui::Spacing();
-        if (ImGui::SmallButton("Reset")) {
+        if (ImGui::SmallButton(" Reset ")) {
             gui_PixelSize[0] = 1.f;
             gui_PixelSize[1] = 1.f;
             gui_PixelSize[2] = 1.f;

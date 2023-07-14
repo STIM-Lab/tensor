@@ -365,29 +365,18 @@ int main(int argc, char** argv) {
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		// We should map the volume sizes to (0
-		glm::mat4 Mscale;
-		if (TENSOR_LOADED) {
-			Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(gui_VolumeSize[0] / T.X(), gui_VolumeSize[1] / T.Y(), 1.0f));
-		}
-		else
-			Mscale = glm::mat4(1.0f);
-		
 		glm::mat4 Mtran;
 
 		if (VOLUME_LOADED && RENDER_IMAGE) {
 			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			size_t xi, yi, zi;
-			xi = (scroll_axis == 0) ? scroll_value : axes[0];
-			yi = (scroll_axis == 1) ? scroll_value : axes[1];
-			zi = (scroll_axis == 2) ? scroll_value : axes[2];
 
-			// Translation matrix
+			// Translation matrix - the glyphs are rendered from (0,0) position to (Volume_size.x, .y)
+			// The rectangle location is at (-0.5, 0.5), so a 0.5 should be deducted from the final translation
 			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(I.X() * 0.5f, I.Y() * 0.5f, scroll_value - (gui_VolumeSize[2] / 2.f)));
 			// Scale matrix
-			glm::mat4 scale = glm::scale(Mscale, glm::vec3(I.X(), I.Y(), 1.0f));
+			glm::mat4 scale = glm::scale(glm::mat4(1.0f), glm::vec3(gui_PixelSize[0] * I.X(), gui_PixelSize[1] * I.Y(), 1.0f));
 
 			// Scroll_value should get mapped from range [0, I.Z() - 1] to range [0, 1]
 			float mappep_scroll_value = (float)scroll_value / (float)(I.Z() - 1);
@@ -409,7 +398,6 @@ int main(int argc, char** argv) {
 
 		shader.Begin();
 		shader.SetUniformMat4f("MV", Mprojection * Mview);
-		shader.SetUniformMat4f("Mscale", Mscale);
 		shader.SetUniform4f("light0", light0);
 		shader.SetUniform4f("light1", light1);
 		shader.SetUniform1f("ambient", ambient);
@@ -422,11 +410,11 @@ int main(int argc, char** argv) {
 		
 		// Rendering the tensor field for the selected axis
 		if (TENSOR_LOADED && RENDER_GLYPHS) {
-			for (axes[0] = 0; axes[0] < T.X(); axes[0] += step) {
-				for (axes[1] = 0; axes[1] < T.Y(); axes[1] += step) {
-					for (axes[2] = 0; axes[2] < T.Z(); axes[2] += step)
+			size_t xi, yi, zi;
+			for (axes[0] = 0; axes[0] < gui_VolumeSize[0]; axes[0] += step) {
+				for (axes[1] = 0; axes[1] < gui_VolumeSize[1]; axes[1] += step) {
+					for (axes[2] = 0; axes[2] < gui_VolumeSize[2]; axes[2] += step)
 					{
-						size_t xi, yi, zi;
 						xi = (scroll_axis == 0) ? scroll_value : axes[0];
 						yi = (scroll_axis == 1) ? scroll_value : axes[1];
 						zi = (scroll_axis == 2) ? scroll_value : axes[2];

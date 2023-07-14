@@ -8,7 +8,6 @@ const float epsilon = 0.0000001;
 
 uniform mat4 MV;
 uniform mat4 Mtran;
-uniform mat4 Mscale;
 
 uniform int ColorComponent;
 uniform int size;
@@ -225,7 +224,7 @@ void main() {
 	mat4 Mrot = mat4(eigvecs);
 	Mrot[3][3] = 1.0;
 
-	mat4 ModelMat = Mtran * Mscale * Mrot;
+	mat4 ModelMat = Mtran * Mrot;
 
 	////////////////////////////////////////////////////////////////
 	////////////////////// DR.MAYERICH'S CODE //////////////////////
@@ -275,7 +274,7 @@ void main() {
 
 	sq_n = normalize(vec3(sx * sq_n.x, sy * sq_n.y, sz * sq_n.z));
 		
-	mat3 NormMat = transpose(inverse(mat3(ModelMat)));
+	mat3 NormMat = transpose(inverse(mat3(Mtran * Mrot)));
 	vertexNorm = NormMat * sq_n;
 
 	/////////////// DR.MAYERICH'S CODE ENDED /////////////////////////
