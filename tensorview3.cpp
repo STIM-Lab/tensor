@@ -104,8 +104,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 }
 
 void resetPlane(float frame) {
-	camera.setPosition(frame / 2.0f, frame / 2.0f, frame);
-	camera.LookAt(frame / 2.0f, frame / 2.0f, 0.0f, 0.0f, 1.0f, 0.0f);
+	// Reset camera view to initial state
+	camera.setPosition(glm::vec3(0, 0, 0));
+	camera.LookAt(glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+	camera.setFOV(60);
 
 	move[1] = 0.0f;
 	move[0] = 0.0f;
@@ -155,28 +157,6 @@ void InitGLEW() {
 		exit(1);
 	}
 }
-
-/*glm::mat4 GetCameraView() {
-
-	float frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
-	if (scroll_axis == 2 && axis_change)
-	{
-		camera.setPosition(frame / 2.0f, frame / 2.0f, frame);				// adjust the eye position
-		camera.LookAt(frame / 2.0f, frame / 2.0f, 0, 0.0f, 1.0f, 0.0f);
-	}
-	else if (scroll_axis == 1 && axis_change)
-	{
-		camera.setPosition(frame / 2.0f, -frame, frame / 2.0f);
-		camera.LookAt(frame / 2.0f, 0, frame / 2.0f, 0.0f, 0.0f, 1.0f);
-	}
-	else if (scroll_axis == 0 && axis_change)
-	{
-		camera.setPosition(frame, frame / 2.0f, frame / 2.0f);
-		camera.LookAt(0, frame / 2.0f, frame / 2.0f, 0.0f, 0.0f, 1.0f);
-	}
-	axis_change = false;
-	return camera.getMatrix();
-}*/
 
 tira::volume<float> GetDiagValues(tira::volume<glm::mat3> T) {
 	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);
