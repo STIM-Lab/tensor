@@ -5,10 +5,10 @@ import scipy as sp
 from skimage.color import rgb2gray
 import sys
 
-def structure2d(I, sigma):
+def structure2d(I, w=3):
 
     if(len(I.shape) > 2):
-        img = rgb2gray(I)
+        img = I[:, :, 0]
     else:
         img = I
 
@@ -25,18 +25,18 @@ def structure2d(I, sigma):
     T[:, :, 1, 0] = T[:, :, 0, 1]
 
     #if the sigma value is 0, don't do any blurring or resampling
-    if sigma == 0:
+    if w == 0:
         return T
         
-    # otherwise blur and resample the image
+    # otherwise blur the image
     else:    
-        # blur the structure tensor
-        T_blur = sp.ndimage.gaussian_filter(T, [sigma, sigma, 0, 0])
-        
-        # resample the structure tensor
-        T_resampled = downscale_local_mean(T_blur, (sigma, sigma, 1, 1))
+        window = np.ones((w, w, 1, 1))
+        T_blur = sp.signal.convolve(T, window, mode="same")
 
-    return T_resampled
+    return T_blur
+
+def structure2d_bin(I, w=3):
+    
 
 if __name__ == "__main__":
     if(len(sys.argv) < 2):

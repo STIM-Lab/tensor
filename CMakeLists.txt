@@ -46,6 +46,8 @@ configure_file(data/0_1.npy
 
 configure_file(data/1_1.npy 
 				1_1.npy COPYONLY)
+configure_file(data/spread_0.bmp 
+				spread_0.bmp COPYONLY)
 
 configure_file(data/damaged_shape.npy 
 				damaged_shape.npy COPYONLY)
@@ -56,6 +58,12 @@ configure_file(shaders/source.shader
 				source.shader COPYONLY)
 configure_file(shaders/volume.shader 
 				volume.shader COPYONLY)
+
+# copy python scripts
+configure_file(structure2d.py 
+				structure2d.py COPYONLY)
+configure_file(tensorvote.py 
+				tensorvote.py COPYONLY)
 				
 #set the include directories
 include_directories(
