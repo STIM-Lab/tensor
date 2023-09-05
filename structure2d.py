@@ -37,6 +37,18 @@ def structure2d(I, w=3):
 
 def structure2d_bin(I, w=3):
     
+    if(len(I.shape) > 2):
+        img = I[:, :, 0]
+    else:
+        img = I
+        
+    T = structure2d(I, w)
+    
+    nz = img == 0
+    T[nz, :, :] = 0
+    
+    return T
+    
 
 if __name__ == "__main__":
     if(len(sys.argv) < 2):
