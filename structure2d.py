@@ -35,7 +35,7 @@ def structure2d(I, w=3):
 
     return T_blur
 
-def structure2d_bin(I, w=3):
+def structure2d_nz(I, w=3):
     
     if(len(I.shape) > 2):
         img = I[:, :, 0]
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         filename = sys.argv[1]
         print("processing file " + filename)
         I = imread(filename)
-        T = structure2d(I, 0)
+        T = structure2d_nz(I, 0)
     
     if(len(sys.argv) > 2):
         # the user provided an output file name
