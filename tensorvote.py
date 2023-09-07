@@ -153,9 +153,10 @@ def vector2tensor(x, y):
 
 # apply tensor voting to the tensor field T and return the result
 # T is an NxMx2x2 tensor field
-def vote(T, sigma):
+def vote(T, sigma, w=None):
     
-    w = int(6 * sigma / 2)
+    if w is None:
+        w = int(6 * sigma / 2)
     
     X = T.shape[0]
     Y = T.shape[1]
