@@ -192,6 +192,10 @@ __host__ __device__ VoteContribution Saliency(glm::mat2 T, float u, float v, int
     float lambda2 = lambdas[0];
     float ecc = sqrt(1.0 - (pow(lambda2, 2) / pow(lambda1, 2)));
 
+    if (isnan(ecc)) {
+        ecc = 0;
+    }
+
     VoteContribution out;
     out.votes = st.votes;
     out.decay = st.decay * ecc * lambda1;

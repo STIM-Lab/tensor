@@ -190,10 +190,10 @@ int main(int argc, char* argv[]) {
 
     tira::image<glm::mat2> Tn = LoadTensorField(inFile);
 
-    tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
+    //tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
     float* T_cuda = CUDAImplementation(Tn, sigma);
 
-    SaveTensorField(T_cpu, "cpu_" + outFile);
+    //SaveTensorField(T_cpu, "cpu_" + outFile);
     SaveTensorField(T_cuda, Tn.shape()[1], Tn.shape()[0], "cuda_" + outFile);
 
     return 0;

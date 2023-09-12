@@ -15,8 +15,8 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
-set(Boost_NO_WARN_NEW_VERSIONS 1)
-find_package(Boost REQUIRED COMPONENTS program_options)
+#set(Boost_NO_WARN_NEW_VERSIONS 1)
+#find_package(Boost REQUIRED COMPONENTS program_options)
 
 
 #build the executable in the binary directory on MS Visual Studio
@@ -104,7 +104,7 @@ target_link_libraries(tensorview3
 				PRIVATE GLEW::GLEW
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
-				Boost::program_options
+#				Boost::program_options
 #				Eigen3::Eigen
 				PRIVATE imgui::imgui
 )
