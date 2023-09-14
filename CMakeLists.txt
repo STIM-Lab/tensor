@@ -46,11 +46,30 @@ configure_file(data/0_1.npy
 
 configure_file(data/1_1.npy 
 				1_1.npy COPYONLY)
-configure_file(data/spread_0.bmp 
-				spread_0.bmp COPYONLY)
 
 configure_file(data/damaged_shape.npy 
 				damaged_shape.npy COPYONLY)
+
+configure_file(data/spread_2_hurl_0.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+
+configure_file(data/spread_2_hurl_2.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+
+configure_file(data/spread_2_hurl_5.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+				
+configure_file(data/spread_5_hurl_0.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+
+configure_file(data/spread_5_hurl_2.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+
+configure_file(data/spread_5_hurl_5.bmp 
+				spread_2_hurl_0.bmp COPYONLY)
+
+configure_file(tensorvote.sh 
+				tensorvote.sh COPYONLY)
 
 configure_file(shaders/glyph2d.shader 
 				glyph2d.shader COPYONLY)

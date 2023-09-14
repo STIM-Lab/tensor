@@ -188,17 +188,17 @@ __host__ __device__ VoteContribution Saliency(glm::mat2 T, float u, float v, int
 
     TensorAngleCalculation st = SaliencyTheta(theta, u, v, sigma);
 
-    float lambda1 = lambdas[1];
-    float lambda2 = lambdas[0];
-    float ecc = sqrt(1.0 - (pow(lambda2, 2) / pow(lambda1, 2)));
+    float lambdaLarge = lambdas[1];
+    float lambdaSmall = lambdas[0];
+    float ecc = sqrt(1.0 - (pow(lambdaSmall, 2) / pow(lambdaLarge, 2)));
 
     if (isnan(ecc)) {
         ecc = 0;
     }
 
     VoteContribution out;
-    out.votes = st.votes;
-    out.decay = st.decay * ecc * lambda1;
+    out.votes = st.votes * lambdaLarge;
+    out.decay = st.decay * ecc * lambdaLarge;
 
     return out;
 }
