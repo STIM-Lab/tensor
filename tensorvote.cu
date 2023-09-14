@@ -9,10 +9,12 @@
 #define __device__
 #endif
 
-static void HandleError(cudaError_t err, const char* file, int line) {
-	if (err != cudaSuccess) {
-		std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
-	}
+static void HandleError(cudaError_t err, const char *file, int line)
+{
+    if (err != cudaSuccess)
+    {
+        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
+    }
 }
 #define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
@@ -47,10 +49,8 @@ tira::image<glm::mat2> voteCPU(tira::image<glm::mat2> T, int sigma)
     return VT;
 }
 
-__global__ void voteGPU(float* data, float* VT, int sigma, int w, int width, int height) {
-
-    // extern __shared__ float s[];
-
+__global__ void voteGPU(float *data, float *VT, int sigma, int w, int width, int height)
+{
     // get index for input data
     size_t y = blockDim.y * blockIdx.y + threadIdx.y;
     size_t x = blockDim.x * blockIdx.x + threadIdx.x;
@@ -59,42 +59,21 @@ __global__ void voteGPU(float* data, float* VT, int sigma, int w, int width, int
     if (y >= height || x >= width)
         return;
 
-    // int idx = 4 * (threadIdx.y * blockDim.y + threadIdx.x);
+    float vt[4] = {0, 0, 0, 0};
 
-    // s[idx + 0] = data[4 * (y * width + x) + 0];
-    // s[idx + 1] = data[4 * (y * width + x) + 1];
-    // s[idx + 2] = data[4 * (y * width + x) + 2];
-    // s[idx + 3] = data[4 * (y * width + x) + 3];
-
-    // __syncthreads();
-
-    float vt[4] = { 0,0,0,0 };
-
-    for (int u = -w; u < w; u++) {
-        for (int v = -w; v < w; v++) {
+    for (int u = -w; u < w; u++)
+    {
+        for (int v = -w; v < w; v++)
+        {
             int index = ((v + y) * width + x + u);
             int indexShared = ((threadIdx.y + v) * blockDim.y + threadIdx.x + u);
-            // if (indexShared < blockDim.x * blockDim.y && indexShared >= 0) {
-            //     glm::mat2 T(
-            //         s[4 * indexShared + 0],
-            //         s[4 * indexShared + 1],
-            //         s[4 * indexShared + 2],
-            //         s[4 * indexShared + 3]
-            //     );
-
-            //     VoteContribution vc = Saliency(T, u, v, sigma);
-            //     vt[0] += vc.votes[0][0] * vc.decay;
-            //     vt[1] += vc.votes[0][1] * vc.decay;
-            //     vt[2] += vc.votes[1][0] * vc.decay;
-            //     vt[3] += vc.votes[1][1] * vc.decay;
-            // }
-            if (index < width * height && index >= 0) {
+            if (index < width * height && index >= 0)
+            {
                 glm::mat2 T(
                     data[4 * index + 0],
                     data[4 * index + 1],
                     data[4 * index + 2],
-                    data[4 * index + 3]
-                );
+                    data[4 * index + 3]);
 
                 VoteContribution vc = Saliency(T, u, v, sigma);
                 vt[0] += vc.votes[0][0] * vc.decay;
@@ -111,7 +90,8 @@ __global__ void voteGPU(float* data, float* VT, int sigma, int w, int width, int
     VT[4 * (y * width + x) + 3] = vt[3];
 }
 
-tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma) {
+tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma)
+{
     std::cout << "**********CPU**********" << std::endl;
 
     std::chrono::high_resolution_clock::time_point start, stop;
@@ -127,22 +107,23 @@ tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma) {
     return T;
 }
 
-float* CUDAImplementation(tira::image<glm::mat2> Tn, int sigma) {
+float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma)
+{
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
 
     std::cout << "**********CUDA**********" << std::endl;
 
-    float width  = Tn.shape()[1];
+    float width = Tn.shape()[1];
     float height = Tn.shape()[0];
     int size = 4 * width * height;
 
-    float* data = (float*)Tn.data();
+    float *data = (float *)Tn.data();
 
     int w = 6 * sigma / 2;
 
-    float* inArray;
-    float* outArray;
+    float *inArray;
+    float *outArray;
 
     HANDLE_ERROR(cudaMalloc(&inArray, size * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&outArray, size * sizeof(float)));
@@ -161,12 +142,12 @@ float* CUDAImplementation(tira::image<glm::mat2> Tn, int sigma) {
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    voteGPU <<< blocks, threads, sharedBytes >>> (inArray, outArray, sigma, w, width, height);
+    voteGPU<<<blocks, threads, sharedBytes>>>(inArray, outArray, sigma, w, width, height);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
-    float* gpu_out = new float[size];
+    float *gpu_out = new float[size];
     HANDLE_ERROR(cudaMemcpy(gpu_out, outArray, size * sizeof(float), cudaMemcpyDeviceToHost));
 
     float totalTime;
@@ -177,9 +158,11 @@ float* CUDAImplementation(tira::image<glm::mat2> Tn, int sigma) {
     return gpu_out;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
 
-    if (argc != 4) {
+    if (argc != 4)
+    {
         std::cout << "Need input in the form of {input npy file} {output npy file} {sigma}" << std::endl;
         return -1;
     }
@@ -190,10 +173,10 @@ int main(int argc, char* argv[]) {
 
     tira::image<glm::mat2> Tn = LoadTensorField(inFile);
 
-    //tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
-    float* T_cuda = CUDAImplementation(Tn, sigma);
+    // tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
+    float *T_cuda = CUDAImplementation(Tn, sigma);
 
-    //SaveTensorField(T_cpu, "cpu_" + outFile);
+    // SaveTensorField(T_cpu, "cpu_" + outFile);
     SaveTensorField(T_cuda, Tn.shape()[1], Tn.shape()[0], "cuda_" + outFile);
 
     return 0;

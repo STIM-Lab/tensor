@@ -27,7 +27,8 @@ struct TensorAngleCalculation
     float decay;
 };
 
-struct multiVec2 {
+struct multiVec2
+{
     glm::vec2 x;
     glm::vec2 y;
 };
@@ -44,12 +45,14 @@ tira::image<glm::mat2> LoadTensorField(std::string filename)
     return T0;
 }
 
-void SaveTensorField(tira::image<glm::mat2> T, std::string filename) {
-    tira::image<float> out((float*)T.data(), T.X(), T.Y(), 4);
+void SaveTensorField(tira::image<glm::mat2> T, std::string filename)
+{
+    tira::image<float> out((float *)T.data(), T.X(), T.Y(), 4);
     out.save_npy(filename);
 }
 
-void SaveTensorField(float* data, float width, float height, std::string filename) {
+void SaveTensorField(float *data, float width, float height, std::string filename)
+{
     tira::image<float> out(data, width, height, 4);
     out.save_npy(filename);
 }
@@ -163,16 +166,16 @@ __host__ __device__ TensorAngleCalculation SaliencyTheta(float theta, float u, f
     out.votes = outer;
     out.decay = decay;
 
-
     return out;
 }
 
 __host__ __device__ VoteContribution Saliency(glm::mat2 T, float u, float v, int sigma)
 {
 
-    if (!NonZeroTensor(T)) {
+    if (!NonZeroTensor(T))
+    {
         VoteContribution out;
-        out.votes = glm::mat2(0,0,0,0);
+        out.votes = glm::mat2(0, 0, 0, 0);
         out.decay = 0;
 
         return out;
@@ -192,12 +195,13 @@ __host__ __device__ VoteContribution Saliency(glm::mat2 T, float u, float v, int
     float lambdaSmall = lambdas[0];
     float ecc = sqrt(1.0 - (pow(lambdaSmall, 2) / pow(lambdaLarge, 2)));
 
-    if (isnan(ecc)) {
+    if (isnan(ecc))
+    {
         ecc = 0;
     }
 
     VoteContribution out;
-    out.votes = st.votes * lambdaLarge;
+    out.votes = st.votes;
     out.decay = st.decay * ecc * lambdaLarge;
 
     return out;
