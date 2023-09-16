@@ -107,7 +107,7 @@ tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma)
     return T;
 }
 
-float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma)
+float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma, int w)
 {
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
@@ -119,8 +119,6 @@ float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma)
     int size = 4 * width * height;
 
     float *data = (float *)Tn.data();
-
-    int w = 6 * sigma / 2;
 
     float *inArray;
     float *outArray;
@@ -163,18 +161,26 @@ int main(int argc, char *argv[])
 
     if (argc != 4)
     {
-        std::cout << "Need input in the form of {input npy file} {output npy file} {sigma}" << std::endl;
+        std::cout << "Need input in the form of {input npy file} {output npy file} {sigma} {windowSize (optional)}" << std::endl;
         return -1;
     }
 
     std::string inFile(argv[1]);
     std::string outFile(argv[2]);
     int sigma = atoi(argv[3]);
+    int windowSize;
+
+    if (argc > 4) {
+        windowSize = atoi(argv[4]);
+    }
+    else {
+        windowSize = 6 * sigma / 2;
+    }
 
     tira::image<glm::mat2> Tn = LoadTensorField(inFile);
 
     // tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
-    float *T_cuda = CUDAImplementation(Tn, sigma);
+    float *T_cuda = CUDAImplementation(Tn, sigma, windowSize);
 
     // SaveTensorField(T_cpu, "cpu_" + outFile);
     SaveTensorField(T_cuda, Tn.shape()[1], Tn.shape()[0], "cuda_" + outFile);
