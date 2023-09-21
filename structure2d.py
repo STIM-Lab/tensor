@@ -5,7 +5,7 @@ import scipy as sp
 from skimage.color import rgb2gray
 import sys
 
-def structure2d(I, w=3):
+def structure2d(I, sigma=3):
 
     if(len(I.shape) > 2):
         img = I[:, :, 0]
@@ -25,12 +25,12 @@ def structure2d(I, w=3):
     T[:, :, 1, 0] = T[:, :, 0, 1]
 
     #if the sigma value is 0, don't do any blurring or resampling
-    if w == 0:
+    if sigma == 0:
         return T
         
     # otherwise blur the image
     else:    
-        window = np.ones((w, w, 1, 1))
+        window = np.ones((sigma, sigma, 1, 1))
         T_blur = sp.signal.convolve(T, window, mode="same")
 
     return T_blur
@@ -46,6 +46,26 @@ def structure2d_nz(I, w=3):
     
     nz = img == 0
     T[nz, :, :] = 0
+    
+    return T
+
+def hessian(I, w=0):
+    
+    if(len(I.shape) > 2):
+        img = I[:, :, 0]
+    else:
+        img = I
+    
+    dIdy, dIdx = np.gradient(img)
+    dI2dy2, _ = np.gradient(dIdy)
+    _, dI2dx2 = np.gradient(dIdx)
+    
+    # create the Hessian tensor
+    T = np.zeros((img.shape[0], img.shape[1], 2, 2))
+    T[:, :, 0, 0] = dI2dx2**2
+    T[:, :, 1, 1] = dI2dy2**2
+    T[:, :, 0, 1] = dI2dx2*dI2dy2
+    T[:, :, 1, 0] = T[:, :, 0, 1]
     
     return T
     
