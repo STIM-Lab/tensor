@@ -15,8 +15,9 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
-#set(Boost_NO_WARN_NEW_VERSIONS 1)
-#find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Eigen3 REQUIRED)
+set(Boost_NO_WARN_NEW_VERSIONS 1)
+find_package(Boost REQUIRED COMPONENTS program_options)
 
 
 #build the executable in the binary directory on MS Visual Studio
@@ -27,6 +28,7 @@ if ( MSVC )
 	SET( LIBRARY_OUTPUT_DIRECTORY_RELEASE "${OUTPUT_DIRECTORY}")
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 	add_definitions(-D_SCL_SECURE_NO_WARNINGS)
+	add_definitions(-D_USE_MATH_DEFINES)
 endif ( MSVC )
 
 configure_file(Roboto-Medium.ttf 
@@ -68,6 +70,18 @@ configure_file(data/spread_5_hurl_2.bmp
 configure_file(data/spread_5_hurl_5.bmp 
 				spread_2_hurl_0.bmp COPYONLY)
 
+configure_file(data/plane.bmp 
+				plane.bmp COPYONLY)
+
+configure_file(data/plane_2X.bmp 
+				plane_2X.bmp COPYONLY)
+
+configure_file(data/plane_4X.bmp 
+				plane_4X.bmp COPYONLY)
+
+configure_file(data/plane_8X.bmp 
+				plane_8X.bmp COPYONLY)
+
 configure_file(tensorvote.sh 
 				tensorvote.sh COPYONLY)
 
@@ -77,6 +91,9 @@ configure_file(shaders/source.shader
 				source.shader COPYONLY)
 configure_file(shaders/volume.shader 
 				volume.shader COPYONLY)
+
+configure_file(data/magic.bmp 
+				magic.bmp COPYONLY)
 
 # copy python scripts
 configure_file(structure2d.py 
@@ -123,9 +140,19 @@ target_link_libraries(tensorview3
 				PRIVATE GLEW::GLEW
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
-#				Boost::program_options
+				Boost::program_options
 #				Eigen3::Eigen
 				PRIVATE imgui::imgui
+)
+
+#create an executable
+add_executable(structen
+				structen.cpp
+)
+
+target_link_libraries(structen
+				Boost::program_options
+				Eigen3::Eigen
 )
 
 # tensorvote executable
