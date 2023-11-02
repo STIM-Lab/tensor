@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 
 	unsigned int d = 1;						// derivative to calculate
 	unsigned int O = 2;
-	std::string fname = "plane.bmp";
+	std::string fname = "plane_2X.bmp";
 
 	tira::image<float> I(fname);
 	/*tira::image<float> I(255, 255, 1);

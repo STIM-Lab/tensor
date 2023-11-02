@@ -70,17 +70,8 @@ configure_file(data/spread_5_hurl_2.bmp
 configure_file(data/spread_5_hurl_5.bmp 
 				spread_2_hurl_0.bmp COPYONLY)
 
-configure_file(data/plane.bmp 
-				plane.bmp COPYONLY)
-
-configure_file(data/plane_2X.bmp 
-				plane_2X.bmp COPYONLY)
-
 configure_file(data/plane_4X.bmp 
 				plane_4X.bmp COPYONLY)
-
-configure_file(data/plane_8X.bmp 
-				plane_8X.bmp COPYONLY)
 
 configure_file(tensorvote.sh 
 				tensorvote.sh COPYONLY)
