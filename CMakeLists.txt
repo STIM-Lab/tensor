@@ -34,57 +34,11 @@ endif ( MSVC )
 configure_file(Roboto-Medium.ttf 
 				Roboto-Medium.ttf COPYONLY)
 
-configure_file(data/lena.npy 
-				lena.npy COPYONLY)
-
-configure_file(shaders/colormap.shader 
-				colormap.shader COPYONLY)
-
-configure_file(data/oval.npy 
-				oval.npy COPYONLY)
-
-configure_file(data/0_1.npy 
-				0_1.npy COPYONLY)
-
-configure_file(data/1_1.npy 
-				1_1.npy COPYONLY)
-
-configure_file(data/damaged_shape.npy 
-				damaged_shape.npy COPYONLY)
-
-configure_file(data/spread_2_hurl_0.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-
-configure_file(data/spread_2_hurl_2.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-
-configure_file(data/spread_2_hurl_5.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-				
-configure_file(data/spread_5_hurl_0.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-
-configure_file(data/spread_5_hurl_2.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-
-configure_file(data/spread_5_hurl_5.bmp 
-				spread_2_hurl_0.bmp COPYONLY)
-
-configure_file(data/plane_4X.bmp 
-				plane_4X.bmp COPYONLY)
-
-configure_file(tensorvote.sh 
-				tensorvote.sh COPYONLY)
-
-configure_file(shaders/glyph2d.shader 
-				glyph2d.shader COPYONLY)
-configure_file(shaders/source.shader 
-				source.shader COPYONLY)
-configure_file(shaders/volume.shader 
-				volume.shader COPYONLY)
-
-configure_file(data/magic.bmp 
-				magic.bmp COPYONLY)
+# copy test data
+configure_file(data/spread2_hurl5.bmp 
+				spread2_hurl5.bmp COPYONLY)
+configure_file(data/st2d_spread2_hurl5.npy 
+				st2d_spread2_hurl5.npy COPYONLY)
 
 # copy python scripts
 configure_file(structure2d.py 
@@ -155,8 +109,4 @@ add_executable(tensorvote
 target_link_libraries(tensorvote
 				PRIVATE glm::glm
 )
-
-# tensorview 3 components
-configure_file(data/oval3d.npy 
-			   oval3d.npy COPYONLY)
 

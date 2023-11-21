@@ -60,17 +60,17 @@ std::vector< std::vector<T> > finite_difference_coefficients(unsigned int deriva
 
 int main(int argc, char** argv) {
 
-	unsigned int d = 1;						// derivative to calculate
-	unsigned int O = 2;
-	std::string fname = "plane_2X.bmp";
+	std::string in_fname = "test_image_3D.npy";
+	unsigned int in_O = 2;						// order of the structure tensor derivative calculation
+	unsigned int D;								// number of dimensions in the structure tensor
 
-	tira::image<float> I(fname);
-	/*tira::image<float> I(255, 255, 1);
-	for (int i = 0; i < I.X(); i++) {
-		for (int j = 0; j < I.Y(); j++) {
-			I(i, j, 0) = j;
-		}
-	}*/
+	unsigned int d = 1;							// derivative to calculate
+
+	tira::field<float> T;
+	T.load_npy(in_fname);
+
+	/*tira::image<float> I(in_fname);
+
 	tira::image<float> grey = I.channel(0);
 
 	auto clock_start = std::chrono::system_clock::now();
@@ -83,22 +83,5 @@ int main(int argc, char** argv) {
 
 	tira::image<unsigned char> color = D.cmap();
 	color.save("test.bmp");
-
-	/*std::vector<size_t> shape = {10};
-	tira::field<float> T(shape);
-	T({ 0 }) = 0;
-	T({ 1 }) = 1;
-	T({ 2 }) = 2;
-	T({ 3 }) = 3;
-	T({ 4 }) = 4;
-	T({ 5 }) = 5;
-	T({ 6 }) = 4;
-	T({ 7 }) = 3;
-	T({ 8 }) = 2;
-	T({ 9 }) = 1;
-
-	tira::image<float> D = T.derivative(0, 2, 4);
-	//tira::image<float>* Dimg = dynamic_cast<tira::image<float>*>(D);
-	//tira::image<unsigned char> color = D.cmap(0, 1);
 	*/
 }
