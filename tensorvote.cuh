@@ -38,12 +38,12 @@ __host__ __device__ bool NonZeroTensor(glm::mat2 T)
     return T[0][0] || T[0][1] || T[1][0] || T[1][1];
 }
 
-tira::image<glm::mat2> LoadTensorField(std::string filename)
+/*tira::image<glm::mat2> LoadTensorField(std::string filename)
 {
     tira::image<glm::mat2> T0;
     T0.load_npy<float>(filename);
     return T0;
-}
+}*/
 
 void SaveTensorField(tira::image<glm::mat2> T, std::string filename)
 {

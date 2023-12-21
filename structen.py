@@ -49,6 +49,38 @@ def structure2d_nz(I, w=3):
     
     return T
 
+# calculate the N-D structure tensor
+def structen(I, sigma):
+    
+    # calculate the gradient of the image
+    D = np.gradient(I)
+    
+    dims = len(D)
+    
+    # allocate the structure tensor
+    T_shape = I.shape + (dims, dims)
+    T = np.zeros(T_shape)
+    
+    for d1 in range(dims):
+        for d2 in range(dims):
+            T[..., d1, d2] = D[d1] * D[d2]
+            
+    if sigma is not None:
+        
+        if np.isscalar(sigma):
+            s = tuple([sigma] * dims) + (0, 0)
+        elif len(sigma) == 1:
+            s = ((sigma[0]) * dims) + (0, 0)
+        elif len(sigma) == dims:
+            s = sigma + (0, 0)
+        else:
+            raise Exception("Invalid sigma (must be a single number or one number for each dimension)")
+        
+        return sp.ndimage.gaussian_filter(T, s)
+        
+    return T
+    
+
 def hessian(I, w=0):
     
     if(len(I.shape) > 2):

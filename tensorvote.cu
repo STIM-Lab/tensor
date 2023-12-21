@@ -51,32 +51,30 @@ tira::image<glm::mat2> voteCPU(tira::image<glm::mat2> T, int sigma)
 
 __global__ void voteGPU(float *data, float *VT, int sigma, int w, int width, int height)
 {
-    // get index for input data
-    size_t y = blockDim.y * blockIdx.y + threadIdx.y;
+    size_t y = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
     size_t x = blockDim.x * blockIdx.x + threadIdx.x;
 
-    // if not within bounds of image, return
-    if (y >= height || x >= width)
+    
+    if (y >= height || x >= width)                                                          // if not within bounds of image, return
         return;
 
-    float vt[4] = {0, 0, 0, 0};
+    float vt[4] = {0, 0, 0, 0};                                                             // initialize a tensor to zeros
 
-    for (int u = -w; u < w; u++)
+    for (int u = -w; u < w; u++)                                                            // for each pixel within the window
     {
         for (int v = -w; v < w; v++)
         {
-            int index = ((v + y) * width + x + u);
-            int indexShared = ((threadIdx.y + v) * blockDim.y + threadIdx.x + u);
-            if (index < width * height && index >= 0)
-            {
+            int index = ((v + y) * width + x + u);                                          // calculate a 1D index into the tensor field
+            //int indexShared = ((threadIdx.y + v) * blockDim.y + threadIdx.x + u);
+            if (index < width * height && index >= 0) {                                     // DAVID: This will cause wrap-around artifacts
                 glm::mat2 T(
                     data[4 * index + 0],
                     data[4 * index + 1],
                     data[4 * index + 2],
                     data[4 * index + 3]);
 
-                VoteContribution vc = Saliency(T, u, v, sigma);
-                vt[0] += vc.votes[0][0] * vc.decay;
+                VoteContribution vc = Saliency(T, u, v, sigma);                             // calculate the saliency given the tensor at (u,v)
+                vt[0] += vc.votes[0][0] * vc.decay;                                         // sum the tensor contribution based on the saliency
                 vt[1] += vc.votes[0][1] * vc.decay;
                 vt[2] += vc.votes[1][0] * vc.decay;
                 vt[3] += vc.votes[1][1] * vc.decay;
@@ -107,6 +105,13 @@ tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma)
     return T;
 }
 
+/// <summary>
+/// Calculates one iteration of tensor voting given an input tensor field Tn
+/// </summary>
+/// <param name="Tn">Input tensor field as a 2D image of matrices</param>
+/// <param name="sigma">Standard deviation for the decay function</param>
+/// <param name="w">Window size for the decay function (usually dependent on sigma)</param>
+/// <returns></returns>
 float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma, int w)
 {
     cudaDeviceProp props;
@@ -140,7 +145,7 @@ float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma, int w)
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    voteGPU<<<blocks, threads, sharedBytes>>>(inArray, outArray, sigma, w, width, height);
+    voteGPU<<<blocks, threads, sharedBytes>>>(inArray, outArray, sigma, w, width, height);              // call the CUDA kernel for voting
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -156,34 +161,3 @@ float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma, int w)
     return gpu_out;
 }
 
-int main(int argc, char *argv[])
-{
-
-    if (argc != 4)
-    {
-        std::cout << "Need input in the form of {input npy file} {output npy file} {sigma} {windowSize (optional)}" << std::endl;
-        return -1;
-    }
-
-    std::string inFile(argv[1]);
-    std::string outFile(argv[2]);
-    int sigma = atoi(argv[3]);
-    int windowSize;
-
-    if (argc > 4) {
-        windowSize = atoi(argv[4]);
-    }
-    else {
-        windowSize = 6 * sigma / 2;
-    }
-
-    tira::image<glm::mat2> Tn = LoadTensorField(inFile);
-
-    // tira::image<glm::mat2> T_cpu = CPUImplementation(Tn, sigma);
-    float *T_cuda = CUDAImplementation(Tn, sigma, windowSize);
-
-    // SaveTensorField(T_cpu, "cpu_" + outFile);
-    SaveTensorField(T_cuda, Tn.shape()[1], Tn.shape()[0], "cuda_" + outFile);
-
-    return 0;
-}

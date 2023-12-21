@@ -41,8 +41,8 @@ configure_file(data/st2d_spread2_hurl5.npy
 				st2d_spread2_hurl5.npy COPYONLY)
 
 # copy python scripts
-configure_file(structure2d.py 
-				structure2d.py COPYONLY)
+configure_file(structen.py 
+				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
 				
@@ -102,11 +102,14 @@ target_link_libraries(structen
 
 # tensorvote executable
 add_executable(tensorvote
+				tensorvote.cpp
+				tensorvote.h
 				tensorvote.cuh	
 				tensorvote.cu
 )
 
 target_link_libraries(tensorvote
 				PRIVATE glm::glm
+				Boost::program_options
 )
 

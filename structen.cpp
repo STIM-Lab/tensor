@@ -4,6 +4,13 @@
 #include <chrono>
 
 #include <tira/image.h>
+#include <tira/volume.h>
+
+#include <boost/program_options.hpp>
+
+std::string in_inputname;
+std::string in_outputname;
+unsigned int in_order;
 
 
 /// <summary>
@@ -60,28 +67,70 @@ std::vector< std::vector<T> > finite_difference_coefficients(unsigned int deriva
 
 int main(int argc, char** argv) {
 
-	std::string in_fname = "test_image_3D.npy";
-	unsigned int in_O = 2;						// order of the structure tensor derivative calculation
-	unsigned int D;								// number of dimensions in the structure tensor
+	// Declare the supported options.
+	boost::program_options::options_description desc("Allowed options");
+	desc.add_options()
+		("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
+		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "optional image field corresponding to the tensors")
+		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
+		("help", "produce help message")
+		;
+	boost::program_options::variables_map vm;
 
-	unsigned int d = 1;							// derivative to calculate
+	boost::program_options::positional_options_description p;
+	p.add("input", -1);
+	boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
-	tira::field<float> T;
-	T.load_npy(in_fname);
+	boost::program_options::notify(vm);
 
-	/*tira::image<float> I(in_fname);
+	if (vm.count("help")) {
+		std::cout << desc << std::endl;
+		return 1;
+	}
 
-	tira::image<float> grey = I.channel(0);
+	int dim = 3;															// number of dimensions
+	std::vector< tira::field<float> > D;									// vector stores the derivatives
 
-	auto clock_start = std::chrono::system_clock::now();
-	
-	tira::image<float> D = grey.derivative(0, 1, 6);
+	if (dim == 2) {
+		tira::image<float> I(in_inputname);									// load the input image
+		tira::image<float> grey = I.channel(0);								// get the first channel if this is a color image
+		tira::field<float> Dx = grey.derivative(1, 1, in_order);			// calculate the derivative along the x axis	
+		tira::field<float> Dy = grey.derivative(0, 1, in_order);			// calculate the derivative along the y axis
 
-	auto clock_now = std::chrono::system_clock::now();
-	float currentTime = float(std::chrono::duration_cast <std::chrono::microseconds> (clock_now - clock_start).count());
-	std::cout << "Elapsed Time: " << currentTime / 1000000 << " S \n";
+		D.push_back(Dx);
+		D.push_back(Dy);
+	}
+	else if (dim == 3) {
+		tira::volume<float> I(in_inputname);
+		tira::volume<float> grey = I.channel(0);
+		tira::field<float> Dx = grey.derivative(2, 1, in_order);
+		tira::field<float> Dy = grey.derivative(1, 1, in_order);
+		tira::field<float> Dz = grey.derivative(0, 1, in_order);
 
-	tira::image<unsigned char> color = D.cmap();
-	color.save("test.bmp");
-	*/
+		D.push_back(Dx);
+		D.push_back(Dy);
+		D.push_back(Dz);
+	}
+
+	std::vector<size_t> tensor_shape = D[0].shape();						// get the shape of the tensor field
+	tensor_shape[dim] = dim;												// push two additional dimensions representing the square matrix
+	tensor_shape.push_back(dim);
+
+	tira::field<float> ST(tensor_shape);
+
+	std::vector<size_t> st_coord, i_coord;
+	for (tira::field<float>::iterator i = D[0].begin(); i != D[0].end(); i++) {
+		i_coord = i.coord();
+		st_coord = i_coord;
+		st_coord.resize(dim + 2);
+		for (unsigned int d0 = 0; d0 < dim; d0++) {
+			st_coord[dim + 0] = d0;
+			for (unsigned int d1 = 0; d1 < dim; d1++) {
+				st_coord[dim + 1] = d1;
+				ST(st_coord) = D[d0](i_coord) * D[d1](i_coord);
+			}
+		}
+	}
+
+	ST.save_npy(in_outputname);
 }
