@@ -6,7 +6,6 @@
 
 #include <tira/image.h>
 
-#include <glm/glm.hpp>
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 
@@ -25,28 +24,6 @@ static void HandleError(cudaError_t err, const char *file, int line)
 }
 #define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
-struct VoteContribution
-{
-    glm::mat2 votes;
-    float decay;
-};
-
-struct TensorAngleCalculation
-{
-    glm::mat2 votes;
-    float decay;
-};
-
-struct multiVec2
-{
-    glm::vec2 x;
-    glm::vec2 y;
-};
-
-bool NonZeroTensor(glm::mat2 T)
-{
-    return T[0][0] || T[0][1] || T[1][0] || T[1][1];
-}
 
 // small then large
 glm::vec2 Eigenvalues2D(glm::mat2 T)
@@ -120,83 +97,11 @@ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigen
     }
 }
 
-float Decay(float angle, float length, int sigma)
+/// Calculate the contribution of a vote at position (u,v) relative to the current tensor T
+// T is the current tensor
+// (u,v) is the relative position of the votee
+VoteContribution Saliency(float u, float v, int sigma, float *eigenvalues, float *eigenvectors)
 {
-    if (length == 0)
-        return 1;
-
-    float alpha = acos(abs(cos(M_PI / 2 - angle)));
-
-    // calculate c (see math)
-    float c = (-16 * log10f(0.1) * (sigma - 1)) / (pow(M_PI, 2));
-
-    // calculate saliency decay
-    float S;
-    if (alpha == 0)
-        S = length;
-    else
-        S = (alpha * length) / sin(alpha);
-
-    float kappa = (2 * sin(alpha)) / length;
-    float S_kappa = pow(S, 2) + c * pow(kappa, 2);
-    float E = -1 * S_kappa / (pow(sigma, 2));
-    float d;
-    float pi4 = M_PI / 4;
-    if (alpha > pi4 || alpha < -pi4)
-        d = 0;
-    else
-        d = exp(E);
-
-    return d;
-}
-
-TensorAngleCalculation SaliencyTheta(float theta, float u, float v, int sigma = 10)
-{
-    float theta_cos = cos(theta);
-    float theta_sin = sin(theta);
-
-    glm::mat2 Rtheta_r(theta_cos, theta_sin, -theta_sin, theta_cos);
-    glm::mat2 Rtheta_l(theta_cos, -theta_sin, theta_sin, theta_cos);
-
-    glm::vec2 p(Rtheta_r[0][0] * u + Rtheta_r[0][1] * v, Rtheta_r[1][0] * u + Rtheta_r[1][1] * v);
-
-    float l = sqrt(pow(p[0], 2) + pow(p[1], 2));
-
-    float phi = atan2(p[1], p[0]);
-
-    float decay = Decay(phi, l, sigma);
-
-    float phi2 = 2 * phi;
-
-    float phi2_cos = cos(phi2);
-    float phi2_sin = sin(phi2);
-
-    glm::mat2 Rphi2(phi2_cos, -phi2_sin, phi2_sin, phi2_cos);
-
-    glm::vec2 V_source(Rphi2[0][0], Rphi2[1][0]);
-
-    glm::vec2 V(Rtheta_l[0][0] * V_source[0] + Rtheta_l[0][1] * V_source[1], Rtheta_l[1][0] * V_source[0] + Rtheta_l[1][1] * V_source[1]);
-    glm::mat2 outer = glm::outerProduct(V, V);
-
-    TensorAngleCalculation out;
-
-    out.votes = outer;
-    out.decay = decay;
-
-    return out;
-}
-
-VoteContribution Saliency(glm::mat2 T, float u, float v, int sigma, float *eigenvalues, float *eigenvectors)
-{
-
-    if (!NonZeroTensor(T))
-    {
-        VoteContribution out;
-        out.votes = glm::mat2(0, 0, 0, 0);
-        out.decay = 0;
-
-        return out;
-    }
 
     // glm::vec2 lambdas = Eigenvalue2D(T);
 
@@ -232,36 +137,37 @@ VoteContribution Saliency(glm::mat2 T, float u, float v, int sigma, float *eigen
 
 void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w)
 {
-    float *V = new float[sx * sy * 2 * 2];            // allocate space for the eigenvectors
-    float *L = new float[sx * sy * 2];                // allocate space for the eigenvalues
-    cpuEigendecomposition(input_field, V, L, sx, sy); // calculate the eigendecomposition of the entire field
+    float *V = new float[sx * sy * 2 * 2];              // allocate space for the eigenvectors
+    float *L = new float[sx * sy * 2];                  // allocate space for the eigenvalues
+    cpuEigendecomposition(input_field, V, L, sx, sy);   // calculate the eigendecomposition of the entire field
 
-    for (unsigned int yi = 0; yi < sy; yi++)
-    {
-        for (unsigned int xi = 0; xi < sx; xi++)
-        {
-            for (int u = -w; u < w; u++)
-            {
-                for (int v = -w; v < w; v++)
-                {
+    int xr, yr;                                         // x and y coordinates within the window
+    for (unsigned int yi = 0; yi < sy; yi++) {          // for each pixel in the image
+        for (unsigned int xi = 0; xi < sx; xi++) {
+
+            glm::mat2 T = glm::mat2(                    // retrieve the tensor for the current pixel
+                input_field[(yi * sx + xi) * 4 + 0],
+                input_field[(yi * sx + xi) * 4 + 1],
+                input_field[(yi * sx + xi) * 4 + 2],
+                input_field[(yi * sx + xi) * 4 + 3]);
+
+            for (int v = -w; v < w; v++) {              // for each pixel in the window
+                yr = yi + v;
+                for (int u = -w; u < w; u++) {
+                    xr = xi + u;
+
                     // DO TENSOR VOTING HERE
-                    // output_field[??] = ??
+                    // output_field[??] = ??                   
 
-                    glm::mat2 T = glm::mat2(
-                        input_field[(yi * sx + xi) * 4 + 0],
-                        input_field[(yi * sx + xi) * 4 + 1],
-                        input_field[(yi * sx + xi) * 4 + 2],
-                        input_field[(yi * sx + xi) * 4 + 3]);
-
+                                                        // calculate the contribution of (u,v) to (x,y)        
                     VoteContribution vote = Saliency(
-                                                T,
                                                 u,
                                                 v,
                                                 sigma,
-                                                &L[(yi * sx + xi) * 2],
-                                                &V[(yi * sx + xi) * 4])
-                                                .votes[0][0];
+                                                &L[(yr * sx + xr) * 2],
+                                                &V[(yr * sx + xr) * 4]);
 
+                    /// DAVID: check everything after this, then try running on some small test data
                     output_field[(yi + u) * sx + (xi + v) + 0] += vote.votes[0][0] * vote.decay;
                     output_field[(yi + u) * sx + (xi + v) + 1] += vote.votes[0][1] * vote.decay;
                     output_field[(yi + u) * sx + (xi + v) + 2] += vote.votes[1][0] * vote.decay;

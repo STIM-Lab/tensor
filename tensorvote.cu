@@ -1,6 +1,8 @@
 #include <iostream>
 #include <stdio.h>
 
+#include "tensorvote.h"
+
 #include "tensorvote.cuh"
 
 #include <chrono>
@@ -8,6 +10,77 @@
 #ifdef __CUDACC__
 #define __device__
 #endif
+
+__host__ __device__ bool NonZeroTensor(glm::mat2 T)
+{
+    return T[0][0] || T[0][1] || T[1][0] || T[1][1];
+}
+
+__host__ __device__ float Decay(float angle, float length, int sigma)
+{
+    if (length == 0)
+        return 1;
+
+    float alpha = acos(abs(cos(M_PI / 2 - angle)));
+
+    // calculate c (see math)
+    float c = (-16 * log10f(0.1) * (sigma - 1)) / (pow(M_PI, 2));
+
+    // calculate saliency decay
+    float S;
+    if (alpha == 0)
+        S = length;
+    else
+        S = (alpha * length) / sin(alpha);
+
+    float kappa = (2 * sin(alpha)) / length;
+    float S_kappa = pow(S, 2) + c * pow(kappa, 2);
+    float E = -1 * S_kappa / (pow(sigma, 2));
+    float d;
+    float pi4 = M_PI / 4;
+    if (alpha > pi4 || alpha < -pi4)
+        d = 0;
+    else
+        d = exp(E);
+
+    return d;
+}
+
+__host__ __device__ TensorAngleCalculation SaliencyTheta(float theta, float u, float v, int sigma = 10)
+{
+    float theta_cos = cos(theta);
+    float theta_sin = sin(theta);
+
+    glm::mat2 Rtheta_r(theta_cos, theta_sin, -theta_sin, theta_cos);
+    glm::mat2 Rtheta_l(theta_cos, -theta_sin, theta_sin, theta_cos);
+
+    glm::vec2 p(Rtheta_r[0][0] * u + Rtheta_r[0][1] * v, Rtheta_r[1][0] * u + Rtheta_r[1][1] * v);
+
+    float l = sqrt(pow(p[0], 2) + pow(p[1], 2));
+
+    float phi = atan2(p[1], p[0]);
+
+    float decay = Decay(phi, l, sigma);
+
+    float phi2 = 2 * phi;
+
+    float phi2_cos = cos(phi2);
+    float phi2_sin = sin(phi2);
+
+    glm::mat2 Rphi2(phi2_cos, -phi2_sin, phi2_sin, phi2_cos);
+
+    glm::vec2 V_source(Rphi2[0][0], Rphi2[1][0]);
+
+    glm::vec2 V(Rtheta_l[0][0] * V_source[0] + Rtheta_l[0][1] * V_source[1], Rtheta_l[1][0] * V_source[0] + Rtheta_l[1][1] * V_source[1]);
+    glm::mat2 outer = glm::outerProduct(V, V);
+
+    TensorAngleCalculation out;
+
+    out.votes = outer;
+    out.decay = decay;
+
+    return out;
+}
 
 static void HandleError(cudaError_t err, const char *file, int line)
 {
