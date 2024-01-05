@@ -43,6 +43,7 @@ struct multiVec2
     glm::vec2 y;
 };
 
+// small then large
 glm::vec2 Eigenvalues2D(glm::mat2 T)
 {
     float d = T[0][0];
@@ -60,6 +61,7 @@ glm::vec2 Eigenvalues2D(glm::mat2 T)
     return out;
 }
 
+// small then large
 glm::mat2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas)
 {
     float d = T[0][0];
@@ -192,10 +194,12 @@ VoteContribution Saliency(glm::mat2 T, float u, float v, int sigma, float *eigen
     }
 
     // glm::vec2 lambdas = Eigenvalue2D(T);
+
+    // ordered as large then small
     glm::vec2 lambdas(eigenvalues[1], eigenvalues[0]);
 
     // multiVec2 e_vecs = Eigenvector2D(T, lambdas);
-    multiVec2 e_vecs = multiVec2(glm::vec2(eigenvectors[0], eigenvectors[1]), glm::vec2(eigenvectors[2], eigenvectors[3]));
+    multiVec2 e_vecs = multiVec2(glm::vec2(eigenvectors[2], eigenvectors[3]), glm::vec2(eigenvectors[0], eigenvectors[1]));
 
     // glm::vec2 k1 = e_vecs.y;
 
@@ -238,12 +242,14 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                     // DO TENSOR VOTING HERE
                     // output_field[??] = ??
 
+                    glm::mat2 T = glm::mat2(
+                        input_field[(yi * sx + xi) * 4 + 0],
+                        input_field[(yi * sx + xi) * 4 + 1],
+                        input_field[(yi * sx + xi) * 4 + 2],
+                        input_field[(yi * sx + xi) * 4 + 3]);
+
                     VoteContribution vote = Saliency(
-                                                glm::mat2(
-                                                    input_field[(yi * sx + xi) * 4 + 0],
-                                                    input_field[(yi * sx + xi) * 4 + 1],
-                                                    input_field[(yi * sx + xi) * 4 + 2],
-                                                    input_field[(yi * sx + xi) * 4 + 3]),
+                                                T,
                                                 u,
                                                 v,
                                                 sigma,
