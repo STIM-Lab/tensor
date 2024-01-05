@@ -43,6 +43,11 @@ struct multiVec2
     glm::vec2 y;
 };
 
+bool NonZeroTensor(glm::mat2 T)
+{
+    return T[0][0] || T[0][1] || T[1][0] || T[1][1];
+}
+
 // small then large
 glm::vec2 Eigenvalues2D(glm::mat2 T)
 {
