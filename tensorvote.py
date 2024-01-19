@@ -15,13 +15,10 @@ def decay_wu(cos_theta, length, sigma):
 
     c = np.exp(-(length**2) / (sigma**2))
     
-    scale = 1.0 / (np.pi * (sigma**2) / 2)
-    
     radial = (1 - cos_theta ** 2)
     
-    D = scale * c * radial
-    D[length == 0] = scale
-    
+    D = c * radial
+   
     return D
 
 # generate a saliency field for a stick tensor with direction e sampled for all
@@ -37,18 +34,22 @@ def saliency_wu(e, L, V0, V1, sigma):
     d = decay_wu(eTv, L, sigma)
     
     # calculate the target tensor orientation
-    Ep0 = np.divide(d * (R * e[0] - L * V0), R, out=d * e[0], where=R!=0)
-    Ep1 = np.divide(d * (R * e[1] - L * V1), R, out=d * e[1], where=R!=0) 
+    Ep0 = np.divide((R * e[0] - L * V0), R, out=np.ones_like(L) * e[0], where=R!=0)
+    Ep1 = np.divide((R * e[1] - L * V1), R, out=np.ones_like(L) * e[1], where=R!=0) 
     
     
-    
+    # turn the orientation into a stick tensor
     S = np.zeros((V0.shape[0], V1.shape[1], 2, 2))
     S[:, :, 0, 0] = Ep0 ** 2
     S[:, :, 1, 1] = Ep1 ** 2
     S[:, :, 1, 0] = Ep0 * Ep1
     S[:, :, 0, 1] = S[:, :, 1, 0]
     
-    return S
+    # scale the stick tensor by the decay function
+    d = np.expand_dims(d, 2)
+    d = np.expand_dims(d, 3)
+    
+    return S * d
     
 
 # calculate the vote result of the tensor field T
@@ -123,6 +124,7 @@ def vector2tensor(x, y):
 
 # visualize a tensor field T (NxMx2x2)
 def visualize(T, mode=None):
+    plt.figure()
     Eval, Evec = np.linalg.eigh(T)
     plt.quiver(Evec[:, :, 0, 1], Evec[:, :, 1, 1], pivot="middle", headwidth=0, headlength=0, headaxislength=0, width=0.001)
     plt.xlabel("X axis")

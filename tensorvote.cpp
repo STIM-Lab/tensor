@@ -108,33 +108,39 @@ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigen
     }
 }
 
-/// Calculate the contribution of a vote at position (u,v) relative to the current tensor T
-// T is the current tensor
-// (u,v) is the relative position of the votee
-VoteContribution Saliency(float u, float v, int sigma, float *eigenvalues, float *eigenvectors)
-{
-
-    glm::vec2 k1(eigenvectors[0], eigenvectors[1]);
-
-    float theta = atan2(k1[1], k1[0]);
-
-    TensorAngleCalculation st = SaliencyTheta(theta, u, v, sigma);
- 
-    float lambdaLarge = eigenvalues[1];
-    float lambdaSmall = eigenvalues[0];
-    float ecc = sqrt(1.0 - (pow(lambdaSmall, 2) / pow(lambdaLarge, 2)));
-
-    if (isnan(ecc))
-    {
-        ecc = 0;
-    }
-
-    VoteContribution out;
-    out.votes = st.votes;
-    out.decay = st.decay;// *ecc* lambdaLarge;
-
-    return out;
+float Decay_Wu(float cos_theta, float length, float sigma) {
+    float c = exp(-(length * length) / (sigma * sigma));
+    //float gaussian = 1.0 / ((M_PI * sigma * sigma) / 2);
+    float radial = 1 - (cos_theta * cos_theta);
+    float D = c * radial;
+    return D;
 }
+
+VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
+
+    glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
+    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
+    glm::vec2 uv_norm = glm::vec2(u, v) / length;           // normalize the direction vector
+
+    float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
+    float radius = length / (2 * eTv);
+    float large_lambda = eigenvalues[1];
+    float d = large_lambda * Decay_Wu(eTv, length, sigma);
+
+                                                            // calculate the votee orientation
+    float tvx = (radius * ev[0] - length * u) / radius; // DAVID: This might be wrong - looks like we're squaring the decay
+    float tvy = (radius * ev[1] - length * v) / radius;
+
+    glm::mat2 TV;
+    TV[0][0] = tvx * tvx;
+    TV[1][1] = tvy * tvy;
+    TV[0][1] = TV[1][0] = tvx * tvy;
+    VoteContribution R;
+    R.votes = TV;
+    R.decay = d;
+    return R;
+}
+
 
 void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w)
 {
@@ -149,6 +155,10 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
         save_field(&L[0], sx, sy, 2, "debug_eigenvalues.npy");
         save_field(&V[0], sx, sy, 2, "debug_eigenvector.npy");
     }
+    std::vector<float> debug_decay;
+    if (debug) {
+        debug_decay = std::vector<float>(sx * sy);
+    }
 
     int xr, yr;                                                 // x and y coordinates within the window
     for (unsigned int yi = 0; yi < sy; yi++) {                  // for each pixel in the image
@@ -161,23 +171,29 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                 input_field[(yi * sx + xi) * 4 + 3]);
 
             glm::mat2 Votee(0.0f);
+            float total_decay = 0.0f;
 
             for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
                 yr = yi + v;
                 if (yr >= 0 && yr < sy) {
                     for (int u = -hw; u < hw; u++) {
                         
-                        xr = xi + u;
-                        if (xr >= 0 && xr < sx) {
-                                                                // calculate the contribution of (u,v) to (x,y)        
-                            VoteContribution vote = Saliency(
-                                u,
-                                v,
-                                sigma,
-                                &L[(yr * sx + xr) * 2],
-                                &V[(yr * sx + xr) * 2]);
+                        if (!(u == 0 && v == 0)) {
+                            xr = xi + u;
+                            if (xr >= 0 && xr < sx) {
+                                // calculate the contribution of (u,v) to (x,y)   
+                                VoteContribution vote = Saliency_Wu(
+                                    u,
+                                    v,
+                                    sigma,
+                                    &L[(yr * sx + xr) * 2],
+                                    &V[(yr * sx + xr) * 2]);
 
-                            Votee = Votee + vote.votes * vote.decay;
+                                Votee = Votee + vote.votes * vote.decay;
+                                if (debug) {
+                                    total_decay += vote.decay;
+                                }
+                            }
                         }
                     }
                 }
@@ -186,8 +202,12 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
             output_field[(yi * sx + xi) * 4 + 1] += Votee[0][1];
             output_field[(yi * sx + xi) * 4 + 2] += Votee[1][0];
             output_field[(yi * sx + xi) * 4 + 3] += Votee[1][1];
+            if (debug) {
+                debug_decay[yi * sx + xi] = total_decay;
+            }
         }
     }
+    save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
 }
 
 /// Create an empty field with a single stick tensor in the middle oriented along (x, y)
@@ -211,7 +231,7 @@ int main(int argc, char *argv[])
     // Declare the supported options.
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
-        ("output", boost::program_options::value<std::string>(&in_outputname)->default_value("tv.npy"), "optional image field corresponding to the tensors")
+        ("output", boost::program_options::value<std::string>(&in_outputname)->default_value("result.npy"), "optional image field corresponding to the tensors")
         ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(5.0f), "order used to calculate the first derivative")
         ("window", boost::program_options::value<unsigned int>(&in_window), "window size (6 * sigma + 1 as default)")
         ("cuda", boost::program_options::value<int>(&in_cuda)->default_value(0), "cuda device index (-1 for CPU)")
