@@ -1,20 +1,27 @@
-import structure2d as st
+import structen as st
 import tensorvote as tv
 import skimage
 import scipy as sp
 import numpy as np
 import matplotlib.pyplot as plt
 
+# This function generates test data and runs both the Python a C/CUDA code
 
-T = np.load("data/axis_grid.npy")
+# run the generate_data.py script to create raw images
 
-plt.figure()
-tv.visualize(T)
+# --------- STRUCTEN -----------------
+# run the Python structen script to generate initial tensor fields
 
-sigma = 5
-TF = tv.iterative_vote(T, sigma, 3, 1)
+# run the C structen script to generate initial tensor fields
 
-plt.figure()
-tv.visualize(TF[-1])
+# compare the Python and C tensor fields
 
 
+# -------- TENSORVOTE ----------------
+# run the Python tensorvote script to generate a final tensor field
+
+# run the C tensorvote script to generate a final tensor field
+
+# LATER: run the CUDA tensorvote script to generate a final tensor field
+
+# compare all of the tensor fields

@@ -34,17 +34,15 @@ endif ( MSVC )
 configure_file(Roboto-Medium.ttf 
 				Roboto-Medium.ttf COPYONLY)
 
-# copy test data
-configure_file(data/spread2_hurl5.bmp 
-				spread2_hurl5.bmp COPYONLY)
-configure_file(data/st2d_spread2_hurl5.npy 
-				st2d_spread2_hurl5.npy COPYONLY)
-
 # copy python scripts
 configure_file(structen.py 
 				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
+configure_file(testbench.py 
+				testbench.py COPYONLY)
+configure_file(data/generate_data.py 
+				generate_data.py COPYONLY)
 				
 #set the include directories
 include_directories(

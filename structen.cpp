@@ -70,8 +70,8 @@ int main(int argc, char** argv) {
 	// Declare the supported options.
 	boost::program_options::options_description desc("Allowed options");
 	desc.add_options()
-		("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
-		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "optional image field corresponding to the tensors")
+		("input", boost::program_options::value<std::string>(&in_inputname), "input image")
+		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "output file storing the tensor field")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
 		("help", "produce help message")
 		;
@@ -90,6 +90,9 @@ int main(int argc, char** argv) {
 
 	int dim = 3;															// number of dimensions
 	std::vector< tira::field<float> > D;									// vector stores the derivatives
+
+	if (in_inputname.rfind("*") == std::string::npos)
+		dim = 2;
 
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);									// load the input image

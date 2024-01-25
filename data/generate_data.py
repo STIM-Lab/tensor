@@ -74,10 +74,10 @@ def savestack(filename, I):
         ski.io.imsave(filestring %zi, I8[:, :, zi])
     
     
-N = 50
+N = 200
 boxes = 5
 width = 2
-noise = 0.2
+noise = 0.1
 
 grid2D = axis_grid_2d(N, boxes, width, noise)
 

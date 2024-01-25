@@ -127,9 +127,15 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
     float large_lambda = eigenvalues[1];
     float d = large_lambda * Decay_Wu(eTv, length, sigma);
 
-                                                            // calculate the votee orientation
-    float tvx = (radius * ev[0] - length * u) / radius; // DAVID: This might be wrong - looks like we're squaring the decay
-    float tvy = (radius * ev[1] - length * v) / radius;
+    float tvx, tvy;
+    if (isinf(radius)) {
+        tvx = ev[0];
+        tvy = ev[1];
+    }
+    else {                                                      // calculate the votee orientation
+        tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
+        tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
+    }
 
     glm::mat2 TV;
     TV[0][0] = tvx * tvx;
