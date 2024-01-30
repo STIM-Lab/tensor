@@ -28,6 +28,14 @@ const char* glsl_version = "#version 130";              // specify the version o
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);   // specify the OpenGL color used to clear the back buffer
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
 
+const std::string colormap_shader_string =
+#include "shaders/colormap.shader"
+;
+
+const std::string glyph_shader_string =
+#include "shaders/glyph2d.shader"
+;
+
 // TENSOR FIELD DATA
 
 tira::image<glm::mat2> T0;
@@ -428,7 +436,7 @@ void InitUI(GLFWwindow* window, const char* glsl_version) {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    io.Fonts->AddFontFromFileTTF("Roboto-Medium.ttf", ui_scale * 16.0f);
+    //io.Fonts->AddFontFromFileTTF("Roboto-Medium.ttf", ui_scale * 16.0f);
 
 }
 
@@ -482,11 +490,11 @@ int main(int argc, char** argv) {
     }
 
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
-    CMAP_MATERIAL = new tira::glMaterial("colormap.shader");
+    CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
     SCALARTYPE = ScalarType::NoScalar;
 
     GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
-    GLYPH_MATERIAL = new tira::glMaterial("glyph2d.shader");
+    GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
 
     //ScalarFrom_TensorElement2D(1, 1);
     

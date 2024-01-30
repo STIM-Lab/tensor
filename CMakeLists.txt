@@ -39,8 +39,8 @@ configure_file(structen.py
 				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
-configure_file(testbench.py 
-				testbench.py COPYONLY)
+configure_file(tensor_testbench.py 
+				tensor_testbench.py COPYONLY)
 configure_file(data/generate_data.py 
 				generate_data.py COPYONLY)
 				

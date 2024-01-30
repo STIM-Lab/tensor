@@ -1,3 +1,5 @@
+R"(
+
 # shader vertex
 # version 330 core
 
@@ -30,3 +32,4 @@ void main() {
 	//color = vec4(1.0, 0.0, 0.0, 1.0);
 	color = (texture(scalar, vertex_texcoord) - minval) / (maxval - minval);
 };
+)"

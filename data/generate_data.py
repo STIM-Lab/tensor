@@ -73,31 +73,31 @@ def savestack(filename, I):
         filestring = filename + "%0" + str(digits) + "d.bmp"
         ski.io.imsave(filestring %zi, I8[:, :, zi])
     
+if __name__ == "__main__":    
+    N = 200
+    boxes = 5
+    width = 2
+    noise = 0.1
     
-N = 200
-boxes = 5
-width = 2
-noise = 0.1
-
-grid2D = axis_grid_2d(N, boxes, width, noise)
-
-
-T2 = st.structen(grid2D, 1)
-
-plt.figure()
-plt.imshow(grid2D)
-plt.title("Original Image")
-
-
-plt.figure()
-tv.visualize(T2)
-plt.title("Structure Tensor Field")
-
-ski.io.imsave("grid2D.bmp", np.uint8(grid2D * 255))
-np.save("grid2D.npy", T2.astype(np.float32))
-
-grid3D = axis_grid_3d(N, boxes, width, noise)
-T3 = st.structen(grid3D, 1)
-np.save("grid3D.npy", T3.astype(np.float32))
-savestack("grid3D/grid3D", grid3D)
+    grid2D = axis_grid_2d(N, boxes, width, noise)
+    
+    
+    T2 = st.structen(grid2D, 1)
+    
+    plt.figure()
+    plt.imshow(grid2D)
+    plt.title("Original Image")
+    
+    
+    plt.figure()
+    tv.visualize(T2)
+    plt.title("Structure Tensor Field")
+    
+    ski.io.imsave("grid2D.bmp", np.uint8(grid2D * 255))
+    np.save("grid2D.npy", T2.astype(np.float32))
+    
+    grid3D = axis_grid_3d(N, boxes, width, noise)
+    T3 = st.structen(grid3D, 1)
+    np.save("grid3D.npy", T3.astype(np.float32))
+    savestack("grid3D/grid3D", grid3D)
 

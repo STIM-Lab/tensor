@@ -1,3 +1,5 @@
+R"(
+
 # shader vertex
 # version 330 core
 
@@ -122,3 +124,5 @@ in vec4 vertex_color;
 void main() {
 	color = vertex_color;
 };
+
+)"
