@@ -8,6 +8,7 @@ from generate_data import axis_grid_2d
 from structure2d import structure2d_nz
 import subprocess
 import os
+import time
 
 # This function generates test data and runs both the Python a C/CUDA code
 
@@ -36,15 +37,22 @@ input_data = generate_data(100, 200, 100)
 python_structuretensors = []
 print('Generating python structure tensors...')
 for i in range(len(input_data)):
+    start = time.time()
     python_structuretensors.append(structure2d_nz(input_data[i]))
+    end = time.time()
+    print('Generating structure tensor in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
 
 print('Generating C structure tensors...')
-if not os.path.exists('C_structure'):
-    os.makedirs('C_structure')
+if not os.path.exists('C_Structure'):
+    os.makedirs('C_Structure')
 
 for filename in os.listdir('Data_Output'):
-    
-    subprocess.run(['./structen.exe', '--input', os.path.join('Data_Output', filename), '--output', os.path.join('C_structure', filename.split('.')[0] + '.npy')])
+    start = time.time()
+    subprocess.run(['./structen.exe', 
+                    '--input', os.path.join('Data_Output', filename), 
+                    '--output', os.path.join('C_Structure', filename.split('.')[0] + '.npy')])
+    end = time.time()
+    print('Generating structure tensor in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
 
 # -------- TENSORVOTE ----------------
 # run the Python tensorvote script to generate a final tensor field
@@ -63,16 +71,23 @@ if not os.path.exists('C_Output'):
 
 sigma = 10
 iterations = 1
+cuda = -1
 print('Running python tensorvote...')
 for i in range(len(input_data)):
+    start = time.time()
     votefields = tv.iterative_vote(python_structuretensors[i], sigma, iterations)
     # tv.visualize(votefields[-1])
     np.save(os.path.join('Python_Output', 'vote_' + str(i) + '.npy'), votefields[-1].astype(np.float32))
+    end = time.time()
+    print('Running tensorvote in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
 
 print('Running C tensorvote...')
-for filename in os.listdir('C_structure'):
+for filename in os.listdir('C_Structure'):
+    start = time.time()
     subprocess.run(['./tensorvote.exe', 
                     '--input', os.path.join('C_structure', filename), 
                     '--output', os.path.join('C_Output', filename), 
                     '--sigma', str(sigma), 
-                    'cuda', '-1'])
+                    'cuda', str(cuda)])
+    end = time.time()
+    print('Running tensorvote in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')

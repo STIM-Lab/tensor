@@ -213,7 +213,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
             }
         }
     }
-    save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
+    //save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
 }
 
 /// Create an empty field with a single stick tensor in the middle oriented along (x, y)
@@ -286,6 +286,9 @@ int main(int argc, char *argv[])
 
     if (debug) T.save_npy("debug_input.npy");
     Tr.save_npy(in_outputname);
+
+    std::cout << in_inputname << std::endl;
+    std::cout << in_outputname << std::endl;
 
     return 0;
 }
