@@ -14,6 +14,7 @@ def structure2d(I, sigma=3):
 
     # calculate the image gradient
     dIdy, dIdx = np.gradient(img)
+    print("Max dIdy: " + str(np.max(dIdy)))
     
     
 

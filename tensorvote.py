@@ -123,7 +123,7 @@ def vector2tensor(x, y):
 
 
 # visualize a tensor field T (NxMx2x2)
-def visualize(T, mode=None):
+def visualize(T, plot_title = "Tensor Field", mode=None):
     plt.figure()
     Eval, Evec = np.linalg.eigh(T)
     plt.quiver(Evec[:, :, 0, 1], Evec[:, :, 1, 1], pivot="middle", headwidth=0, headlength=0, headaxislength=0, width=0.001)
@@ -138,6 +138,8 @@ def visualize(T, mode=None):
         ecc = np.sqrt(1 - ratio)
         plt.imshow(ecc, origin="lower")
     plt.colorbar()
+    plt.title(plot_title)
+    plt.show()
     
 # performs iterative voting on a tensor field T
 # sigma is the standard deviation for the first iteration

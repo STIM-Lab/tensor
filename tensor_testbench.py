@@ -16,8 +16,8 @@ def generate_grids(lower: int, upper: int, step: int, boxes=10, linewidth=1, noi
    
     data = []
     for i in range(lower, upper, step):
-        data.append(axis_grid_2d(i, boxes, linewidth, noise))
-        skimage.io.imsave(os.path.join(data_directory, 'grid_' + str(i) + '.bmp'), np.uint8(data[-1] * 255))
+        data.append(axis_grid_2d(i, boxes, linewidth, noise) * 255)
+        skimage.io.imsave(os.path.join(data_directory, 'grid_' + str(i) + '.bmp'), np.uint8(data[-1]))
     return data
 
 def voting(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda):
@@ -67,7 +67,7 @@ python_structuretensors = []
 print('Generating python structure tensors from grids...')
 for i in range(len(input_data)):
     start = time.time()
-    python_structuretensors.append(st.structure2d_nz(input_data[i]))
+    python_structuretensors.append(st.structure2d(input_data[i], sigma=0))
     end = time.time()
     print('Generating structure tensor in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
 
@@ -78,6 +78,7 @@ for filename in input_filenames:
     start = time.time()
     subprocess.run(['./structen.exe', 
                     '--input', os.path.join(data_directory, filename), 
+                    '--order', "2",
                     '--output', os.path.join(data_directory, "c_" + filename.split('.')[0] + '.npy')])
     end = time.time()
     print('Generating structure tensor in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
@@ -109,12 +110,16 @@ for filename in input_filenames:
 summed_squared_difference = structure_tensor_difference(python_structuretensors, c_structuretensors)
 
 # visualize the difference
+plt.figure()
 plt.imshow(summed_squared_difference, cmap='hot', interpolation='nearest')
+plt.title("Mean Squared Error per Pixel")
 plt.colorbar()
 plt.show()
 
-tv.visualize(python_structuretensors[0])
-tv.visualize(c_structuretensors[0])
+tv.visualize(python_structuretensors[0], "Python Structure Tensor Output")
+
+
+tv.visualize(c_structuretensors[0], "C/C++ Structure Tensor Output")
     
 sigma = 10
 iterations = 1
