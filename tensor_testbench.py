@@ -20,12 +20,13 @@ def generate_grids(lower: int, upper: int, step: int, boxes=10, linewidth=1, noi
         skimage.io.imsave(os.path.join(data_directory, 'grid_' + str(i) + '.bmp'), np.uint8(data[-1]))
     return data
 
-def voting(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda):
+def python_and_c_tensorvote(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda):
+    python_tensorvote_fields = []
     print('Running Python tensorvote...')
     for i in range(len(input_data)):
         start = time.time()
-        python_votefields = tv.iterative_vote(python_structuretensors[i], sigma, iterations)
-        np.save(os.path.join(data_directory, 'python_vote_' + filename.split('.')[0] + '.npy'), python_votefields[-1].astype(np.float32))
+        python_tensorvote_fields.append(tv.iterative_vote(python_structuretensors[i], sigma, iterations)[-1])
+        np.save(os.path.join(data_directory, 'python_vote_' + input_filenames[i].split('.')[0] + '.npy'), (python_tensorvote_fields[-1]).astype(np.float32))
         end = time.time()
         print('Running tensorvote in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
 
@@ -40,23 +41,32 @@ def voting(input_data, input_filenames, python_structuretensors, sigma, iteratio
         end = time.time()
         print('Running tensorvote in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
         
-def structure_tensor_difference(python_structuretensors, c_structuretensors):
-    summed_squared_error = np.zeros(input_data[0].shape)
-    for struc in range(len(input_data)):
-        for i in range(len(input_data[0])):
-            for j in range(len(input_data[0])):
-                squared_differences = (python_structuretensors[struc][i][j] - c_structuretensors[struc][i][j])**2
-                summed_squared_error[i][j] += np.sum(squared_differences)
+    c_tensorvote_fields = []
+    for filename in input_filenames:
+        c_tensorvote_fields.append(np.load(os.path.join(data_directory, "c_vote_" + filename.split('.')[0] + '.npy')))
+        
+    return python_tensorvote_fields, c_tensorvote_fields
+        
+def tensor_field_difference(field_one, field_two):
+    
+    if field_one.shape != field_two.shape:
+        raise ValueError("The two fields must have the same shape") 
+    
+    shape = field_one.shape
+    
+    summed_squared_error = np.zeros((shape[0], shape[0]))
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            squared_differences = (field_one[i][j] - field_two[i][j])**2
+            summed_squared_error[i][j] += np.sum(squared_differences)
                 
     return summed_squared_error
-
 
 # create a directory to store the raw image data
 data_directory = "test_data"
 if os.path.exists(data_directory):
     shutil.rmtree(data_directory)
 os.makedirs(data_directory)    
-
 
 # generate grids used as input
 input_data = generate_grids(100, 200, 100)
@@ -83,63 +93,19 @@ for filename in input_filenames:
     end = time.time()
     print('Generating structure tensor in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
 
-# compare the C and Python structure tensors
-# Omar: think of some comparison metric - maybe mean squared error?
-
 # load the C structure tensors
 c_structuretensors = []
 for filename in input_filenames:
     c_structuretensors.append(np.load(os.path.join(data_directory, "c_" + filename.split('.')[0] + '.npy')))
-
-# Calculate mean squared error for each pixel point
-# subtract each pixel point and square it, then take the sum of the matrix for each pixel point    
-# compare the C and Python structure tensors amd vosualize the difference
-# for i in range(len(input_data)):
-#     print('Comparing structure tensors for grid size', input_data[i].shape[0], '...')
-
-#     error = np.mean((python_structuretensors[i] - c_structuretensors[i])**2)
-#     print('Mean squared error:', error)
-# create a matrix in the shape of the input data
-# summed_squared_error = np.zeros(input_data[0].shape)
-# for struc in range(len(input_data)):
-#     for i in range(len(input_data[0])):
-#         for j in range(len(input_data[0])):
-#             squared_differences = (python_structuretensors[struc][i][j] - c_structuretensors[struc][i][j])**2
-#             summed_squared_error[i][j] += np.sum(squared_differences)
-    
-summed_squared_difference = structure_tensor_difference(python_structuretensors, c_structuretensors)
-
-# visualize the difference
-plt.figure()
-plt.imshow(summed_squared_difference, cmap='hot', interpolation='nearest')
-plt.title("Mean Squared Error per Pixel")
-plt.colorbar()
-plt.show()
-
-tv.visualize(python_structuretensors[0], "Python Structure Tensor Output")
-
-
-tv.visualize(c_structuretensors[0], "C/C++ Structure Tensor Output")
     
 sigma = 10
 iterations = 1
 cuda = -1
-# voting(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda)
-# print('Running Python tensorvote...')
-# for i in range(len(input_data)):
-#     start = time.time()
-#     python_votefields = tv.iterative_vote(python_structuretensors[i], sigma, iterations)
-#     np.save(os.path.join(data_directory, 'python_vote_' + filename.split('.')[0] + '.npy'), python_votefields[-1].astype(np.float32))
-#     end = time.time()
-#     print('Running tensorvote in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
-
-# print('Running C tensorvote...')
-# for filename in input_filenames:
-#     start = time.time()
-#     subprocess.run(['./tensorvote.exe', 
-#                     '--input', os.path.join(data_directory, "c_" + filename.split('.')[0] + ".npy"), 
-#                     '--output', os.path.join(data_directory, "c_vote_" + filename.split('.')[0] + '.npy'), 
-#                     '--sigma', str(sigma), 
-#                     '--cuda', str(cuda)])
-#     end = time.time()
-#     print('Running tensorvote in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
+python_votefields, c_votefields = python_and_c_tensorvote(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda)
+    
+# compare the tensor fields
+print('Comparing tensor fields...')
+difference = tensor_field_difference(python_votefields[0], c_votefields[0])
+plt.imshow(difference)
+plt.colorbar()
+plt.show()
