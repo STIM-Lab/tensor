@@ -91,21 +91,6 @@ def vote_k_wu(T, k=0, sigma=3):
             S = scale * saliency_wu(E[x0, x1], L, V0, V1, sigma)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
-    
-# generates a test voting field around a stick tensor pointed in the direction (x, y)
-# (x, y) is the orientation of the stick tensor
-# N is the resolution of the test field
-# sigma is the decay falloff
-def testfield_wu(x, y, N=100, sigma=10):
-
-    t = vector2tensor(x, y)
-
-    T = np.zeros((N, N, 2, 2))
-    T[int(N/2), int(N/2), :, :] = t
-
-    VF = vote_k_wu(T, 0, sigma)
-
-    return VF
 
 def vector2tensor(x, y):
 
@@ -120,6 +105,30 @@ def vector2tensor(x, y):
     tensor[1,1] = vector[1] * vector[1]
 
     return tensor
+
+#generate an NxN field with a stick tensor pointing in the (x,y) direction
+def generate_stick_field(x=0, y=1, N=100):
+    T = np.zeros((N, N, 2, 2))
+    center = int(N/2)
+    T[center, center] = vector2tensor(x, y)
+
+    return T
+    
+# generates a test voting field around a stick tensor pointed in the direction (x, y)
+# (x, y) is the orientation of the stick tensor
+# N is the resolution of the test field
+# sigma is the decay falloff
+def testfield(x, y, N=100, sigma=10):
+
+    # generate a field with a single stick tensor in the middle
+    T = generate_stick_field(x, y, N)
+
+    # apply tensor voting
+    VF = vote_k_wu(T, 0, sigma)
+
+    return VF
+
+
 
 
 # visualize a tensor field T (NxMx2x2)
