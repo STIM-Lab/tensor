@@ -19,6 +19,12 @@ def generate_grids(lower: int, upper: int, step: int, boxes=10, linewidth=1, noi
         data.append(axis_grid_2d(i, boxes, linewidth, noise) * 255)
     return data
 
+def generate_field_image(x, y, N=100, sigma=10):
+    T = np.zeros((N, N))
+    T[int(N/2), int(N/2)] = 1
+
+    return T
+
 def python_and_c_tensorvote(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda, directory):
     python_tensorvote_fields = []
     print('Running Python tensorvote...')
@@ -68,7 +74,9 @@ def main():
     os.makedirs(data_directory)    
 
     # generate grids used as input
-    input_data = generate_grids(100, 200, 100)
+    # input_data = generate_grids(100, 200, 100)
+    
+    input_data = [generate_field_image(1, 1)]
     
     for image in input_data:
         skimage.io.imsave(os.path.join(data_directory, 'grid_' + str(image.shape[0]) + '.bmp'), np.uint8(image))
