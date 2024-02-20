@@ -148,8 +148,7 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
 }
 
 
-void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w)
-{
+void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w) {
     std::vector<float> V(sx * sy * 2);                          // allocate space for the eigenvectors
     std::vector<float> L(sx * sy * 2);                          // allocate space for the eigenvalues
 
@@ -213,7 +212,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
             }
         }
     }
-    //save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
+    save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
 }
 
 /// Create an empty field with a single stick tensor in the middle oriented along (x, y)
@@ -231,8 +230,7 @@ tira::field<float> StickTensor(size_t sx, size_t sy, float x, float y) {
     return S;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 
     // Declare the supported options.
     boost::program_options::options_description desc("Allowed options");

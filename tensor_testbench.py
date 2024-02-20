@@ -10,32 +10,25 @@ import os
 import time
 import shutil
 
-# function generates a series of grids used to test the structen and tensor voting algorithms
-def generate_grids(lower: int, upper: int, step: int, boxes=10, linewidth=1, noise=0):
-    print('Generating grids...')
-   
-    data = []
-    for i in range(lower, upper, step):
-        data.append(axis_grid_2d(i, boxes, linewidth, noise) * 255)
-    return data
-
-
-
-def python_and_c_tensorvote(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda, directory):
+def python_and_c_tensorvote(input_filenames, python_structuretensors, sigma, iterations, cuda, input_directory, output_directory):
+    
     python_tensorvote_fields = []
     print('Running Python tensorvote...')
-    for i in range(len(input_data)):
+    for i in range(len(python_structuretensors)):
         start = time.time()
+        
         python_tensorvote_fields.append(tv.iterative_vote(python_structuretensors[i], sigma, iterations)[-1])
         end = time.time()
-        print('Running tensorvote in Python for grid size', input_data[i].shape[0], 'took', end - start, 'seconds.')
+        print('Running tensorvote in Python for grid size', python_structuretensors[i].shape[0], 'took', end - start, 'seconds.')
+
+        np.save(os.path.join(output_directory, 'p_' + input_filenames[i].split('.')[0] + '.npy'), (python_tensorvote_fields[i]).astype(np.float32))
 
     print('Running C tensorvote...')
     for filename in input_filenames:
         start = time.time()
         subprocess.run(['./tensorvote.exe', 
-                        '--input', os.path.join(directory, "c_" + filename.split('.')[0] + ".npy"), 
-                        '--output', os.path.join(directory, "c_vote_" + filename.split('.')[0] + '.npy'), 
+                        '--input', os.path.join(input_directory, filename.split('.')[0] + ".npy"), 
+                        '--output', os.path.join(output_directory, 'c_' + filename.split('.')[0] + '.npy'), 
                         '--sigma', str(sigma), 
                         '--cuda', str(cuda)])
         end = time.time()
@@ -43,7 +36,7 @@ def python_and_c_tensorvote(input_data, input_filenames, python_structuretensors
         
     c_tensorvote_fields = []
     for filename in input_filenames:
-        c_tensorvote_fields.append(np.load(os.path.join(directory, "c_vote_" + filename.split('.')[0] + '.npy')))
+        c_tensorvote_fields.append(np.load(os.path.join(output_directory, 'c_' + filename.split('.')[0] + '.npy')))
         
     return python_tensorvote_fields, c_tensorvote_fields
         
@@ -67,7 +60,11 @@ def tensor_field_difference(field_one, field_two, visualize=False, name = ""):
          
     return np.max(summed_squared_error)
 
-def run_grid_test(data_directory, visualize=False):
+def run_grid_test(data_directory, input_field_directory, visualize=False):
+    
+    image_directory = os.path.join(data_directory, "images")
+    
+    os.makedirs(image_directory)
     
     # generate the grids used as input to both algorithms
     input_data = []
@@ -81,7 +78,7 @@ def run_grid_test(data_directory, visualize=False):
     input_filenames = []
     for i in range(len(input_data)):
         input_filenames.append('grid_' + str(input_data[i].shape[0]) + '.bmp')
-        skimage.io.imsave(os.path.join(data_directory, input_filenames[i]), np.uint8(input_data[i]))
+        skimage.io.imsave(os.path.join(image_directory, input_filenames[i]), np.uint8(input_data[i]))
         
     # run each image through the Python structure tensor code
     python_structuretensors = []
@@ -98,9 +95,9 @@ def run_grid_test(data_directory, visualize=False):
     for filename in input_filenames:
         start = time.time()
         subprocess.run(['./structen.exe', 
-                        '--input', os.path.join(data_directory, filename), 
+                        '--input', os.path.join(image_directory, filename), 
                         '--order', "2",
-                        '--output', os.path.join(data_directory, "c_" + filename.split('.')[0] + '.npy')])
+                        '--output', os.path.join(input_field_directory, filename.split('.')[0] + '.npy')])
         end = time.time()
         print('Generating structure tensor in C for grid size', filename.split('.')[0].split('_')[1], 'took', end - start, 'seconds.')
     
@@ -108,42 +105,57 @@ def run_grid_test(data_directory, visualize=False):
     print("\n\n--------Comparing C/Python Structure Tensor Results--------")
     c_structuretensors = []
     for ti in range(len(input_filenames)):
-        c_structuretensors.append(np.load(os.path.join(data_directory, "c_" + input_filenames[ti].split('.')[0] + '.npy')))
+        c_structuretensors.append(np.load(os.path.join(input_field_directory, input_filenames[ti].split('.')[0] + '.npy')))
         error = tensor_field_difference(c_structuretensors[ti], python_structuretensors[ti], visualize, input_filenames[ti].split('.')[0])
         print("Grid test ( " + input_filenames[ti].split('.')[0] + " ):  error = " + str(error))
         
-    return python_structuretensors, c_structuretensors
+    return python_structuretensors, c_structuretensors, input_filenames
+
+def run_field_test(data_directory, visualize=False):
+    
+    fields = []
+    fields.append(tv.generate_stick_field(0, 1, 100))
+    fields.append(tv.generate_stick_field(1, 0, 100))
+    fields.append(tv.generate_stick_field(1, 1, 100))
+    
+    input_filenames = []
+    
+    for i in range(len(fields)):
+        input_filenames.append('stick_field_' + str(i) + '.npy')
+        np.save(os.path.join(data_directory, input_filenames[i]), fields[i].astype(np.float32))
+        
+    return fields, input_filenames
+    
 
 def main():
     # create a directory to store the raw image data    
     print("Creating test image directory...")
     data_directory = "test_data"
+    input_field_directory = os.path.join(data_directory, "input_fields")
+    output_field_directory = os.path.join(data_directory, "output_fields")
     if os.path.exists(data_directory):
         shutil.rmtree(data_directory)
-    os.makedirs(data_directory)    
-    print("done.")
+    os.makedirs(data_directory)
+    os.makedirs(input_field_directory)
+    os.makedirs(output_field_directory)
+    print("Created test image directory.")
 
     # run the grid test
-    python_structuretensors, c_structuretensors = run_grid_test(data_directory, True)
+    python_structuretensors, _, input_filenames = run_grid_test(data_directory, input_field_directory)
+    # python_structuretensors, input_filenames = run_field_test(data_directory, True)
     
-    # input_data = [tv.generate_stick_field(1, 1, 100)]
-   
-        
-    # sigma = 10
-    # iterations = 1
-    # cuda = -1
-    # python_votefields, c_votefields = python_and_c_tensorvote(input_data, input_filenames, python_structuretensors, sigma, iterations, cuda, data_directory)
-    
-    # for field in python_votefields:
-    #     np.save(os.path.join(data_directory, 'python_vote_' + input_filenames[i].split('.')[0] + '.npy'), (field).astype(np.float32))
-        
+    sigma = 10
+    iterations = 1
+    cuda = -1
+    python_votefields, c_votefields = python_and_c_tensorvote(input_filenames, 
+                                                              python_structuretensors, sigma, iterations, cuda, input_field_directory, output_field_directory)
     
     # # compare the tensor fields
-    # print('Comparing tensor fields...')
-    # difference = tensor_field_difference(python_votefields[0], c_votefields[0])
-    # plt.imshow(difference)
-    # plt.colorbar()
-    # plt.show()
+    print('Comparing tensor fields...')
+    difference = tensor_field_difference(python_votefields[0], c_votefields[0])
+    plt.imshow(difference)
+    plt.colorbar()
+    plt.show()
 
 if __name__ == "__main__":
     main()
