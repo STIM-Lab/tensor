@@ -40,7 +40,7 @@ def python_and_c_tensorvote(input_filenames, python_structuretensors, sigma, ite
         
     return python_tensorvote_fields, c_tensorvote_fields
         
-def tensor_field_difference(field_one, field_two, visualize=False, name = ""):
+def tensor_field_difference(field_one, field_two, band=1, visualize=False, name = ""):
     
     if field_one.shape != field_two.shape:
         raise ValueError("The two fields must have the same shape") 
@@ -48,8 +48,8 @@ def tensor_field_difference(field_one, field_two, visualize=False, name = ""):
     shape = field_one.shape
     
     summed_squared_error = np.zeros((shape[0], shape[1]))
-    for i in range(shape[0]):
-        for j in range(shape[1]):
+    for i in range(band, shape[0]-band):
+        for j in range(band, shape[1]-band):
             squared_differences = (field_one[i][j] - field_two[i][j])**2
             summed_squared_error[i][j] += np.sum(squared_differences)
     if(visualize):
@@ -68,10 +68,11 @@ def run_grid_test(data_directory, input_field_directory, visualize=False):
     
     # generate the grids used as input to both algorithms
     input_data = []
-    input_data.append(axis_grid_2d(100, 4, 2, 0.00) * 255)
-    input_data.append(axis_grid_2d(200, 4, 4, 0.01) * 255)
-    input_data.append(axis_grid_2d(300, 4, 6, 0.10) * 255)
-    input_data.append(axis_grid_2d(400, 4, 8, 0.00) * 255)
+    input_data.append(axis_grid_2d(3, 2, 1, 0.10))
+    input_data.append(axis_grid_2d(100, 4, 2, 0.00))
+    input_data.append(axis_grid_2d(200, 4, 4, 0.01))
+    input_data.append(axis_grid_2d(300, 4, 6, 0.10))
+    input_data.append(axis_grid_2d(400, 4, 8, 0.20))
     
     
     # save an image for each grid that will be used to test the C code
@@ -106,7 +107,7 @@ def run_grid_test(data_directory, input_field_directory, visualize=False):
     c_structuretensors = []
     for ti in range(len(input_filenames)):
         c_structuretensors.append(np.load(os.path.join(input_field_directory, input_filenames[ti].split('.')[0] + '.npy')))
-        error = tensor_field_difference(c_structuretensors[ti], python_structuretensors[ti], visualize, input_filenames[ti].split('.')[0])
+        error = tensor_field_difference(c_structuretensors[ti], python_structuretensors[ti], 1, visualize, input_filenames[ti].split('.')[0])
         print("Grid test ( " + input_filenames[ti].split('.')[0] + " ):  error = " + str(error))
         
     return python_structuretensors, c_structuretensors, input_filenames
@@ -144,18 +145,19 @@ def main():
     python_structuretensors, _, input_filenames = run_grid_test(data_directory, input_field_directory)
     # python_structuretensors, input_filenames = run_field_test(data_directory, True)
     
-    sigma = 10
-    iterations = 1
-    cuda = -1
-    python_votefields, c_votefields = python_and_c_tensorvote(input_filenames, 
-                                                              python_structuretensors, sigma, iterations, cuda, input_field_directory, output_field_directory)
     
-    # # compare the tensor fields
-    print('Comparing tensor fields...')
-    difference = tensor_field_difference(python_votefields[0], c_votefields[0])
-    plt.imshow(difference)
-    plt.colorbar()
-    plt.show()
+    # sigma = 10
+    # iterations = 1
+    # cuda = -1
+    # python_votefields, c_votefields = python_and_c_tensorvote(input_filenames, 
+    #                                                           python_structuretensors, sigma, iterations, cuda, input_field_directory, output_field_directory)
+    
+    # # # compare the tensor fields
+    # print('Comparing tensor fields...')
+    # difference = tensor_field_difference(python_votefields[0], c_votefields[0])
+    # plt.imshow(difference)
+    # plt.colorbar()
+    # plt.show()
 
 if __name__ == "__main__":
     main()

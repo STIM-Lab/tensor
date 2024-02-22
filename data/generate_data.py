@@ -9,6 +9,9 @@ import skimage as ski
 # thickness is the width of each grid line
 def axis_grid_2d(N, b, linewidth, noise=0):
     
+    if b < 2:
+        raise ValueError("An axis grid requries at least two boxes")
+        
     # calculate the number of grid lines
     nlines = b - 1
     
@@ -28,8 +31,9 @@ def axis_grid_2d(N, b, linewidth, noise=0):
         
     if noise != 0:
         I = np.random.normal(0, noise, I.shape) + I
+    I[I<0] = 0
         
-    return (I - np.min(I)) / (np.max(I) - np.min(I))
+    return np.floor(((I - np.min(I)) / (np.max(I) - np.min(I))) * 255)
 
 # generates an NxNxN axis-aligned grid with b boxes along each dimension
 # thickness is the width of each grid line
