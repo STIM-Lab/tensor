@@ -56,6 +56,7 @@ def tensor_field_difference(field_one, field_two, band=1, visualize=False, name 
         plt.figure()
         plt.imshow(summed_squared_error)
         plt.title("Error for test case " + name)
+        plt.colorbar()
         plt.show()
          
     return np.max(summed_squared_error)
@@ -146,18 +147,18 @@ def main():
     # python_structuretensors, input_filenames = run_field_test(data_directory, True)
     
     
-    # sigma = 10
-    # iterations = 1
-    # cuda = -1
-    # python_votefields, c_votefields = python_and_c_tensorvote(input_filenames, 
-    #                                                           python_structuretensors, sigma, iterations, cuda, input_field_directory, output_field_directory)
+    sigma = 10
+    iterations = 1
+    cuda = -1
+    python_votefields, c_votefields = python_and_c_tensorvote(input_filenames, 
+                                                              python_structuretensors, sigma, iterations, cuda, input_field_directory, output_field_directory)
     
-    # # # compare the tensor fields
-    # print('Comparing tensor fields...')
-    # difference = tensor_field_difference(python_votefields[0], c_votefields[0])
-    # plt.imshow(difference)
-    # plt.colorbar()
-    # plt.show()
+    # # compare the tensor fields
+    print('Comparing tensor fields...')
+    for i in range(len(python_votefields)):
+        difference = tensor_field_difference(python_votefields[i], c_votefields[i], 1, visualize=True, name = input_filenames[i].split('.')[0])
+        print("Test case " + input_filenames[i].split('.')[0] + " error = " + str(difference))
+
 
 if __name__ == "__main__":
     main()
