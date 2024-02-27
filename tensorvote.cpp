@@ -212,7 +212,8 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
             }
         }
     }
-    save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
+    if(debug)
+        save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
 }
 
 /// Create an empty field with a single stick tensor in the middle oriented along (x, y)

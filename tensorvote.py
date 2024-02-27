@@ -63,10 +63,6 @@ def vote_k_wu(T, k=0, sigma=3):
     # store the eigenvector corresponding to eigenvalue k
     E = evecs[:, :, :, k]
     
-    # calculate the eccentricity
-    #ecc = np.sqrt(1.0 - (evals[:, :, 0]**2 / evals[:, :, 1]**2))  # calculate the eccentricity
-    #ecc[np.isnan(ecc)] = 0
-    
     # calculate the optimal window size
     w = int(6 * sigma + 1)
     x = np.linspace(-w/2, w/2, w)
@@ -87,7 +83,7 @@ def vote_k_wu(T, k=0, sigma=3):
         #vfx0 = x0 + pad
         for x1 in range(T.shape[1]):
             #vfx1 = x1 + pad
-            scale = evals[x0, x1, 1] # * ecc[x0, x1]
+            scale = evals[x0, x1, k]
             S = scale * saliency_wu(E[x0, x1], L, V0, V1, sigma)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
