@@ -120,22 +120,36 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
 
     glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
     float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
-    glm::vec2 uv_norm = glm::vec2(u, v) / length;           // normalize the direction vector
+
+    glm::vec2 uv_norm = glm::vec2(u, v);                    // normalize the direction vector
+    if (length != 0.0) {                                    // handle normalization if length is zero
+        uv_norm /= length;
+    }
 
     float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
-    float radius = length / (2 * eTv);
-    float large_lambda = eigenvalues[1];
-    float d = large_lambda * Decay_Wu(eTv, length, sigma);
+    float radius;
+    if (eTv == 0.0)                                         // handle the radius if eTv is zero
+        radius = 0.0;
+    else
+        radius = length / (2 * eTv);
+    //float large_lambda = eigenvalues[1];
+    float d = Decay_Wu(eTv, length, sigma);
 
     float tvx, tvy;
-    if (isinf(radius)) {
+    //if (isinf(radius)) {
+    //    tvx = ev[0];
+    //    tvy = ev[1];
+    //}
+    //else {                                                      // calculate the votee orientation
+    if (radius == 0.0) {
         tvx = ev[0];
         tvy = ev[1];
     }
-    else {                                                      // calculate the votee orientation
+    else {
         tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
         tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
     }
+    //}
 
     glm::mat2 TV;
     TV[0][0] = tvx * tvx;
@@ -177,13 +191,14 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
 
             glm::mat2 Votee(0.0f);
             float total_decay = 0.0f;
+            float scale = 0.0f;
 
             for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
                 yr = yi + v;
                 if (yr >= 0 && yr < sy) {
                     for (int u = -hw; u < hw; u++) {
                         
-                        if (!(u == 0 && v == 0)) {
+                        //if (!(u == 0 && v == 0)) {
                             xr = xi + u;
                             if (xr >= 0 && xr < sx) {
                                 // calculate the contribution of (u,v) to (x,y)   
@@ -193,13 +208,13 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                                     sigma,
                                     &L[(yr * sx + xr) * 2],
                                     &V[(yr * sx + xr) * 2]);
-
-                                Votee = Votee + vote.votes * vote.decay;
+                                scale = L[(yr * sx + xr) * 2 + 1];
+                                Votee = Votee + scale * vote.votes * vote.decay;
                                 if (debug) {
                                     total_decay += vote.decay;
                                 }
                             }
-                        }
+                       // }
                     }
                 }
             }

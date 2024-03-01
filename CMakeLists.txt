@@ -41,7 +41,7 @@ configure_file(tensorvote.py
 				tensorvote.py COPYONLY)
 configure_file(tensor_testbench.py 
 				tensor_testbench.py COPYONLY)
-configure_file(data/generate_data.py 
+configure_file(generate_data.py 
 				generate_data.py COPYONLY)
 				
 #set the include directories

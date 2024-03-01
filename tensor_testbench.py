@@ -169,7 +169,8 @@ def main():
     sigma = 2
     iterations = 1
     cuda = -1
-    run_vote_field_test(1, 0, 11, 1, -1, True)
+    run_vote_field_test(1, 0, 5, 2, -1, True)
+    
     run_vote_test(input_filenames, 
                     python_structuretensors, 
                     sigma, 
@@ -187,3 +188,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# N = 5
+# sigma = 2
+# VF = tv.testfield(1, 0, N, sigma)
+# T = tv.generate_stick_field(1, 0, N)
+# VF = tv.iterative_vote(T, sigma, 1)[-1]
+
+# tv.visualize(VF)

@@ -120,7 +120,7 @@ def testfield(x, y, N=100, sigma=10):
     T = generate_stick_field(x, y, N)
 
     # apply tensor voting
-    VF = vote_k_wu(T, 0, sigma)
+    VF = vote_k_wu(T, 1, sigma)
 
     return VF
 
