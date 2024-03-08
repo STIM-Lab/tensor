@@ -13,7 +13,7 @@ arg: tensor voting sigma
 
 def decay_wu(cos_theta, length, sigma):
 
-    c = np.exp(-(length**2) / (sigma**2))
+    c = np.exp(-(length**2) / (sigma**2), dtype=np.float32)
     
     radial = (1 - cos_theta ** 2)
     
@@ -29,13 +29,13 @@ def saliency_wu(e, L, V0, V1, sigma):
     eTv = e[0] * V0 + e[1] * V1
     
     # calculate the radius of the osculating circle
-    R = np.divide(L, (2 * eTv), out=np.zeros_like(L), where=eTv!=0)
+    R = np.divide(L, (2 * eTv), out=np.zeros_like(L), where=eTv!=0, dtype=np.float32)
     
     d = decay_wu(eTv, L, sigma)
     
     # calculate the target tensor orientation
-    Ep0 = np.divide((R * e[0] - L * V0), R, out=np.ones_like(L) * e[0], where=R!=0)
-    Ep1 = np.divide((R * e[1] - L * V1), R, out=np.ones_like(L) * e[1], where=R!=0) 
+    Ep0 = np.divide((R * e[0] - L * V0), R, out=np.ones_like(L) * e[0], where=R!=0, dtype=np.float32)
+    Ep1 = np.divide((R * e[1] - L * V1), R, out=np.ones_like(L) * e[1], where=R!=0, dtype=np.float32) 
     
     
     # turn the orientation into a stick tensor
@@ -65,17 +65,17 @@ def vote_k_wu(T, k=0, sigma=3):
     
     # calculate the optimal window size
     w = int(6 * sigma + 1)
-    x = np.linspace(-w/2, w/2, w)
+    x = np.linspace(-w/2, w/2, w, dtype=np.float32)
     X0, X1 = np.meshgrid(x, x)
     L = np.sqrt(X0**2 + X1**2)
     
     # calculate the normalized vector from (0, 0) to each point
-    V0 = np.divide(X0, L, where=L!=0)
-    V1 = np.divide(X1, L, where=L!=0)
+    V0 = np.divide(X0, L, where=L!=0, dtype=np.float32)
+    V1 = np.divide(X1, L, where=L!=0, dtype=np.float32)
     
     # create a padded vote field to store the vote results
     pad = int(3*sigma)
-    VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
+    VF = np.pad(np.zeros(T.shape, dtype=np.float32), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     
     # for each pixel in the tensor field
@@ -90,11 +90,11 @@ def vote_k_wu(T, k=0, sigma=3):
 
 def vector2tensor(x, y):
 
-    vector = np.array([x, y])
-    vector = vector / np.linalg.norm(vector)
+    vector = np.array([x, y], dtype=np.float32)
+    vector = vector / np.linalg.norm(vector,)
 
 
-    tensor = np.zeros([2, 2])
+    tensor = np.zeros([2, 2], dtype=np.float32)
     tensor[0,0] = vector[0] * vector[0]
     tensor[0,1] = vector[0] * vector[1]
     tensor[1,0] = vector[1] * vector[0]
@@ -156,7 +156,7 @@ def iterative_vote(T, sigma, iterations, dsigma=1):
     V.append(T)
     for i in range(iterations):
         
-        T = vote_k_wu(V[i], 1, sigma + dsigma * i)
+        T = vote_k_wu(V[i].astype(np.float32), 1, sigma + dsigma * i)
 
         V.append(T)
         
