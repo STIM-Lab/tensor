@@ -11,9 +11,9 @@ import time
 import shutil
 
 def run_vote_field_test(x, y, N, sigma, cuda, visualize=False):
-    T = tv.generate_stick_field(x, y, N)
+    T = tv.generate_stick_field(x, y, N).astype(np.float32)
     c_filename = "stick_" + str(x) + "_" + str(y) + "_" + str(N) + ".npy"
-    np.save("test_data/input_fields/" + c_filename, T.astype(np.float32))
+    np.save("test_data/input_fields/" + c_filename, T)
     subprocess.run(['./tensorvote.exe', 
                     '--input', "test_data/input_fields/" + c_filename, 
                     '--output', "test_data/output_fields/" + "c_" + c_filename, 
@@ -55,28 +55,57 @@ def run_vote_test(input_filenames, python_structuretensors, sigma, iterations, c
     for filename in input_filenames:
         c_vote = np.load(os.path.join(output_directory, 'c_' + filename.split('.')[0] + '.npy'))
         p_vote = np.load(os.path.join(output_directory, 'p_' + filename.split('.')[0] + '.npy'))
-        error = tensor_field_difference(c_vote, p_vote, 1, True, filename.split('.')[0])
+        error = tensor_field_difference(c_vote, p_vote, 1, False, filename.split('.')[0])
         print("Grid test ( " + filename.split('.')[0] + " ):  error = " + str(error))
         
     # return python_tensorvote_fields, c_tensorvote_fields
         
-def tensor_field_difference(field_one, field_two, band=1, visualize=False, name = ""):
-    
-    if field_one.shape != field_two.shape:
+def tensor_field_difference(true_field, test_field, band=1, visualize=False, name = ""):
+    epsilon = 0.0001
+    if true_field.shape != test_field.shape:
         raise ValueError("The two fields must have the same shape") 
     
-    shape = field_one.shape
+    shape = true_field.shape
+    
+    absolute_error = np.abs(true_field - test_field)
+    relative_error = absolute_error / (np.abs(true_field) + epsilon)
+    max_relative_error = np.max(np.max(relative_error, 3), 2)
     
     summed_squared_error = np.zeros((shape[0], shape[1]))
     for i in range(band, shape[0]-band):
         for j in range(band, shape[1]-band):
-            squared_differences = (field_one[i][j] - field_two[i][j])**2
+            squared_differences = (true_field[i][j] - test_field[i][j])**2
             summed_squared_error[i][j] += np.sum(squared_differences)
     if(visualize):
         plt.figure()
+        plt.subplot(2, 3, 1)
+        tv.visualize(true_field)
+        #plt.title("First Field")
+        
+        plt.subplot(2, 3, 2)
+        tv.visualize(test_field)
+        #plt.title("Second Field")
+        
+        plt.subplot(2, 3, 3)
         plt.imshow(summed_squared_error)
-        plt.title("Error for test case " + name)
+        plt.title("Sum Squared Error ")
         plt.colorbar()
+        
+        plt.subplot(2, 3, 4)
+        plt.imshow(relative_error[:, :, 0, 0])
+        plt.title("Relative Error in V[0, 0] ")
+        plt.colorbar()
+        
+        plt.subplot(2, 3, 5)
+        plt.imshow(relative_error[:, :, 0, 1])
+        plt.title("Relative Error in V[0, 1]")
+        plt.colorbar()
+        
+        plt.subplot(2, 3, 6)
+        plt.imshow(relative_error[:, :, 1, 1])
+        plt.title("Relative Error in V[1, 1]")
+        plt.colorbar()
+
         plt.show()
          
     return np.max(summed_squared_error)
@@ -92,8 +121,8 @@ def run_grid_test(data_directory, input_field_directory, visualize=False):
     #input_data.append(axis_grid_2d(3, 2, 1, 0.0))
     input_data.append(axis_grid_2d(100, 4, 2, 0.0))
     input_data.append(axis_grid_2d(200, 4, 4, 0.0))
-    #input_data.append(axis_grid_2d(300, 4, 6, 1.0))
-    #input_data.append(axis_grid_2d(400, 4, 8, 2.0))
+    input_data.append(axis_grid_2d(300, 4, 6, 0.0))
+    input_data.append(axis_grid_2d(400, 4, 8, 0.0))
     
     
     # save an image for each grid that will be used to test the C code
@@ -136,9 +165,9 @@ def run_grid_test(data_directory, input_field_directory, visualize=False):
 def run_field_test(data_directory, visualize=False):
     
     fields = []
-    fields.append(tv.generate_stick_field(0, 1, 100))
-    fields.append(tv.generate_stick_field(1, 0, 100))
-    fields.append(tv.generate_stick_field(1, 1, 100))
+    fields.append(tv.generate_stick_field(0, 1, 100).astype(np.float32))
+    fields.append(tv.generate_stick_field(1, 0, 100).astype(np.float32))
+    fields.append(tv.generate_stick_field(1, 1, 100).astype(np.float32))
     
     input_filenames = []
     
@@ -163,13 +192,16 @@ def main():
     print("Created test image directory.")
 
     # run the grid test
+    print("\n\n\n--------------Processing Structure Tensor Fields--------------")
     python_structuretensors, _, input_filenames = run_grid_test(data_directory, input_field_directory)
     
     
     sigma = 2
     iterations = 1
     cuda = -1
-    run_vote_field_test(1, 0, 5, 2, -1, True)
+    #run_vote_field_test(1, 0, 5, 2, -1, False)
+    
+    print("\n\n\n--------------Processing Tensor Voting Fields--------------")
     
     run_vote_test(input_filenames, 
                     python_structuretensors, 
@@ -189,6 +221,8 @@ def main():
 if __name__ == "__main__":
     main()
 
+# T = tv.generate_stick_field(1, 0, 5)
+# TV = tv.iterative_vote(T, 1, 1)[-1]
 # N = 5
 # sigma = 2
 # VF = tv.testfield(1, 0, N, sigma)

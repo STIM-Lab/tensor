@@ -198,23 +198,21 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                 if (yr >= 0 && yr < sy) {
                     for (int u = -hw; u < hw; u++) {
                         
-                        //if (!(u == 0 && v == 0)) {
-                            xr = xi + u;
-                            if (xr >= 0 && xr < sx) {
-                                // calculate the contribution of (u,v) to (x,y)   
-                                VoteContribution vote = Saliency_Wu(
-                                    u,
-                                    v,
-                                    sigma,
-                                    &L[(yr * sx + xr) * 2],
-                                    &V[(yr * sx + xr) * 2]);
-                                scale = L[(yr * sx + xr) * 2 + 1];
-                                Votee = Votee + scale * vote.votes * vote.decay;
-                                if (debug) {
-                                    total_decay += vote.decay;
-                                }
+                        xr = xi + u;
+                        if (xr >= 0 && xr < sx) {
+                            // calculate the contribution of (u,v) to (x,y)   
+                            VoteContribution vote = Saliency_Wu(
+                                u,
+                                v,
+                                sigma,
+                                &L[(yr * sx + xr) * 2],
+                                &V[(yr * sx + xr) * 2]);
+                            scale = L[(yr * sx + xr) * 2 + 1];
+                            Votee = Votee + scale * vote.votes * vote.decay;
+                            if (debug) {
+                                total_decay += vote.decay;
                             }
-                       // }
+                        }
                     }
                 }
             }
