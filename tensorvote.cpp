@@ -41,8 +41,7 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
 }
 
 // small then large
-glm::vec2 Eigenvalues2D(glm::mat2 T)
-{
+glm::vec2 Eigenvalues2D(glm::mat2 T) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
@@ -59,8 +58,7 @@ glm::vec2 Eigenvalues2D(glm::mat2 T)
 }
 
 // small then large
-glm::vec2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1)
-{
+glm::vec2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
@@ -77,8 +75,7 @@ glm::vec2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1)
     }
 }
 
-void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy)
-{
+void Eigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
 
     unsigned int i;
     for (unsigned int yi = 0; yi < sy; yi++)
@@ -110,7 +107,6 @@ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigen
 
 float Decay_Wu(float cos_theta, float length, float sigma) {
     float c = exp(-(length * length) / (sigma * sigma));
-    //float gaussian = 1.0 / ((M_PI * sigma * sigma) / 2);
     float radial = 1 - (cos_theta * cos_theta);
     float D = c * radial;
     return D;
@@ -132,15 +128,9 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
         radius = 0.0;
     else
         radius = length / (2 * eTv);
-    //float large_lambda = eigenvalues[1];
     float d = Decay_Wu(eTv, length, sigma);
 
     float tvx, tvy;
-    //if (isinf(radius)) {
-    //    tvx = ev[0];
-    //    tvy = ev[1];
-    //}
-    //else {                                                      // calculate the votee orientation
     if (radius == 0.0) {
         tvx = ev[0];
         tvy = ev[1];
@@ -149,7 +139,6 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
         tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
         tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
     }
-    //}
 
     glm::mat2 TV;
     TV[0][0] = tvx * tvx;
@@ -168,7 +157,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
-    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
+    Eigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
 
     if (debug) {
         save_field(&L[0], sx, sy, 2, "debug_eigenvalues.npy");

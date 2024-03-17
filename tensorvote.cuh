@@ -12,20 +12,17 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-void SaveTensorField(tira::image<glm::mat2> T, std::string filename)
-{
+void SaveTensorField(tira::image<glm::mat2> T, std::string filename) {
     tira::image<float> out((float *)T.data(), T.X(), T.Y(), 4);
     out.save_npy(filename);
 }
 
-void SaveTensorField(float *data, float width, float height, std::string filename)
-{
+void SaveTensorField(float *data, float width, float height, std::string filename) {
     tira::image<float> out(data, width, height, 4);
     out.save_npy(filename);
 }
 
-__host__ __device__ glm::vec2 Eigenvalue2D(glm::mat2 T)
-{
+__host__ __device__ glm::vec2 gpuEigenvalues2D(glm::mat2 T) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
@@ -41,71 +38,64 @@ __host__ __device__ glm::vec2 Eigenvalue2D(glm::mat2 T)
     return out;
 }
 
-__host__ __device__ multiVec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas)
-{
+__host__ __device__ glm::vec2 gpuEigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
     float g = T[1][1];
 
-    multiVec2 e_vecs;
-    if (e != 0)
-    {
-        glm::vec2 vec0 = glm::normalize(glm::vec2(1.0, (lambdas[0] - d) / e));
-        glm::vec2 vec1 = glm::normalize(glm::vec2(1.0, (lambdas[1] - d) / e));
-
-        e_vecs.x = vec0;
-        e_vecs.y = vec1;
+    if (e != 0) {
+        return glm::normalize(glm::vec2(1.0, (lambdas[index] - d) / e));
     }
-    else if (g == 0)
-    {
-        e_vecs.x = glm::vec2(1.0, 0.0);
-        e_vecs.y = glm::vec2(1.0, 0.0);
+    else if (g == 0) {
+        return glm::vec2(1.0, 0.0);
     }
-    else
-    {
-        e_vecs.x = glm::vec2(0.0, 1.0);
-        e_vecs.y = glm::vec2(0.0, 1.0);
+    else {
+        return glm::vec2(0.0, 1.0);
     }
-    return e_vecs;
 }
 
+float Decay(float cos_theta, float length, float sigma) {
+    float c = exp(-(length * length) / (sigma * sigma));
+    float radial = 1 - (cos_theta * cos_theta);
+    float D = c * radial;
+    return D;
+}
 
+__host__ __device__ VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
 
-__host__ __device__ VoteContribution Saliency(glm::mat2 T, float u, float v, int sigma)
-{
+    glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
+    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
 
-    if (!NonZeroTensor(T))
-    {
-        VoteContribution out;
-        out.votes = glm::mat2(0, 0, 0, 0);
-        out.decay = 0;
-
-        return out;
+    glm::vec2 uv_norm = glm::vec2(u, v);                    // normalize the direction vector
+    if (length != 0.0) {                                    // handle normalization if length is zero
+        uv_norm /= length;
     }
 
-    glm::vec2 lambdas = Eigenvalue2D(T);
+    float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
+    float radius;
+    if (eTv == 0.0)                                         // handle the radius if eTv is zero
+        radius = 0.0;
+    else
+        radius = length / (2 * eTv);
+    float d = Decay(eTv, length, sigma);
 
-    multiVec2 e_vecs = Eigenvector2D(T, lambdas);
-
-    glm::vec2 k1 = e_vecs.y;
-
-    float theta = atan2(k1[1], k1[0]);
-
-    TensorAngleCalculation st = SaliencyTheta(theta, u, v, sigma);
-
-    float lambdaLarge = lambdas[1];
-    float lambdaSmall = lambdas[0];
-    float ecc = sqrt(1.0 - (pow(lambdaSmall, 2) / pow(lambdaLarge, 2)));
-
-    if (isnan(ecc))
-    {
-        ecc = 0;
+    float tvx, tvy;
+    if (radius == 0.0) {
+        tvx = ev[0];
+        tvy = ev[1];
+    }
+    else {
+        tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
+        tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
     }
 
-    VoteContribution out;
-    out.votes = st.votes;
-    out.decay = st.decay * ecc * lambdaLarge;
-
-    return out;
+    glm::mat2 TV;
+    TV[0][0] = tvx * tvx;
+    TV[1][1] = tvy * tvy;
+    TV[0][1] = TV[1][0] = tvx * tvy;
+    VoteContribution R;
+    R.votes = TV;
+    R.decay = d;
+    return R;
 }
