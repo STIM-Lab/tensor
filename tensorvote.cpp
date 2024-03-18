@@ -1,4 +1,5 @@
 #include "tensorvote.h"
+#include "tensorvote.cuh"
 
 #include <iostream>
 
@@ -17,10 +18,8 @@ int in_cuda;
 std::vector<float> in_votefield;
 bool debug = false;
 
-static void HandleError(cudaError_t err, const char *file, int line)
-{
-    if (err != cudaSuccess)
-    {
+static void HandleError(cudaError_t err, const char *file, int line) {
+    if (err != cudaSuccess) {
         std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
     }
 }
@@ -283,6 +282,9 @@ int main(int argc, char *argv[]) {
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
+    }
+    else {
+        CUDAImplementation(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
     }
 
     if (debug) T.save_npy("debug_input.npy");
