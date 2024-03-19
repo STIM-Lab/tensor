@@ -7,6 +7,9 @@
 
 #include <chrono>
 
+#define GLM_FORCE_CUDA
+#include <glm/glm.hpp>
+
 #ifdef __CUDACC__
 #define __device__
 #endif
@@ -20,6 +23,23 @@ static void HandleError(cudaError_t err, const char *file, int line)
 }
 #define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
+// small then large
+__device__ __host__ glm::vec2 Eigenvalues2D(glm::mat2 T) {
+    float d = T[0][0];
+    float e = T[0][1];
+    float f = e;
+    float g = T[1][1];
+
+    float dpg = d + g;
+    float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    float a = (dpg + disc) / 2.0f;
+    float b = (dpg - disc) / 2.0f;
+    float min = a < b ? a : b;
+    float max = a > b ? a : b;
+    glm::vec2 out(min, max);
+    return out;
+}
+/*
 __device__ bool NonZeroTensor(glm::mat2 T) {
     return T[0][0] || T[0][1] || T[1][0] || T[1][1];
 }
@@ -190,19 +210,31 @@ __global__ void voteGPU(float *data, float *VT, float* eigenvalues, float* eigen
     VT[4 * (y * width + x) + 2] = vt[2];
     VT[4 * (y * width + x) + 3] = vt[3];
 }
+*/
 
 /// <summary>
-/// Calculates one iteration of tensor voting given an input tensor field Tn
+/// 
 /// </summary>
-/// <param name="Tn">Input tensor field as a 2D image of matrices</param>
+/// <param name="input_field">Pointer to the input field in CPU memory</param>
+/// <param name="output_field">Pointer to the output field (destination) in CPU memory</param>
+/// <param name="sx">Size of the field along the x axis</param>
+/// <param name="sy">Size of the field along the y axis</param>
 /// <param name="sigma">Standard deviation for the decay function</param>
-/// <param name="w">Window size for the decay function (usually dependent on sigma)</param>
-/// <returns></returns>
-float* CUDAImplementation(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w) {
+/// <param name="w">Width of the window to be used</param>
+/// <param name="device">ID for the CUDA device</param>
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
     cudaDeviceProp props;
-    HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
+    HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
 
     std::cout << "**********CUDA**********" << std::endl;
+
+    // DAVID: Copy the input field to the GPU
+    // DAVID: Write a kernel that copies the input field to the output field
+    // DAVID: Copy the output field from the GPU
+
+    /*
+
+    
 
     int hw = (int)(w / 2);
     int size = 4 * sx * sy;
@@ -251,5 +283,6 @@ float* CUDAImplementation(float* input_field, float* output_field, unsigned int 
     std::cout << "Elapsed time: " << totalTime / 1000 << " seconds" << std::endl;
 
     return gpu_out;
+    */
 }
 

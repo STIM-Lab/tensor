@@ -1,16 +1,16 @@
-#include <stdio.h>
-#include <string>
-#include <vector>
+//#include <stdio.h>
+//#include <string>
+//#include <vector>
 
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-#include <device_functions.h>
+//#include <cuda.h>
+//#include <cuda_runtime.h>
+//#include <device_launch_parameters.h>
+//#include <device_functions.h>
 
-#include "tira/image.h"
+//#include "tira/image.h"
 
-#define _USE_MATH_DEFINES
-#include <math.h>
+//#define _USE_MATH_DEFINES
+//#include <math.h>
 
 //__host__ __device__ bool NonZeroTensor(glm::mat2 T);
 //void SaveTensorField(tira::image<glm::mat2> T, std::string filename);
@@ -20,4 +20,6 @@
 //float Decay(float cos_theta, float lenght, float sigma);
 //__host__ __device__ VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues)
 
-float* CUDAImplementation(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w);
+glm::vec2 Eigenvalues2D(glm::mat2 T);
+
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device);

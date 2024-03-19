@@ -5,10 +5,11 @@
 
 #include <boost/program_options.hpp>
 
-#include <tira/image.h>
+#include <tira/field.h>
+//#include <tira/image.h>
 
-#include <cuda.h>
-#include <cuda_runtime_api.h>
+//#include <cuda.h>
+//#include <cuda_runtime_api.h>
 
 std::string in_inputname;
 std::string in_outputname;
@@ -18,12 +19,12 @@ int in_cuda;
 std::vector<float> in_votefield;
 bool debug = false;
 
-static void HandleError(cudaError_t err, const char *file, int line) {
-    if (err != cudaSuccess) {
-        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
-    }
-}
-#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
+//static void HandleError(cudaError_t err, const char *file, int line) {
+//    if (err != cudaSuccess) {
+//        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
+//    }
+//}
+//#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
 /// <summary>
 /// Save a field of floating point values as a NumPy file
@@ -39,25 +40,10 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
     O.save_npy(filename);
 }
 
-// small then large
-glm::vec2 Eigenvalues2D(glm::mat2 T) {
-    float d = T[0][0];
-    float e = T[0][1];
-    float f = e;
-    float g = T[1][1];
 
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
-    float min = a < b ? a : b;
-    float max = a > b ? a : b;
-    glm::vec2 out(min, max);
-    return out;
-}
 
 // small then large
-glm::vec2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1) {
+glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
@@ -91,7 +77,7 @@ void Eigendecomposition(float *input_field, float *eigenvectors, float *eigenval
                 input_field[ti + 3]);
 
             glm::vec2 evals = Eigenvalues2D(T);                     // calculate the eigenvalues
-            glm::vec2 evec = Eigenvectors2D(T, evals);              // calculate the largest eigenvector
+            glm::vec2 evec = Eigenvector2D(T, evals, 1);              // calculate the largest (1) eigenvector
 
             unsigned int vi = i * 2;                                // update the vector/value index (each is 2 elements)
             eigenvectors[vi + 0] = evec[0];                         // save the eigenvectors to the output array
@@ -104,14 +90,14 @@ void Eigendecomposition(float *input_field, float *eigenvectors, float *eigenval
     }
 }
 
-float Decay_Wu(float cos_theta, float length, float sigma) {
+float Decay(float cos_theta, float length, float sigma) {
     float c = exp(-(length * length) / (sigma * sigma));
     float radial = 1 - (cos_theta * cos_theta);
     float D = c * radial;
     return D;
 }
 
-VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
+VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
 
     glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
     float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
@@ -127,7 +113,7 @@ VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, 
         radius = 0.0;
     else
         radius = length / (2 * eTv);
-    float d = Decay_Wu(eTv, length, sigma);
+    float d = Decay(eTv, length, sigma);
 
     float tvx, tvy;
     if (radius == 0.0) {
@@ -189,7 +175,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                         xr = xi + u;
                         if (xr >= 0 && xr < sx) {
                             // calculate the contribution of (u,v) to (x,y)   
-                            VoteContribution vote = Saliency_Wu(
+                            VoteContribution vote = Saliency(
                                 u,
                                 v,
                                 sigma,
@@ -265,8 +251,8 @@ int main(int argc, char *argv[]) {
 
 
     // make sure that the selected CUDA device is valid, and switch to the CPU if it isn't
-    cudaDeviceProp props;
-    HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
+    //cudaDeviceProp props;
+    //HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
 
     tira::field<float> T;
 
@@ -284,7 +270,7 @@ int main(int argc, char *argv[]) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
     }
     else {
-        CUDAImplementation(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_cuda);
     }
 
     if (debug) T.save_npy("debug_input.npy");
