@@ -1,15 +1,4 @@
-#include "tensorvote.h"
 #include "tensorvote.cuh"
-
-#include <iostream>
-
-#include <boost/program_options.hpp>
-
-#include <tira/field.h>
-//#include <tira/image.h>
-
-//#include <cuda.h>
-//#include <cuda_runtime_api.h>
 
 std::string in_inputname;
 std::string in_outputname;
@@ -18,13 +7,6 @@ unsigned int in_window;
 int in_cuda;
 std::vector<float> in_votefield;
 bool debug = false;
-
-//static void HandleError(cudaError_t err, const char *file, int line) {
-//    if (err != cudaSuccess) {
-//        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
-//    }
-//}
-//#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
 /// <summary>
 /// Save a field of floating point values as a NumPy file
@@ -40,109 +22,13 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
     O.save_npy(filename);
 }
 
-
-
-// small then large
-glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1) {
-    float d = T[0][0];
-    float e = T[0][1];
-    float f = e;
-    float g = T[1][1];
-
-    if (e != 0) {
-        return glm::normalize(glm::vec2(1.0, (lambdas[index] - d) / e));
-    }
-    else if (g == 0) {
-        return glm::vec2(1.0, 0.0);
-    }
-    else {
-        return glm::vec2(0.0, 1.0);
-    }
-}
-
-void Eigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
-
-    unsigned int i;
-    for (unsigned int yi = 0; yi < sy; yi++)
-    { // for each tensor in the field
-        for (unsigned int xi = 0; xi < sx; xi++)
-        {
-            i = (yi * sx + xi); // calculate a 1D index into the 2D image
-
-            unsigned int ti = i * 4;                                // update the tensor index (each tensor is 4 elements)
-                                                                    // store the tensor as a matrix to make this more readable
-            glm::mat2 T(input_field[ti + 0],
-                input_field[ti + 1], 
-                input_field[ti + 2], 
-                input_field[ti + 3]);
-
-            glm::vec2 evals = Eigenvalues2D(T);                     // calculate the eigenvalues
-            glm::vec2 evec = Eigenvector2D(T, evals, 1);              // calculate the largest (1) eigenvector
-
-            unsigned int vi = i * 2;                                // update the vector/value index (each is 2 elements)
-            eigenvectors[vi + 0] = evec[0];                         // save the eigenvectors to the output array
-            eigenvectors[vi + 1] = evec[1];
-
-            
-            eigenvalues[vi + 0] = evals[0];                         // save the eigenvalues to the output array
-            eigenvalues[vi + 1] = evals[1];
-        }
-    }
-}
-
-float Decay(float cos_theta, float length, float sigma) {
-    float c = exp(-(length * length) / (sigma * sigma));
-    float radial = 1 - (cos_theta * cos_theta);
-    float D = c * radial;
-    return D;
-}
-
-VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
-
-    glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
-    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
-
-    glm::vec2 uv_norm = glm::vec2(u, v);                    // normalize the direction vector
-    if (length != 0.0) {                                    // handle normalization if length is zero
-        uv_norm /= length;
-    }
-
-    float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
-    float radius;
-    if (eTv == 0.0)                                         // handle the radius if eTv is zero
-        radius = 0.0;
-    else
-        radius = length / (2 * eTv);
-    float d = Decay(eTv, length, sigma);
-
-    float tvx, tvy;
-    if (radius == 0.0) {
-        tvx = ev[0];
-        tvy = ev[1];
-    }
-    else {
-        tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
-        tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
-    }
-
-    glm::mat2 TV;
-    TV[0][0] = tvx * tvx;
-    TV[1][1] = tvy * tvy;
-    TV[0][1] = TV[1][0] = tvx * tvy;
-    VoteContribution R;
-    R.votes = TV;
-    R.decay = d;
-    return R;
-}
-
-
 void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w) {
     std::vector<float> V(sx * sy * 2);                          // allocate space for the eigenvectors
     std::vector<float> L(sx * sy * 2);                          // allocate space for the eigenvalues
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
-    Eigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
+    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
 
     if (debug) {
         save_field(&L[0], sx, sy, 2, "debug_eigenvalues.npy");
@@ -248,11 +134,6 @@ int main(int argc, char *argv[]) {
 
     // calculate the window size if one isn't provided
     if (!vm.count("window")) in_window = int(6 * in_sigma + 1);
-
-
-    // make sure that the selected CUDA device is valid, and switch to the CPU if it isn't
-    //cudaDeviceProp props;
-    //HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
 
     tira::field<float> T;
 

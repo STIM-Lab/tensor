@@ -1,5 +1,25 @@
 {
     "files.associations": {
-        "vector": "cpp"
+        "vector": "cpp",
+        "*.ipp": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "deque": "cpp",
+        "format": "cpp",
+        "initializer_list": "cpp",
+        "list": "cpp",
+        "queue": "cpp",
+        "random": "cpp",
+        "ranges": "cpp",
+        "regex": "cpp",
+        "span": "cpp",
+        "stack": "cpp",
+        "type_traits": "cpp",
+        "valarray": "cpp",
+        "xhash": "cpp",
+        "xstring": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "cmath": "cpp"
     }
 }

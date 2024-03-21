@@ -1,25 +1,52 @@
-//#include <stdio.h>
-//#include <string>
-//#include <vector>
+#include <stdio.h>
+#include <string>
+#include <iostream>
+#include <stdio.h>
 
-//#include <cuda.h>
-//#include <cuda_runtime.h>
-//#include <device_launch_parameters.h>
-//#include <device_functions.h>
+#include <glm/glm.hpp>
 
-//#include "tira/image.h"
+#include <tira/field.h>
+#include <tira/image.h>
 
-//#define _USE_MATH_DEFINES
-//#include <math.h>
+#include <cuda_runtime_api.h>
 
-//__host__ __device__ bool NonZeroTensor(glm::mat2 T);
-//void SaveTensorField(tira::image<glm::mat2> T, std::string filename);
-//void SaveTensorField(float* data, float width, float height, std::string filename);
-//__host__ __device__ glm::vec2 gpuEigenvalues2D(glm::mat2 T);
-//__host__ __device__ glm::vec2 gpuEigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
-//float Decay(float cos_theta, float lenght, float sigma);
-//__host__ __device__ VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues)
+#include <boost/program_options.hpp>
 
-glm::vec2 Eigenvalues2D(glm::mat2 T);
+#include <math.h>
 
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device);
+#define _USE_MATH_DEFINES
+
+__host__ __device__ static void HandleError(cudaError_t err, const char *file, int line)
+{
+    if (err != cudaSuccess)
+    {
+        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
+    }
+}
+#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
+
+#include <glm/glm.hpp>
+
+struct VoteContribution
+{
+    glm::mat2 votes;
+    float decay;
+};
+
+struct TensorAngleCalculation
+{
+    glm::mat2 votes;
+    float decay;
+};
+
+struct multiVec2
+{
+    glm::vec2 x;
+    glm::vec2 y;
+};
+
+__host__ __device__ glm::vec2 Eigenvalues2D(glm::mat2 T);
+__host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
+__host__ __device__ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy);
+__host__ __device__ VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors);
+__global__ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device);
