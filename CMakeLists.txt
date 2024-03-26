@@ -101,7 +101,6 @@ target_link_libraries(structen
 # tensorvote executable
 add_executable(tensorvote
 				tensorvote.cpp
-				tensorvote.h
 				tensorvote.cuh	
 				tensorvote.cu
 )

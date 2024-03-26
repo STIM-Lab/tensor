@@ -1,19 +1,20 @@
 
-#include "tensorvote.cuh"
-
-#include <chrono>
-#include <vector>
-
-#include <cuda.h>
-#include <device_functions.h>
-#include <cuda_runtime.h>
-#include <device_launch_parameters.h>
-
+#include <glm/glm.hpp>
 #define GLM_FORCE_CUDA
 
-#ifdef __CUDACC__
-#define __device__
-#endif
+#include "tensorvote.cuh"
+
+#include <iostream>
+
+
+static void HandleError(cudaError_t err, const char* file, int line)
+{
+    if (err != cudaSuccess)
+    {
+        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
+    }
+}
+#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
 // small then large
 __host__ __device__ glm::vec2 Eigenvalues2D(glm::mat2 T) {
@@ -36,7 +37,7 @@ __host__ __device__ glm::vec2 Eigenvalues2D(glm::mat2 T) {
 __host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index) {
     float d = T[0][0];
     float e = T[0][1];
-    float f = e;
+    //float f = e;
     float g = T[1][1];
 
     if (e != 0) {
@@ -177,16 +178,16 @@ __global__ void cudaKernel(float *data, float *VT, float* eigenvalues, float* ei
 /// <param name="sigma">Standard deviation for the decay function</param>
 /// <param name="w">Width of the window to be used</param>
 /// <param name="device">ID for the CUDA device</param>
-__global__ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
 
     std::cout << "**********CUDA**********" << std::endl;
-    int hw = (int)(w / 2);
+    //int hw = (int)(w / 2);
     int tensorFieldSize = 4 * sx * sy;
-
-    std::vector<float> V(sx * sy * 2);                          // allocate space for the eigenvectors
-    std::vector<float> L(sx * sy * 2);                          // allocate space for the eigenvalues
+                        
+    float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
+    float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
 
     float* gpuInputField;
     float* gpuOutputField;
@@ -217,5 +218,8 @@ __global__ void cudaVote2D(float* input_field, float* output_field, unsigned int
     float totalTime;
     cudaEventElapsedTime(&totalTime, start, stop);
     std::cout << "Elapsed time: " << totalTime / 1000 << " seconds" << std::endl;
+
+    delete V;
+    delete L;
 }
 

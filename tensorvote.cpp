@@ -1,4 +1,19 @@
+#include <boost/program_options.hpp>
+
+#include <tira/field.h>
+#include <tira/image.h>
+#include <glm/glm.hpp>
+
 #include "tensorvote.cuh"
+glm::vec2 Eigenvalues2D(glm::mat2 T);
+glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
+void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
+VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors);
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device);
+
+
+#include <tira/field.h>
+#include <tira/image.h>
 
 std::string in_inputname;
 std::string in_outputname;
