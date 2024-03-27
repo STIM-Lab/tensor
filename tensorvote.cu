@@ -137,7 +137,6 @@ __global__ void cudaKernel(float *data, float *VT, float* eigenvalues, float* ei
     size_t y = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
     size_t x = blockDim.x * blockIdx.x + threadIdx.x;
 
-    
     if (y >= height || x >= width)                                                          // if not within bounds of image, return
         return;
 
@@ -153,7 +152,15 @@ __global__ void cudaKernel(float *data, float *VT, float* eigenvalues, float* ei
                     data[4 * index + 2],
                     data[4 * index + 3]);
 
-                VoteContribution vc = Saliency(u, v, sigma, eigenvalues, eigenvectors);                             // calculate the saliency given the tensor at (u,v)
+                // printf("T: %f %f %f %f eigenvalues: %f %f eigenvectors: (%f, %f) (%f, %f)\n", T[0][0], T[0][1], T[1][0], T[1][1], eigenvalues[2 * index], eigenvalues[2 * index + 1], eigenvectors[index], eigenvectors[index + 1], eigenvectors[index + 2], eigenvectors[index + 3]);
+
+                VoteContribution vc = Saliency(
+                    u, 
+                    v, 
+                    sigma, 
+                    &eigenvalues[2 * index], 
+                    &eigenvectors[index]
+                );                             // calculate the saliency given the tensor at (u,v)
                 vt[0] += vc.votes[0][0] * vc.decay;                                         // sum the tensor contribution based on the saliency
                 vt[1] += vc.votes[0][1] * vc.decay;
                 vt[2] += vc.votes[1][0] * vc.decay;
@@ -166,6 +173,7 @@ __global__ void cudaKernel(float *data, float *VT, float* eigenvalues, float* ei
     VT[4 * (y * width + x) + 1] = vt[1];
     VT[4 * (y * width + x) + 2] = vt[2];
     VT[4 * (y * width + x) + 3] = vt[3];
+
 }
 
 /// <summary>
@@ -188,14 +196,21 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
                         
     float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
     float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
+    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);
 
     float* gpuInputField;
     float* gpuOutputField;
+    float* gpuV;
+    float* gpuL;
 
     HANDLE_ERROR(cudaMalloc(&gpuInputField, tensorFieldSize * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorFieldSize * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuV, sx * sy * 2 * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuL, sx * sy * 2 * sizeof(float)));
 
     HANDLE_ERROR(cudaMemcpy(gpuInputField, input_field, tensorFieldSize * sizeof(float), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuV, V, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuL, L, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
 
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
     dim3 threads(blockDim, blockDim);
@@ -206,14 +221,14 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);
 
-    cudaKernel<<<blocks, threads>>>(gpuInputField, gpuOutputField, &V[0], &L[0], sigma, w, sx, sy);              // call the CUDA kernel for voting
+    // cudaKernel<<<blocks, threads>>>(gpuInputField, gpuOutputField, &V[0], &L[0], sigma, w, sx, sy);              // call the CUDA kernel for voting
+    cudaKernel<<<blocks, threads>>>(gpuInputField, gpuOutputField, gpuV, gpuL, sigma, w, sx, sy);              // call the CUDA kernel for voting
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
 
-    HANDLE_ERROR(cudaMemcpy(gpuOutputField, output_field, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
+    HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
     
     float totalTime;
     cudaEventElapsedTime(&totalTime, start, stop);

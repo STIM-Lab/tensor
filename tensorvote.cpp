@@ -81,7 +81,8 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
                                 v,
                                 sigma,
                                 &L[(yr * sx + xr) * 2],
-                                &V[(yr * sx + xr) * 2]);
+                                &V[(yr * sx + xr) * 2]
+                            );
                             scale = L[(yr * sx + xr) * 2 + 1];
                             Votee = Votee + scale * vote.votes * vote.decay;
                             if (debug) {
@@ -161,6 +162,8 @@ int main(int argc, char *argv[]) {
     }
     tira::field<float> Tr(T.shape());   // create a field to store the vote result
 
+    std::cout << Tr.shape()[0] << " " << Tr.shape()[1] << std::endl;
+    
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
