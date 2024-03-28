@@ -58,11 +58,11 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
     for (unsigned int yi = 0; yi < sy; yi++) {                  // for each pixel in the image
         for (unsigned int xi = 0; xi < sx; xi++) {
 
-            glm::mat2 T = glm::mat2(                            // retrieve the tensor for the current pixel
-                input_field[(yi * sx + xi) * 4 + 0],
-                input_field[(yi * sx + xi) * 4 + 1],
-                input_field[(yi * sx + xi) * 4 + 2],
-                input_field[(yi * sx + xi) * 4 + 3]);
+            //glm::mat2 T = glm::mat2(                            // retrieve the tensor for the current pixel
+            //    input_field[(yi * sx + xi) * 4 + 0],
+            //    input_field[(yi * sx + xi) * 4 + 1],
+            //    input_field[(yi * sx + xi) * 4 + 2],
+            //    input_field[(yi * sx + xi) * 4 + 3]);
 
             glm::mat2 Votee(0.0f);
             float total_decay = 0.0f;

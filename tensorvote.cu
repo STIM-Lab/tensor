@@ -51,7 +51,7 @@ __host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsi
     }
 }
 
-__host__ __device__  void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
+__host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
 
     unsigned int i;
     for (unsigned int yi = 0; yi < sy; yi++) { // for each tensor in the field
@@ -124,6 +124,7 @@ __host__ __device__  VoteContribution Saliency(float u, float v, float sigma, fl
     return R;
 }
 
+
 /// @brief The kernel to perform the tensor voting on the GPU
 /// @param data Input tensor field
 /// @param VT Output tensor field
@@ -133,108 +134,86 @@ __host__ __device__  VoteContribution Saliency(float u, float v, float sigma, fl
 /// @param w Window size
 /// @param width Tensor field width in pixels
 /// @param height Tensor field height in pixels
-__global__ void cudaKernel(float *data, float *VT, float* eigenvalues, float* eigenvectors, float sigma, int w, int width, int height) {
-    size_t y = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
-    size_t x = blockDim.x * blockIdx.x + threadIdx.x;
+__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int sx, int sy) {
+    int yi = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
+    int xi = blockDim.x * blockIdx.x + threadIdx.x;
 
-    if (y >= height || x >= width)                                                          // if not within bounds of image, return
+    if (yi >= sy || xi >= sx)                                                          // if not within bounds of image, return
         return;
 
-    float vt[4] = {0, 0, 0, 0};                                                             // initialize a tensor to zeros
+    glm::mat2 Votee(0.0f);
+    float scale = 0.0f;
 
-    for (int u = -w; u < w; u++){                                                           // for each pixel within the window
-        for (int v = -w; v < w; v++) {
-            int index = ((v + y) * width + x + u);                                          // calculate a 1D index into the tensor field
-            if (index < width * height && index >= 0) {                                     // DAVID: This will cause wrap-around artifacts
-                glm::mat2 T(
-                    data[4 * index + 0],
-                    data[4 * index + 1],
-                    data[4 * index + 2],
-                    data[4 * index + 3]);
+    int hw = w / 2;
+    int yr, xr;
+    for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
+        yr = yi + v;
+        if (yr >= 0 && yr < sy) {
+            for (int u = -hw; u < hw; u++) {
 
-                // printf("T: %f %f %f %f eigenvalues: %f %f eigenvectors: (%f, %f) (%f, %f)\n", T[0][0], T[0][1], T[1][0], T[1][1], eigenvalues[2 * index], eigenvalues[2 * index + 1], eigenvectors[index], eigenvectors[index + 1], eigenvectors[index + 2], eigenvectors[index + 3]);
-
-                VoteContribution vc = Saliency(
-                    u, 
-                    v, 
-                    sigma, 
-                    &eigenvalues[2 * index], 
-                    &eigenvectors[index]
-                );                             // calculate the saliency given the tensor at (u,v)
-                vt[0] += vc.votes[0][0] * vc.decay;                                         // sum the tensor contribution based on the saliency
-                vt[1] += vc.votes[0][1] * vc.decay;
-                vt[2] += vc.votes[1][0] * vc.decay;
-                vt[3] += vc.votes[1][1] * vc.decay;
+                xr = xi + u;
+                if (xr >= 0 && xr < sx) {
+                    // calculate the contribution of (u,v) to (x,y)   
+                    VoteContribution vote = Saliency(
+                        u,
+                        v,
+                        sigma,
+                        &L[(yr * sx + xr) * 2],
+                        &V[(yr * sx + xr) * 2]
+                    );
+                    float scale = L[(yr * sx + xr) * 2 + 1];
+                    Votee = Votee + scale * vote.votes * vote.decay;
+                }
             }
         }
     }
-
-    VT[4 * (y * width + x) + 0] = vt[0];
-    VT[4 * (y * width + x) + 1] = vt[1];
-    VT[4 * (y * width + x) + 2] = vt[2];
-    VT[4 * (y * width + x) + 3] = vt[3];
-
+    
+    VT[4 * (yi * sx + xi) + 0] = Votee[0][0];
+    VT[4 * (yi * sx + xi) + 1] = Votee[1][0];
+    VT[4 * (yi * sx + xi) + 2] = Votee[0][1];
+    VT[4 * (yi * sx + xi) + 3] = Votee[1][1];
 }
 
-/// <summary>
-/// 
-/// </summary>
-/// <param name="input_field">Pointer to the input field in CPU memory</param>
-/// <param name="output_field">Pointer to the output field (destination) in CPU memory</param>
-/// <param name="sx">Size of the field along the x axis</param>
-/// <param name="sy">Size of the field along the y axis</param>
-/// <param name="sigma">Standard deviation for the decay function</param>
-/// <param name="w">Width of the window to be used</param>
-/// <param name="device">ID for the CUDA device</param>
 void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
 
-    std::cout << "**********CUDA**********" << std::endl;
-    //int hw = (int)(w / 2);
     int tensorFieldSize = 4 * sx * sy;
-                        
     float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
     float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
-    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);
 
-    float* gpuInputField;
+    int hw = (int)(w / 2);                                      // calculate the half window size
+
+    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
+
+    // Declare GPU arrays
     float* gpuOutputField;
     float* gpuV;
     float* gpuL;
 
-    HANDLE_ERROR(cudaMalloc(&gpuInputField, tensorFieldSize * sizeof(float)));
+    // Allocate GPU arrays
     HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorFieldSize * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&gpuV, sx * sy * 2 * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&gpuL, sx * sy * 2 * sizeof(float)));
 
-    HANDLE_ERROR(cudaMemcpy(gpuInputField, input_field, tensorFieldSize * sizeof(float), cudaMemcpyHostToDevice));
+    // Copy input arrays
     HANDLE_ERROR(cudaMemcpy(gpuV, V, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
     HANDLE_ERROR(cudaMemcpy(gpuL, L, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
 
+
+    // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
     dim3 threads(blockDim, blockDim);
     dim3 blocks(sx / threads.x + 1, sy / threads.y + 1);
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
+    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy);              // call the CUDA kernel for voting
 
-
-    // cudaKernel<<<blocks, threads>>>(gpuInputField, gpuOutputField, &V[0], &L[0], sigma, w, sx, sy);              // call the CUDA kernel for voting
-    cudaKernel<<<blocks, threads>>>(gpuInputField, gpuOutputField, gpuV, gpuL, sigma, w, sx, sy);              // call the CUDA kernel for voting
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-
+    // Copy the final result back from the GPU
     HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
-    
-    float totalTime;
-    cudaEventElapsedTime(&totalTime, start, stop);
-    std::cout << "Elapsed time: " << totalTime / 1000 << " seconds" << std::endl;
 
-    delete V;
-    delete L;
+    // Free all of the GPU arrays
+    HANDLE_ERROR(cudaFree(gpuOutputField));
+    HANDLE_ERROR(cudaFree(gpuV));
+    HANDLE_ERROR(cudaFree(gpuL));
 }
 

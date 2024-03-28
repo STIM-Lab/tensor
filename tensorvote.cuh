@@ -22,3 +22,5 @@ struct multiVec2
     glm::vec2 x;
     glm::vec2 y;
 };
+
+void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int vals, std::string filename);
