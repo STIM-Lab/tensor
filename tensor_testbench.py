@@ -176,6 +176,38 @@ def run_field_test(data_directory, visualize=False):
         np.save(os.path.join(data_directory, input_filenames[i]), fields[i].astype(np.float32))
         
     return fields, input_filenames
+
+def display_fields(x, y, N=21, sigma_max=10, sigma_min=0):
+    x = np.linspace(-N/2, N/2, N)
+    X, Y = np.meshgrid(x, x)
+
+
+
+    plt.subplot(2, 3, 1)
+    STICK = tv.stickfield2(0, 1, X, Y, sigma_max, sigma_max)
+    np.save("stick_uniform.npy", STICK.astype(np.float32))
+    tv.visualize(STICK, "Uniform Stick Tensor", fontsize=22)
+    plt.subplot(2, 3, 2)
+    STICK = tv.stickfield2(0, 1, X, Y, sigma_max, sigma_min)
+    np.save("stick_contour.npy", STICK.astype(np.float32))
+    tv.visualize(STICK, "Contour Stick Tensor", fontsize=22)
+    plt.subplot(2, 3, 3)
+    STICK = tv.stickfield2(0, 1, X, Y, sigma_min, sigma_max)
+    np.save("stick_layer.npy", STICK.astype(np.float32))
+    tv.visualize(STICK, "Layer Stick Tensor", fontsize=22)
+
+    plt.subplot(2, 3, 4)
+    PLATE = tv.platefield2(X, Y, sigma_max, sigma_max)
+    np.save("plate_uniform.npy", PLATE.astype(np.float32))
+    tv.visualize(PLATE, "Uniform Plate Tensor", fontsize=22)
+    plt.subplot(2, 3, 5)
+    PLATE = tv.platefield2(X, Y, sigma_max, sigma_min)
+    np.save("plate_contour.npy", PLATE.astype(np.float32))
+    tv.visualize(PLATE, "Contour Plate Tensor", fontsize=22)
+    plt.subplot(2, 3, 6)
+    PLATE = tv.platefield2(X, Y, sigma_min, sigma_max)
+    np.save("plate_layer.npy", PLATE.astype(np.float32))
+    tv.visualize(PLATE, "Layer Plate Tensor", fontsize=22)
     
 
 def main():
@@ -218,10 +250,45 @@ def main():
     #    print("Test case " + input_filenames[i].split('.')[0] + " error = " + str(difference))
 
 
-if __name__ == "__main__":
-    main()
+#if __name__ == "__main__":
+#    main()
 
-# T = tv.generate_stick_field(1, 0, 5)
+#T = tv.testfield(1, 1, 75, 20)
+#tv.visualize(T)
+
+sigma = 1
+iterations = 3
+
+G = axis_grid_2d(100, 3, 2, 1)
+plt.imshow(G)
+
+S = st.hessian(G, 1)
+plt.figure()
+tv.visualize(S)
+TV = tv.iterative_stick2(S, sigma, iterations, 1)
+plt.figure()
+tv.visualize(TV[iterations])
+np.save("votetest.npy", TV[1].astype(np.float32))
+#display_fields(1, 1, N=21, sigma_max=10, sigma_min=7)
+
+
+#plt.imshow(G)
+
+# N = 21
+# R = 21
+# sigma = 10
+# dtheta = np.pi / N
+
+# T = np.zeros((R, R, 2, 2))
+# for n in range(N):
+#     x = np.cos(dtheta * n)
+#     y = np.sin(dtheta * n)
+    
+#     T = T + tv.testfield(x, y, R, sigma)
+#     print(n)
+
+# np.save("circle_field.npy", T.astype(np.float32))
+# tv.visualize(T, mode="eccentricity")
 # TV = tv.iterative_vote(T, 1, 1)[-1]
 # N = 5
 # sigma = 2

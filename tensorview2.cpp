@@ -489,6 +489,10 @@ int main(int argc, char** argv) {
         LoadTensorField(argv[1]);
     }
 
+    if (argc > 0) {
+        GLYPH_ROWS = Tn.shape()[0];
+    }
+
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
     CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
     SCALARTYPE = ScalarType::NoScalar;
