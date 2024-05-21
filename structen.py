@@ -82,22 +82,23 @@ def structen(I, sigma):
     return T
     
 
-def hessian(I, w=0):
+def hessian(I, sigma=0):
     
     if(len(I.shape) > 2):
         img = I[:, :, 0]
     else:
         img = I
+        
+    #if sigma != 0:
+    #    img = sp.ndimage.gaussian_filter(img, sigma)
     
-    dIdy, dIdx = np.gradient(img)
-    dI2dy2, _ = np.gradient(dIdy)
-    _, dI2dx2 = np.gradient(dIdx)
+
     
     # create the Hessian tensor
     T = np.zeros((img.shape[0], img.shape[1], 2, 2))
-    T[:, :, 0, 0] = dI2dx2**2
-    T[:, :, 1, 1] = dI2dy2**2
-    T[:, :, 0, 1] = dI2dx2*dI2dy2
+    T[:, :, 0, 0] = sp.ndimage.gaussian_filter(img, sigma, (0, 2))
+    T[:, :, 1, 1] = sp.ndimage.gaussian_filter(img, sigma, (2, 0))
+    T[:, :, 0, 1] = np.sqrt(sp.ndimage.gaussian_filter(img, sigma, (2, 2))**2)
     T[:, :, 1, 0] = T[:, :, 0, 1]
     
     return T

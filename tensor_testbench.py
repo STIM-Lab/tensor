@@ -4,7 +4,7 @@ import skimage
 import scipy as sp
 import numpy as np
 import matplotlib.pyplot as plt
-from generate_data import axis_grid_2d
+import generate_data as gen
 import subprocess
 import os
 import time
@@ -256,13 +256,14 @@ def main():
 #T = tv.testfield(1, 1, 75, 20)
 #tv.visualize(T)
 
-sigma = 1
-iterations = 3
+sigma = 3
+iterations = 1
+noise = 0.0
 
-G = axis_grid_2d(100, 3, 2, 1)
+G = gen.genCircleGrid2(100, 3, 1, noise)
 plt.imshow(G)
 
-S = st.hessian(G, 1)
+S = st.hessian(G, 0.5)
 plt.figure()
 tv.visualize(S)
 TV = tv.iterative_stick2(S, sigma, iterations, 1)

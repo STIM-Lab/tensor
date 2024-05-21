@@ -39,8 +39,10 @@ configure_file(structen.py
 				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
-configure_file(tensor_testbench.py 
-				tensor_testbench.py COPYONLY)
+#configure_file(tensor_testbench.py 
+#				tensor_testbench.py COPYONLY)
+
+# copy the script to generate example data sets
 configure_file(generate_data.py 
 				generate_data.py COPYONLY)
 				
