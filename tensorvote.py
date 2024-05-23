@@ -169,14 +169,14 @@ def vector2tensor(x, y):
     return tensor
 
 #generate an NxN field with a stick tensor pointing in the (x,y) direction
-def generate_stick_field(x=0, y=1, N=100):
+def generate_stick_field(x=0, y=1, N=101):
     T = np.zeros((N, N, 2, 2))
     center = int(N/2)
     T[center, center] = vector2tensor(x, y)
 
     return T
 
-def generate2(x=0, y=1, N=101, l1=1.0, l0=0.5):
+def generate2(x=0, y=1, N=51, sigma1=20, sigma2=10):
     
     l = np.sqrt(x**2 + y**2)
     if l==0:
@@ -187,15 +187,12 @@ def generate2(x=0, y=1, N=101, l1=1.0, l0=0.5):
         x = x / l
         y = y / l
         
-    q1 = np.array([x, y])[..., np.newaxis]
-    q0 = np.array([y, -x])[..., np.newaxis]
+    X = np.linspace(-N/2, N/2, N)
+    RX, RY = np.meshgrid(X, X)
     
-    T = np.matmul(q0, np.transpose(q0)) * l0 + np.matmul(q1, np.transpose(q1)) * l1
+    T = stickfield2(x, y, RX, RY, sigma1, sigma2)
     
-    F = np.zeros((N, N, 2, 2))
-    F[int(N/2), int(N/2), :, :] = T
-    
-    return F
+    return T
     
     
     

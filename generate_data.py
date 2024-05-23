@@ -145,11 +145,20 @@ if __name__ == "__main__":
         ski.io.imsave("data/circlegrid2_"+ str(noise[ni]*10) + ".png", I.astype(np.uint8))
         
         T = genBoxGrid2T(N, boxes, width, noise[ni])
-        np.save("data/boxgrid2t_" + str(noise[ni]*10) + ".npy", T)
+        np.save("data/boxgrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
         
         T = genCircleGrid2T(N, boxes, width, noise[ni])
-        np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T)
+        np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
     
+    
+    # tensor fields to benchmark visualization
+    T = genCircleGrid2T(100, boxes, width, 0)
+    np.save("data/circlegrid2t_small.npy", T.astype(np.float32))
+    T = genBoxGrid2T(100, boxes, width, 0)
+    np.save("data/boxgrid2t_small.npy", T.astype(np.float32))
+    T = tv.generate2()
+    tv.visualize(T)
+    np.save("data/votefield.npy", T.astype(np.float32))
     
     #T = genCircleGrid2T(100, boxes, width, 0.2)
     #tv.visualize(T)

@@ -62,7 +62,7 @@ bool SCALE_BY_NORM = false;
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
 int SCALARTYPE = ScalarType::NoScalar;
-bool RENDER_GLYPHS = false;
+bool RENDER_GLYPHS = true;
 
 void FitRectangleToWindow(float rect_width, float rect_height, float window_width, float window_height, float& viewport_width, float& viewport_height) {
  
@@ -458,9 +458,6 @@ static void glfw_error_callback(int error, const char* description)
 
 
 int main(int argc, char** argv) {
-
-    //tira::field<double> test;
-    //test.load_npy("D:\\Dropbox\\source\\baig-tensor\\test.npy");
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
