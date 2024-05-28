@@ -58,6 +58,9 @@ int GLYPH_ROWS = 100;
 float GLYPH_SCALE = 0.3;
 bool SCALE_BY_NORM = false;
 
+float MousePos[2];
+float Viewport[2];
+
 
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
@@ -261,6 +264,39 @@ void ScalarFrom_Evec(unsigned int i, unsigned int component) {
 }
 
 
+// small then large
+glm::vec2 Eigenvalues2D(glm::mat2 T) {
+    float d = T[0][0];
+    float e = T[0][1];
+    float f = e;
+    float g = T[1][1];
+
+    float dpg = d + g;
+    float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    float a = (dpg + disc) / 2.0f;
+    float b = (dpg - disc) / 2.0f;
+    float min = a < b ? a : b;
+    float max = a > b ? a : b;
+    glm::vec2 out(min, max);
+    return out;
+}
+
+glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
+    float a = T[0][0];
+    float b = T[0][1];
+    //float c = b;
+    float d = T[1][1];
+
+    if (b != 0) {
+        return glm::normalize(glm::vec2(lambda - d, b));
+    }
+    else if (lambda == 0) {
+        return glm::vec2(1.0, 0.0);
+    }
+    else {
+        return glm::vec2(0.0, 1.0);
+    }
+}
 
 void ScalarRefresh() {
 
@@ -410,6 +446,47 @@ void RenderUI() {
     ImGui::InputFloat("Scale", &SCALE, 0.01, 0.1);
     ImGui::Checkbox("Scale by Norm", &SCALE_BY_NORM);
 
+    int FieldIndex[2] = { (int)MousePos[0], (int)MousePos[1] };
+    if((FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width()) && (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height()))
+        ImGui::Text("Field Index: ---, ---");
+    else if(FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height())
+        ImGui::Text("Field Index: %d, ---", FieldIndex[0]);
+    else if (FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width())
+        ImGui::Text("Field Index: ---, %d", FieldIndex[1]);
+    else {
+        ImGui::Text("Field Index: %d, %d", FieldIndex[0], FieldIndex[1]);
+
+
+        // get the current tensor value
+        glm::mat2 T = Tn(FieldIndex[0], FieldIndex[1]);
+
+        // display the current tensor as a matrix
+        ImGui::Text("Tensor:");
+        float Row0[2] = { T[0][0], T[0][1] };
+        ImGui::InputFloat2("##Row0", Row0);
+        float Row1[2] = { T[1][0], T[1][1] };
+        ImGui::InputFloat2("##Row1", Row1);
+
+        // calculate the eigenvalues
+        glm::vec2 evals = Eigenvalues2D(T);
+
+        // display the eigenvalues
+        ImGui::Text("Eigenvalues:");
+        float lambdas[2] = { evals[0], evals[1] };
+        ImGui::InputFloat2("##lambdas", lambdas);
+
+        // calculate the eigenvectors
+        glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
+        glm::vec2 ev1 = Eigenvector2D(T, evals[1]);
+
+        // display the eigenvectors
+        ImGui::Text("Eigenvectors:");
+        float evx[2] = { ev0[0], ev1[0] };
+        float evy[2] = { ev0[1], ev1[1] };
+        ImGui::InputFloat2("##evx", evx);
+        ImGui::InputFloat2("##evy", evy);
+
+    }
 
 
     ImGui::Render();                                                            // Render all windows
@@ -455,6 +532,17 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
+{
+    int display_w, display_h;
+    glfwGetFramebufferSize(window, &display_w, &display_h);
+    float x_adjustment = (Viewport[0] - (float)Tn.width()) / 2.0f;
+    float y_adjustment = (Viewport[1] - (float)Tn.height()) / 2.0f;
+    MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
+    MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
+    std::cout << "Mouse: " << MousePos[0] << ", " << MousePos[1] << std::endl;
+}
+
 
 
 int main(int argc, char** argv) {
@@ -474,16 +562,21 @@ int main(int argc, char** argv) {
         return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
+    glfwSetCursorPosCallback(window, mouse_callback);
 
     InitUI(window, glsl_version);
 
     if (glewInit() != GLEW_OK)
         std::cout << "Error!" << std::endl;
-	std::cout << "https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html" << std::endl;
+	//std::cout << "https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html" << std::endl;
 
     // Load the tensor field if it is provided as a command-line argument
     if (argc == 2) {
         LoadTensorField(argv[1]);
+    }
+    else {
+        std::cout << "ERROR: No tensor field specified." << std::endl;
+        exit(1);
     }
 
     if (argc > 0) {
@@ -522,9 +615,9 @@ int main(int argc, char** argv) {
 
         if (FIELD_LOADED) {
 
-            float viewport_width, viewport_height;
-            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, viewport_width, viewport_height);
-            glm::mat4 Mview = glm::ortho(-viewport_width / 2.0f, viewport_width / 2.0f, -viewport_height / 2.0f, viewport_height / 2.0f);   // create a view matrix
+            
+            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
+            glm::mat4 Mview = glm::ortho(-Viewport[0] / 2.0f, Viewport[0] / 2.0f, -Viewport[1] / 2.0f, Viewport[1] / 2.0f);   // create a view matrix
 
             if (SCALARTYPE != ScalarType::NoScalar) {
 

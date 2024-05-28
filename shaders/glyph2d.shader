@@ -43,22 +43,21 @@ float EigenvalueSym2D(vec4 T, int i) {
     float a = (dpg + disc) / 2.0f;
     float b = (dpg - disc) / 2.0f;
 
-    if (i == 0) return max(a, b);
-    if (i == 1) return min(a, b);
+    if (i == 0) return min(a, b);
+    else return max(a, b);
 }
 
 // Calculate the eigenvector of a symmetric 2D tensor T given its eigenvalue ev
 vec2 EigenvectorSym2D(vec4 T, float lambda) {
 
-	//float lambda = EigenvalueSym2D(T, i);
-    float d = T.x;
-    float e = T.y;
-    float f = e;
-    float g = T.w;
+    float a = T.x;
+    float b = T.y;
+    //float c = b;
+    float d = T.w;
    
-    if(e != 0)
-        return normalize(vec2(1.0f, (lambda - d) / e));
-    else if (g == 0)
+    if(b != 0)
+        return normalize(vec2(lambda - d, b));
+    else if (lambda == 0)
         return vec2(1.0f, 0.0f);
     else
         return vec2(0.0f, 1.0f);
@@ -70,13 +69,20 @@ void main() {
 	vec4 T = texture(tensorfield, vec2(tx, ty));			// get the tensor encoded in the texture
 	float lambda0 = EigenvalueSym2D(T, 0);					// get the largest eigenvalue
 	float lambda1 = EigenvalueSym2D(T, 1);					// get the smallest eigenvalue
-	vec2 e0 = EigenvectorSym2D(T, lambda0);					// get the largest eigenvector
+	vec2 e1 = EigenvectorSym2D(T, lambda1);					// get the largest eigenvector
 
 	float norm = maxnorm;									// scale the eigenvalues for display
-	if(maxnorm == 0) norm = lambda0;
-	float l0 = lambda0 / norm;
-	float l1 = lambda1 / norm;
-	if(l1 < epsilon) l1 = epsilon;
+	if(maxnorm == 0) norm = lambda1;
+	float l0, l1;
+	if(norm == 0){
+		l0 = 0;
+		l1 = 0;
+	}
+	else{
+		l0 = lambda0 / norm;
+		l1 = lambda1 / norm;
+	}
+	if(l0 < epsilon) l0 = epsilon;
 
 	float x, y;									// create coordinates to store the new (x,y) value of the vertex
 	if (v.x == 0.0f && v.y == 0.0f) {			// keep the center vertex at the center (prevent dividing by 0)
@@ -92,7 +98,7 @@ void main() {
 
 												// eccentricity is 0 for an ellipse, 1 for a line
 		float ecc;
-		float ratio = pow(l1, 2)/ pow(l0, 2);
+		float ratio = pow(l0, 2)/ pow(l1, 2);
 		ecc = sqrt(1.0f - ratio);	// otherwise calculate the elliptical eccentricity [0, 1]
 
 		
@@ -103,17 +109,17 @@ void main() {
 
 		float cos_theta_n = pow(abs(cos_theta), n) * sign(cos_theta);
 		float sin_theta_n = pow(abs(sin_theta), n) * sign(sin_theta);
-		x = cos_theta_n * l0;
+		x = cos_theta_n * l1;
 		//if(l1 < epsilon)
 		//	l1 = epsilon;
-		y = sin_theta_n * l1;
+		y = sin_theta_n * l0;
 		///////////////////////////////////////////////////////////////////////////////////
 		// now we have the new (x, y) coordinates for the vertex
 
 	}
 	
-	gl_Position = MVP * rot(atan(e0.y, e0.x)) * vec4(x * scale, y * scale, v.z, 1.0f);
-	vertex_color = vec4(abs(e0.x), abs(e0.y), 0.0f, 1.0f);
+	gl_Position = MVP * rot(atan(e1.y, e1.x)) * vec4(x * scale, y * scale, v.z, 1.0f);
+	vertex_color = vec4(abs(e1.x), abs(e1.y), 0.0f, 1.0f);
 
 };
 
