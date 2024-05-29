@@ -61,6 +61,8 @@ bool SCALE_BY_NORM = false;
 float MousePos[2];
 float Viewport[2];
 
+const char* FileName = "";
+
 
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
@@ -362,6 +364,7 @@ void RenderUI() {
     ImGui::NewFrame();
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
+    ImGui::Text("File: %s", FileName == NULL ? "N/A" : FileName);
 
     if (ImGui::Button("Load File"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
@@ -573,6 +576,7 @@ int main(int argc, char** argv) {
     // Load the tensor field if it is provided as a command-line argument
     if (argc == 2) {
         LoadTensorField(argv[1]);
+        FileName = argv[1];
     }
     else {
         std::cout << "ERROR: No tensor field specified." << std::endl;
