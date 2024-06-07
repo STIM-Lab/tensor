@@ -1,56 +1,51 @@
 import matplotlib.pyplot as plt
 import numpy as np
+        
+def signpow(x, exponent):
+    return np.sign(x) * np.abs(x) ** exponent
 
-def construct_matrix_from_eigenvalues(e1, e2):
-    v1 = np.array([1, 0])
-    v2 = np.array([0, 1])
-    
-    A = e1 * np.outer(v1, v1) + e2 * np.outer(v2, v2)
-    
-    return A
+def sq_vertex(alpha, beta, theta):
+    cos_theta = np.cos(theta)
+    sin_theta = np.sin(theta)
 
-def draw_ellipse(ax, center, width, height, angle, color='blue'):
-    ellipse = plt.matplotlib.patches.Ellipse(center, width, height, angle=angle, edgecolor=color, facecolor='none')
-    ax.add_patch(ellipse)
+    x = signpow(cos_theta, beta)
+    y = signpow(sin_theta, alpha)
+    return np.array([x, y])
 
-def generate_stick_and_ball_tensors(eigenvalues_array):
+def generate_superquadric_glyphs(eigvals, gamma, size):
+    l0, l1 = eigvals
+
+    theta = np.linspace(0, 2 * np.pi, 100)
+
+    alpha = (1 - (l1 / (l0 + l1))) ** gamma
+    beta = (1 - (l0 / (l0 + l1))) ** gamma
+
+    vertices = np.array([sq_vertex(alpha, beta, t) for t in theta])
+    vertices[:, 0] *= l0 * size
+    vertices[:, 1] *= l1 * size
+
+    return vertices
+
+def plot_superquadric(vertices, title):
     fig, ax = plt.subplots()
-    
-    n = len(eigenvalues_array)
-    ax.set_xlim(-10, 10 * n)
-    ax.set_ylim(-10, 10)
-    
-    for i, (eigenvalue1, eigenvalue2) in enumerate(eigenvalues_array):
-        center = (10 * i, 0)
-        
-        matrix = construct_matrix_from_eigenvalues(eigenvalue1, eigenvalue2)
-        
-        eigenvalues, eigenvectors = np.linalg.eig(matrix)
-        
-        idx = np.argsort(eigenvalues)
-        eigenvalues = eigenvalues[idx]
-        eigenvectors = eigenvectors[:, idx]
-        
-        width = 2 * np.sqrt(eigenvalues[1])  # Major axis
-        height = 2 * np.sqrt(eigenvalues[0])  # Minor axis
-        
-        angle = np.degrees(np.arctan2(eigenvectors[1, 1], eigenvectors[0, 1]))
-        
-        draw_ellipse(ax, center, width, height, angle, color='blue')
-    
+
+    ax.plot(vertices[:, 0], vertices[:, 1], 'b-')
+    ax.fill(vertices[:, 0], vertices[:, 1], 'b', alpha=0.3)
     ax.set_aspect('equal')
-    ax.grid(False)
+
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(title)
+
     plt.show()
 
+# Example eigenvalues (lengths of the principal axes)
+eigvals = np.array([3, 2])  # l0 = major axis, l1 = minor axis
 
-# Example array of eigenvalue tuples transitioning from stick to ball
-eigenvalues_array = [
-    (11, 1),
-    (10, 2),
-    (9, 3),
-    (8, 4),
-    (7, 5),
-    (6, 6)
-]
+# Generate and plot superquadric glyphs for different gamma values
+gammas = [0.5, 1.0, 2.0]
+size = 1.0
 
-generate_stick_and_ball_tensors(eigenvalues_array)
+for gamma in gammas:
+    vertices = generate_superquadric_glyphs(eigvals, gamma, size)
+    plot_superquadric(vertices, f'Superquadric Glyph with gamma={gamma}')
