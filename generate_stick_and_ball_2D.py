@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-        
+
 def signpow(x, exponent):
     return np.sign(x) * np.abs(x) ** exponent
 
@@ -26,26 +26,25 @@ def generate_superquadric_glyphs(eigvals, gamma, size):
 
     return vertices
 
-def plot_superquadric(vertices, title):
-    fig, ax = plt.subplots()
+def plot_superquadric_line(eigenvalues_list, gamma, size):
+    fig, axes = plt.subplots(1, len(eigenvalues_list), figsize=(15, 5))
 
-    ax.plot(vertices[:, 0], vertices[:, 1], 'b-')
-    ax.fill(vertices[:, 0], vertices[:, 1], 'b', alpha=0.3)
-    ax.set_aspect('equal')
+    for ax in axes:
+        ax.set_axis_off()  # Remove borders
 
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title(title)
+    for i, eigvals in enumerate(eigenvalues_list):
+        vertices = generate_superquadric_glyphs(eigvals, gamma, size)
+        ax = axes[i]
+        ax.plot(vertices[:, 0], vertices[:, 1], 'b-')
+        ax.fill(vertices[:, 0], vertices[:, 1], 'b', alpha=0.3)
+        ax.set_aspect('equal')
 
+    plt.subplots_adjust(wspace=0, hspace=0)
     plt.show()
 
-# Example eigenvalues (lengths of the principal axes)
-eigvals = np.array([3, 2])  # l0 = major axis, l1 = minor axis
-
-# Generate and plot superquadric glyphs for different gamma values
-gammas = [0.5, 1.0, 2.0]
+# Generate a range of eigenvalues from stick to ball
+eigenvalues_list = [np.array([3, 0.5]), np.array([3, 1]), np.array([3, 1.5]), np.array([3, 2]), np.array([3, 2.5]), np.array([3, 3])]
+gamma = 1.0
 size = 1.0
 
-for gamma in gammas:
-    vertices = generate_superquadric_glyphs(eigvals, gamma, size)
-    plot_superquadric(vertices, f'Superquadric Glyph with gamma={gamma}')
+plot_superquadric_line(eigenvalues_list, gamma, size)
