@@ -33,56 +33,64 @@ mat4 rot(float theta){
 // Calculate the i-th eigenvalue of a symmetric 2D tensor T
 // T is the tensor represented as a vec4 instead of a mat2, i is the flag to return the lambda you want
 float EigenvalueSym2D(vec4 T, int i) {
-    float d = T.x;
-    float e = T.y;
-    float f = e;
-    float g = T.w;
+    float a = T.x;
+    float b = T.y;
+    float c = b;
+    float d = T.w;
 
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
+    float trace = a + d;
+    float determinant = a*d - b*c;
+    //float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    //float a = (dpg + disc) / 2.0f;
+    //float b = (dpg - disc) / 2.0f;
 
-    if (i == 0) return min(a, b);
-    else return max(a, b);
+    //if (i == 0) return min(a, b);
+    //else return max(a, b);
+    if(i==0) return trace/2.0 - sqrt(trace*trace/4-determinant);
+    else return trace/2.0 + sqrt(trace*trace/4-determinant);
 }
 
 // Calculate the eigenvector of a symmetric 2D tensor T given its eigenvalue ev
 vec2 EigenvectorSym2D(vec4 T, float lambda) {
-
-    float a = T.x;
+	float a = T.x;
     float b = T.y;
     //float c = b;
     float d = T.w;
-   
-    if(b != 0)
+
+    if (b != 0) {
         return normalize(vec2(lambda - d, b));
-    else if (lambda == 0)
-        return vec2(1.0f, 0.0f);
-    else
-        return vec2(0.0f, 1.0f);
+    }
+    else if (lambda == 0) {
+        if (a < d) return vec2(1.0, 0.0);
+        else return vec2(0.0, 1.0);
+    }
+    else {
+        if (a < d) return vec2(0.0, 1.0);
+        else return vec2(1.0, 0.0);
+    }
 }
 
 void main() {
 
 
 	vec4 T = texture(tensorfield, vec2(tx, ty));			// get the tensor encoded in the texture
-	float lambda0 = EigenvalueSym2D(T, 0);					// get the largest eigenvalue
-	float lambda1 = EigenvalueSym2D(T, 1);					// get the smallest eigenvalue
+	float lambda0 = EigenvalueSym2D(T, 0);					// get the smallest eigenvalue
+	float lambda1 = EigenvalueSym2D(T, 1);					// get the largest eigenvalue
+
 	vec2 e1 = EigenvectorSym2D(T, lambda1);					// get the largest eigenvector
 
 	float norm = maxnorm;									// scale the eigenvalues for display
-	if(maxnorm == 0) norm = lambda1;
+	if(maxnorm == 0) norm = lambda1;			// if maxnorm is 0, all glyphs are the same length
 	float l0, l1;
-	if(norm == 0){
+	if(norm == 0){								// if the glyph length is zero, set both axis lengths to zero
 		l0 = 0;
 		l1 = 0;
 	}
-	else{
+	else{										// otherwise set them to the normalized eigenvalues
 		l0 = lambda0 / norm;
 		l1 = lambda1 / norm;
 	}
-	if(l0 < epsilon) l0 = epsilon;
+	if(l0 < epsilon) l0 = epsilon;				// if the smallest length is less than epsilon, set it to epsilon
 
 	float x, y;									// create coordinates to store the new (x,y) value of the vertex
 	if (v.x == 0.0f && v.y == 0.0f) {			// keep the center vertex at the center (prevent dividing by 0)

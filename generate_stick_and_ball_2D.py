@@ -32,9 +32,11 @@ def calculate_eccentricity(eigvals):
 
 def map_eccentricity_to_gamma(eccentricity):
     # Map the range of eccentricity [0, 1] to gamma [0.5, 2]
-    return 0.5 + 1.5 * eccentricity
+    return eccentricity
 
-def plot_superquadric_line(eigenvalues_list, size):
+# draw a line of superquadrics with the given eigenvalues
+def plot_superquadric_line(eigenvalues_list, gamma=None):
+    size = 1.0
     fig, axes = plt.subplots(1, len(eigenvalues_list), figsize=(15, 5))
 
     for ax in axes:
@@ -42,11 +44,14 @@ def plot_superquadric_line(eigenvalues_list, size):
 
     for i, eigvals in enumerate(eigenvalues_list):
         eccentricity = calculate_eccentricity(eigvals)
-        gamma = map_eccentricity_to_gamma(eccentricity)
-        vertices = generate_superquadric_glyphs(eigvals, gamma, size)
+        if gamma == None:
+            gamma_i = map_eccentricity_to_gamma(eccentricity)
+        else:
+            gamma_i = gamma
+        vertices = generate_superquadric_glyphs(eigvals, gamma_i, size)
         ax = axes[i]
-        ax.plot(vertices[:, 0], vertices[:, 1], 'b-')
-        ax.fill(vertices[:, 0], vertices[:, 1], 'b', alpha=0.3)
+        ax.plot(vertices[:, 0], vertices[:, 1], color='black', linestyle='-')
+        ax.fill(vertices[:, 0], vertices[:, 1], color='purple', alpha=0.3)
         ax.set_aspect('equal')
 
     plt.subplots_adjust(wspace=0, hspace=0)
@@ -54,6 +59,5 @@ def plot_superquadric_line(eigenvalues_list, size):
 
 # Generate a range of eigenvalues from stick to ball, including a perfect ball
 eigenvalues_list = [np.array([3, 0.5]), np.array([3, 1]), np.array([3, 1.5]), np.array([3, 2]), np.array([3, 2.5]), np.array([3, 3])]
-size = 1.0
 
-plot_superquadric_line(eigenvalues_list, size)
+plot_superquadric_line(eigenvalues_list, None)

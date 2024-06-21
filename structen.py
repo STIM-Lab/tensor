@@ -5,7 +5,7 @@ import scipy as sp
 from skimage.color import rgb2gray
 import sys
 
-def structure2d(I, sigma=3):
+def structure2d(I, sigma=3, deriv=1):
 
     if(len(I.shape) > 2):
         img = I[:, :, 0]
@@ -13,7 +13,10 @@ def structure2d(I, sigma=3):
         img = I
 
     # calculate the image gradient
-    dIdy, dIdx = np.gradient(img)
+    dIdy = np.gradient(img, axis=0, edge_order=2)
+    #dIdy = np.gradient(dIdy, axis=0, edge_order=2)
+    dIdx = np.gradient(img, axis=1, edge_order=2)
+    #dIdx = np.gradient(dIdx, axis=1, edge_order=2)
     print("Max dIdy: " + str(np.max(dIdy)))
     
     

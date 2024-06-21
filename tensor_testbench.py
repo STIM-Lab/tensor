@@ -257,19 +257,25 @@ def main():
 #tv.visualize(T)
 
 sigma = 3
-iterations = 1
+iterations = 4
 noise = 0.0
+line_width = 1
+num_boxes = 2
+resolution = 51
+structure_sigma = 1
 
-G = gen.genCircleGrid2(100, 3, 1, noise)
+G = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
+skimage.io.imsave("grid.bmp", G.astype(np.uint8))
 plt.imshow(G)
 
-S = st.hessian(G, 0.5)
+#S = st.hessian(G, 3)
+S = st.structure2d(G, structure_sigma, 1)
 plt.figure()
-tv.visualize(S)
+tv.visualize(S, mode="eccentricity")
 TV = tv.iterative_stick2(S, sigma, iterations, 1)
 plt.figure()
-tv.visualize(TV[iterations])
-np.save("votetest.npy", TV[1].astype(np.float32))
+tv.visualize(TV[iterations], mode="eccentricity")
+np.save("votetest.npy", TV[-1].astype(np.float32))
 #display_fields(1, 1, N=21, sigma_max=10, sigma_min=7)
 
 

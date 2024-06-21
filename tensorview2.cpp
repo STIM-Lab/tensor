@@ -267,7 +267,7 @@ void ScalarFrom_Evec(unsigned int i, unsigned int component) {
 
 
 // small then large
-glm::vec2 Eigenvalues2D(glm::mat2 T) {
+glm::vec2 Eigenvalues2D_old(glm::mat2 T) {
     float d = T[0][0];
     float e = T[0][1];
     float f = e;
@@ -283,6 +283,23 @@ glm::vec2 Eigenvalues2D(glm::mat2 T) {
     return out;
 }
 
+glm::vec2 Eigenvalues2D(glm::mat2 T) {
+    float a = T[0][0];
+    float b = T[0][1];
+    float c = b;
+    float d = T[1][1];
+
+    float trace = a + d;
+    float det = a * d - b * c;
+    //float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    float e = trace / 2.0f;
+    float f = sqrt(trace * trace / 4.0 - det);
+    //float min = a < b ? a : b;
+    //float max = a > b ? a : b;
+    glm::vec2 out(e - f, e + f);
+    return out;
+}
+
 glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
     float a = T[0][0];
     float b = T[0][1];
@@ -293,10 +310,12 @@ glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
         return glm::normalize(glm::vec2(lambda - d, b));
     }
     else if (lambda == 0) {
-        return glm::vec2(1.0, 0.0);
+        if (a < d) return glm::vec2(1.0, 0.0);
+        else return glm::vec2(0.0, 1.0);
     }
     else {
-        return glm::vec2(0.0, 1.0);
+        if (a < d) return glm::vec2(0.0, 1.0);
+        else return glm::vec2(1.0, 0.0);
     }
 }
 
@@ -466,9 +485,9 @@ void RenderUI() {
         // display the current tensor as a matrix
         ImGui::Text("Tensor:");
         float Row0[2] = { T[0][0], T[0][1] };
-        ImGui::InputFloat2("##Row0", Row0);
+        ImGui::InputFloat2("##Row0", Row0, "%1.3e");
         float Row1[2] = { T[1][0], T[1][1] };
-        ImGui::InputFloat2("##Row1", Row1);
+        ImGui::InputFloat2("##Row1", Row1, "%1.3e");
 
         // calculate the eigenvalues
         glm::vec2 evals = Eigenvalues2D(T);
@@ -476,7 +495,7 @@ void RenderUI() {
         // display the eigenvalues
         ImGui::Text("Eigenvalues:");
         float lambdas[2] = { evals[0], evals[1] };
-        ImGui::InputFloat2("##lambdas", lambdas);
+        ImGui::InputFloat2("##lambdas", lambdas, "%1.3e");
 
         // calculate the eigenvectors
         glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
@@ -486,8 +505,8 @@ void RenderUI() {
         ImGui::Text("Eigenvectors:");
         float evx[2] = { ev0[0], ev1[0] };
         float evy[2] = { ev0[1], ev1[1] };
-        ImGui::InputFloat2("##evx", evx);
-        ImGui::InputFloat2("##evy", evy);
+        ImGui::InputFloat2("##evx", evx, "%1.3e");
+        ImGui::InputFloat2("##evy", evy, "%1.3e");
 
     }
 
@@ -543,7 +562,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     float y_adjustment = (Viewport[1] - (float)Tn.height()) / 2.0f;
     MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
     MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
-    std::cout << "Mouse: " << MousePos[0] << ", " << MousePos[1] << std::endl;
 }
 
 
@@ -641,6 +659,10 @@ int main(int argc, char** argv) {
                 GLYPH_MATERIAL->Begin();                                                                                    // bind the material
                 int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
                 float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
+                float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
+                float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
+                float tex_sample_size_y = 1.0f / (float)glyph_cols;
+                float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
                 glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
 
                 float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
@@ -655,8 +677,11 @@ int main(int argc, char** argv) {
                         glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
 
                         GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
-                        GLYPH_MATERIAL->SetUniform1f("tx", (float)xi/(float)glyph_cols + scale / (float)Ti.height());                                    // pass the glyph coordinate to the material
-                        GLYPH_MATERIAL->SetUniform1f("ty", (float)yi/(float)GLYPH_ROWS + scale / (float)Ti.width());
+                        float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
+                        float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
+                        //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
+                        GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
+                        GLYPH_MATERIAL->SetUniform1f("ty", ty);
                         if (SCALE_BY_NORM)
                             GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
                         else

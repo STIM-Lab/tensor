@@ -11,6 +11,7 @@
 std::string in_inputname;
 std::string in_outputname;
 unsigned int in_order;
+unsigned int in_derivative;
 
 
 /// <summary>
@@ -72,6 +73,7 @@ int main(int argc, char** argv) {
 	desc.add_options()
 		("input", boost::program_options::value<std::string>(&in_inputname), "input image")
 		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "output file storing the tensor field")
+		("derivative", boost::program_options::value<unsigned int>(&in_derivative)->default_value(1), "output file storing the tensor field")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
 		("help", "produce help message")
 		;
@@ -97,8 +99,8 @@ int main(int argc, char** argv) {
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);									// load the input image
 		tira::image<float> grey = I.channel(0);								// get the first channel if this is a color image
-		tira::field<float> Dx = grey.derivative(1, 1, in_order);			// calculate the derivative along the x axis	
-		tira::field<float> Dy = grey.derivative(0, 1, in_order);			// calculate the derivative along the y axis
+		tira::field<float> Dx = grey.derivative(1, in_derivative, in_order);			// calculate the derivative along the x axis	
+		tira::field<float> Dy = grey.derivative(0, in_derivative, in_order);			// calculate the derivative along the y axis
 
 		D.push_back(Dx);
 		D.push_back(Dy);
@@ -106,9 +108,9 @@ int main(int argc, char** argv) {
 	else if (dim == 3) {
 		tira::volume<float> I(in_inputname);
 		tira::volume<float> grey = I.channel(0);
-		tira::field<float> Dx = grey.derivative(2, 1, in_order);
-		tira::field<float> Dy = grey.derivative(1, 1, in_order);
-		tira::field<float> Dz = grey.derivative(0, 1, in_order);
+		tira::field<float> Dx = grey.derivative(2, in_derivative, in_order);
+		tira::field<float> Dy = grey.derivative(1, in_derivative, in_order);
+		tira::field<float> Dz = grey.derivative(0, in_derivative, in_order);
 
 		D.push_back(Dx);
 		D.push_back(Dy);
