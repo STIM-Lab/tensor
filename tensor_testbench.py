@@ -258,14 +258,14 @@ def main():
 
 sigma = 3
 iterations = 4
-noise = 0.0
+noise = 0.3
 line_width = 1
 num_boxes = 2
 resolution = 51
 structure_sigma = 1
 
 G = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
-skimage.io.imsave("grid.bmp", G.astype(np.uint8))
+skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/grid.bmp", G.astype(np.uint8))
 plt.imshow(G)
 
 #S = st.hessian(G, 3)

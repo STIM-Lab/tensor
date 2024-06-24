@@ -15,7 +15,6 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
-find_package(Eigen3 REQUIRED)
 set(Boost_NO_WARN_NEW_VERSIONS 1)
 find_package(Boost REQUIRED COMPONENTS program_options)
 
@@ -39,8 +38,7 @@ configure_file(structen.py
 				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
-#configure_file(tensor_testbench.py 
-#				tensor_testbench.py COPYONLY)
+
 
 # copy the script to generate example data sets
 configure_file(generate_data.py 
@@ -86,18 +84,16 @@ target_link_libraries(tensorview3
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
 				Boost::program_options
-#				Eigen3::Eigen
 				PRIVATE imgui::imgui
 )
 
 #create an executable
-add_executable(structen
-				structen.cpp
+add_executable(image2tensor
+				image2tensor.cpp
 )
 
-target_link_libraries(structen
+target_link_libraries(image2tensor
 				Boost::program_options
-				Eigen3::Eigen
 )
 
 # tensorvote executable
