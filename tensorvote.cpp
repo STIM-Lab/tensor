@@ -1,13 +1,19 @@
-#include "tensorvote.h"
-
-#include <iostream>
-
 #include <boost/program_options.hpp>
 
+#include <tira/field.h>
 #include <tira/image.h>
+#include <glm/glm.hpp>
 
-#include <cuda.h>
-#include <cuda_runtime_api.h>
+#include "tensorvote.cuh"
+glm::vec2 Eigenvalues2D(glm::mat2 T);
+glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
+void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
+VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors);
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device);
+
+
+#include <tira/field.h>
+#include <tira/image.h>
 
 std::string in_inputname;
 std::string in_outputname;
@@ -16,15 +22,6 @@ unsigned int in_window;
 int in_cuda;
 std::vector<float> in_votefield;
 bool debug = false;
-
-static void HandleError(cudaError_t err, const char *file, int line)
-{
-    if (err != cudaSuccess)
-    {
-        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
-    }
-}
-#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
 /// <summary>
 /// Save a field of floating point values as a NumPy file
@@ -40,116 +37,7 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
     O.save_npy(filename);
 }
 
-// small then large
-glm::vec2 Eigenvalues2D(glm::mat2 T)
-{
-    float d = T[0][0];
-    float e = T[0][1];
-    float f = e;
-    float g = T[1][1];
-
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
-    float min = a < b ? a : b;
-    float max = a > b ? a : b;
-    glm::vec2 out(min, max);
-    return out;
-}
-
-// small then large
-glm::vec2 Eigenvectors2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1)
-{
-    float d = T[0][0];
-    float e = T[0][1];
-    float f = e;
-    float g = T[1][1];
-
-    if (e != 0) {
-        return glm::normalize(glm::vec2(1.0, (lambdas[index] - d) / e));
-    }
-    else if (g == 0) {
-        return glm::vec2(1.0, 0.0);
-    }
-    else {
-        return glm::vec2(0.0, 1.0);
-    }
-}
-
-void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy)
-{
-
-    unsigned int i;
-    for (unsigned int yi = 0; yi < sy; yi++)
-    { // for each tensor in the field
-        for (unsigned int xi = 0; xi < sx; xi++)
-        {
-            i = (yi * sx + xi); // calculate a 1D index into the 2D image
-
-            unsigned int ti = i * 4;                                // update the tensor index (each tensor is 4 elements)
-                                                                    // store the tensor as a matrix to make this more readable
-            glm::mat2 T(input_field[ti + 0],
-                input_field[ti + 1], 
-                input_field[ti + 2], 
-                input_field[ti + 3]);
-
-            glm::vec2 evals = Eigenvalues2D(T);                     // calculate the eigenvalues
-            glm::vec2 evec = Eigenvectors2D(T, evals);              // calculate the largest eigenvector
-
-            unsigned int vi = i * 2;                                // update the vector/value index (each is 2 elements)
-            eigenvectors[vi + 0] = evec[0];                         // save the eigenvectors to the output array
-            eigenvectors[vi + 1] = evec[1];
-
-            
-            eigenvalues[vi + 0] = evals[0];                         // save the eigenvalues to the output array
-            eigenvalues[vi + 1] = evals[1];
-        }
-    }
-}
-
-float Decay_Wu(float cos_theta, float length, float sigma) {
-    float c = exp(-(length * length) / (sigma * sigma));
-    //float gaussian = 1.0 / ((M_PI * sigma * sigma) / 2);
-    float radial = 1 - (cos_theta * cos_theta);
-    float D = c * radial;
-    return D;
-}
-
-VoteContribution Saliency_Wu(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
-
-    glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
-    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
-    glm::vec2 uv_norm = glm::vec2(u, v) / length;           // normalize the direction vector
-
-    float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
-    float radius = length / (2 * eTv);
-    float large_lambda = eigenvalues[1];
-    float d = large_lambda * Decay_Wu(eTv, length, sigma);
-
-    float tvx, tvy;
-    if (isinf(radius)) {
-        tvx = ev[0];
-        tvy = ev[1];
-    }
-    else {                                                      // calculate the votee orientation
-        tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
-        tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
-    }
-
-    glm::mat2 TV;
-    TV[0][0] = tvx * tvx;
-    TV[1][1] = tvy * tvy;
-    TV[0][1] = TV[1][0] = tvx * tvy;
-    VoteContribution R;
-    R.votes = TV;
-    R.decay = d;
-    return R;
-}
-
-
-void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w)
-{
+void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w) {
     std::vector<float> V(sx * sy * 2);                          // allocate space for the eigenvectors
     std::vector<float> L(sx * sy * 2);                          // allocate space for the eigenvalues
 
@@ -170,35 +58,35 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
     for (unsigned int yi = 0; yi < sy; yi++) {                  // for each pixel in the image
         for (unsigned int xi = 0; xi < sx; xi++) {
 
-            glm::mat2 T = glm::mat2(                            // retrieve the tensor for the current pixel
-                input_field[(yi * sx + xi) * 4 + 0],
-                input_field[(yi * sx + xi) * 4 + 1],
-                input_field[(yi * sx + xi) * 4 + 2],
-                input_field[(yi * sx + xi) * 4 + 3]);
+            //glm::mat2 T = glm::mat2(                            // retrieve the tensor for the current pixel
+            //    input_field[(yi * sx + xi) * 4 + 0],
+            //    input_field[(yi * sx + xi) * 4 + 1],
+            //    input_field[(yi * sx + xi) * 4 + 2],
+            //    input_field[(yi * sx + xi) * 4 + 3]);
 
             glm::mat2 Votee(0.0f);
             float total_decay = 0.0f;
+            float scale = 0.0f;
 
             for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
                 yr = yi + v;
                 if (yr >= 0 && yr < sy) {
                     for (int u = -hw; u < hw; u++) {
                         
-                        if (!(u == 0 && v == 0)) {
-                            xr = xi + u;
-                            if (xr >= 0 && xr < sx) {
-                                // calculate the contribution of (u,v) to (x,y)   
-                                VoteContribution vote = Saliency_Wu(
-                                    u,
-                                    v,
-                                    sigma,
-                                    &L[(yr * sx + xr) * 2],
-                                    &V[(yr * sx + xr) * 2]);
-
-                                Votee = Votee + vote.votes * vote.decay;
-                                if (debug) {
-                                    total_decay += vote.decay;
-                                }
+                        xr = xi + u;
+                        if (xr >= 0 && xr < sx) {
+                            // calculate the contribution of (u,v) to (x,y)   
+                            VoteContribution vote = Saliency(
+                                u,
+                                v,
+                                sigma,
+                                &L[(yr * sx + xr) * 2],
+                                &V[(yr * sx + xr) * 2]
+                            );
+                            scale = L[(yr * sx + xr) * 2 + 1];
+                            Votee = Votee + scale * vote.votes * vote.decay;
+                            if (debug) {
+                                total_decay += vote.decay;
                             }
                         }
                     }
@@ -213,7 +101,8 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
             }
         }
     }
-    save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
+    if(debug)
+        save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
 }
 
 /// Create an empty field with a single stick tensor in the middle oriented along (x, y)
@@ -231,8 +120,7 @@ tira::field<float> StickTensor(size_t sx, size_t sy, float x, float y) {
     return S;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 
     // Declare the supported options.
     boost::program_options::options_description desc("Allowed options");
@@ -263,11 +151,6 @@ int main(int argc, char *argv[])
     // calculate the window size if one isn't provided
     if (!vm.count("window")) in_window = int(6 * in_sigma + 1);
 
-
-    // make sure that the selected CUDA device is valid, and switch to the CPU if it isn't
-    cudaDeviceProp props;
-    HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
-
     tira::field<float> T;
 
     if (vm.count("votefield")) {
@@ -279,13 +162,21 @@ int main(int argc, char *argv[])
     }
     tira::field<float> Tr(T.shape());   // create a field to store the vote result
 
+    std::cout << Tr.shape()[0] << " " << Tr.shape()[1] << std::endl;
+    
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window);
     }
+    else {
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_cuda);
+    }
 
     if (debug) T.save_npy("debug_input.npy");
     Tr.save_npy(in_outputname);
+
+    std::cout << in_inputname << std::endl;
+    std::cout << in_outputname << std::endl;
 
     return 0;
 }

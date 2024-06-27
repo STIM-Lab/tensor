@@ -1,88 +1,13 @@
-#include <iostream>
-#include <stdio.h>
 
-#include "tensorvote.h"
+#include <glm/glm.hpp>
+#define GLM_FORCE_CUDA
 
 #include "tensorvote.cuh"
 
-#include <chrono>
+#include <iostream>
 
-#ifdef __CUDACC__
-#define __device__
-#endif
 
-__host__ __device__ bool NonZeroTensor(glm::mat2 T)
-{
-    return T[0][0] || T[0][1] || T[1][0] || T[1][1];
-}
-
-__host__ __device__ float Decay(float angle, float length, int sigma)
-{
-    if (length == 0)
-        return 1;
-
-    float alpha = acos(abs(cos(M_PI / 2 - angle)));
-
-    // calculate c (see math)
-    float c = (-16 * log10f(0.1) * (sigma - 1)) / (pow(M_PI, 2));
-
-    // calculate saliency decay
-    float S;
-    if (alpha == 0)
-        S = length;
-    else
-        S = (alpha * length) / sin(alpha);
-
-    float kappa = (2 * sin(alpha)) / length;
-    float S_kappa = pow(S, 2) + c * pow(kappa, 2);
-    float E = -1 * S_kappa / (pow(sigma, 2));
-    float d;
-    float pi4 = M_PI / 4;
-    if (alpha > pi4 || alpha < -pi4)
-        d = 0;
-    else
-        d = exp(E);
-
-    return d;
-}
-
-__host__ __device__ TensorAngleCalculation SaliencyTheta(float theta, float u, float v, int sigma = 10)
-{
-    float theta_cos = cos(theta);
-    float theta_sin = sin(theta);
-
-    glm::mat2 Rtheta_r(theta_cos, theta_sin, -theta_sin, theta_cos);
-    glm::mat2 Rtheta_l(theta_cos, -theta_sin, theta_sin, theta_cos);
-
-    glm::vec2 p(Rtheta_r[0][0] * u + Rtheta_r[0][1] * v, Rtheta_r[1][0] * u + Rtheta_r[1][1] * v);
-
-    float l = sqrt(pow(p[0], 2) + pow(p[1], 2));
-
-    float phi = atan2(p[1], p[0]);
-
-    float decay = Decay(phi, l, sigma);
-
-    float phi2 = 2 * phi;
-
-    float phi2_cos = cos(phi2);
-    float phi2_sin = sin(phi2);
-
-    glm::mat2 Rphi2(phi2_cos, -phi2_sin, phi2_sin, phi2_cos);
-
-    glm::vec2 V_source(Rphi2[0][0], Rphi2[1][0]);
-
-    glm::vec2 V(Rtheta_l[0][0] * V_source[0] + Rtheta_l[0][1] * V_source[1], Rtheta_l[1][0] * V_source[0] + Rtheta_l[1][1] * V_source[1]);
-    glm::mat2 outer = glm::outerProduct(V, V);
-
-    TensorAngleCalculation out;
-
-    out.votes = outer;
-    out.decay = decay;
-
-    return out;
-}
-
-static void HandleError(cudaError_t err, const char *file, int line)
+static void HandleError(cudaError_t err, const char* file, int line)
 {
     if (err != cudaSuccess)
     {
@@ -91,146 +16,204 @@ static void HandleError(cudaError_t err, const char *file, int line)
 }
 #define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
 
-tira::image<glm::mat2> voteCPU(tira::image<glm::mat2> T, int sigma)
-{
-    int w = 6 * sigma / 2;
+// small then large
+__host__ __device__ glm::vec2 Eigenvalues2D(glm::mat2 T) {
+    float d = T[0][0];
+    float e = T[0][1];
+    float f = e;
+    float g = T[1][1];
 
-    int X = T.shape()[1];
-    int Y = T.shape()[0];
+    float dpg = d + g;
+    float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    float a = (dpg + disc) / 2.0f;
+    float b = (dpg - disc) / 2.0f;
+    float min = a < b ? a : b;
+    float max = a > b ? a : b;
+    glm::vec2 out(min, max);
+    return out;
+}
 
-    tira::image<glm::mat2> VT(X, Y);
+// small then large
+__host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index) {
+    float d = T[0][0];
+    float e = T[0][1];
+    //float f = e;
+    float g = T[1][1];
 
-    for (int x = 0; x < X; x++)
-    {
-        for (int y = 0; y < Y; y++)
-        {
-            for (int u = -w; u < w; u++)
-            {
-                for (int v = -w; v < w; v++)
-                {
-                    if (y + v >= 0 && y + v < Y && x + u >= 0 && x + u < X)
-                    {
-                        VoteContribution vc = Saliency(T(x, y), u, v, sigma);
+    if (e != 0) {
+        return glm::normalize(glm::vec2(1.0, (lambdas[index] - d) / e));
+    }
+    else if (g == 0) {
+        return glm::vec2(1.0, 0.0);
+    }
+    else {
+        return glm::vec2(0.0, 1.0);
+    }
+}
 
-                        VT(x + u, y + v) += vc.votes * vc.decay;
-                    }
+__host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
+
+    unsigned int i;
+    for (unsigned int yi = 0; yi < sy; yi++) { // for each tensor in the field
+        for (unsigned int xi = 0; xi < sx; xi++) {
+            i = (yi * sx + xi); // calculate a 1D index into the 2D image
+
+            unsigned int ti = i * 4;                                // update the tensor index (each tensor is 4 elements)
+                                                                    // store the tensor as a matrix to make this more readable
+            glm::mat2 T(input_field[ti + 0],
+                input_field[ti + 1], 
+                input_field[ti + 2], 
+                input_field[ti + 3]);
+
+            glm::vec2 evals = Eigenvalues2D(T);                     // calculate the eigenvalues
+            glm::vec2 evec = Eigenvector2D(T, evals, 1);              // calculate the largest (1) eigenvector
+
+            unsigned int vi = i * 2;                                // update the vector/value index (each is 2 elements)
+            eigenvectors[vi + 0] = evec[0];                         // save the eigenvectors to the output array
+            eigenvectors[vi + 1] = evec[1];
+
+            
+            eigenvalues[vi + 0] = evals[0];                         // save the eigenvalues to the output array
+            eigenvalues[vi + 1] = evals[1];
+        }
+    }
+}
+
+__host__ __device__ float Decay(float cos_theta, float length, float sigma) {
+    float c = exp(-(length * length) / (sigma * sigma));
+    float radial = 1 - (cos_theta * cos_theta);
+    float D = c * radial;
+    return D;
+}
+
+__host__ __device__  VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
+
+    glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
+    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
+
+    glm::vec2 uv_norm = glm::vec2(u, v);                    // normalize the direction vector
+    if (length != 0.0) {                                    // handle normalization if length is zero
+        uv_norm /= length;
+    }
+
+    float eTv = ev[0] * uv_norm[0] + ev[1] * uv_norm[1];    // calculate the dot product between the eigenvector and direction
+    float radius;
+    if (eTv == 0.0)                                         // handle the radius if eTv is zero
+        radius = 0.0;
+    else
+        radius = length / (2 * eTv);
+    float d = Decay(eTv, length, sigma);
+
+    float tvx, tvy;
+    if (radius == 0.0) {
+        tvx = ev[0];
+        tvy = ev[1];
+    }
+    else {
+        tvx = (radius * ev[0] - length * uv_norm[0]) / radius;
+        tvy = (radius * ev[1] - length * uv_norm[1]) / radius;
+    }
+
+    glm::mat2 TV;
+    TV[0][0] = tvx * tvx;
+    TV[1][1] = tvy * tvy;
+    TV[0][1] = TV[1][0] = tvx * tvy;
+    VoteContribution R;
+    R.votes = TV;
+    R.decay = d;
+    return R;
+}
+
+
+/// @brief The kernel to perform the tensor voting on the GPU
+/// @param data Input tensor field
+/// @param VT Output tensor field
+/// @param eigenvalues Eigenvalues of the input tensor field
+/// @param eigenvectors Eigenvalues of the input tensor field
+/// @param sigma Sigma value for the decay function
+/// @param w Window size
+/// @param width Tensor field width in pixels
+/// @param height Tensor field height in pixels
+__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int sx, int sy) {
+    int yi = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
+    int xi = blockDim.x * blockIdx.x + threadIdx.x;
+
+    if (yi >= sy || xi >= sx)                                                          // if not within bounds of image, return
+        return;
+
+    glm::mat2 Votee(0.0f);
+    float scale = 0.0f;
+
+    int hw = w / 2;
+    int yr, xr;
+    for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
+        yr = yi + v;
+        if (yr >= 0 && yr < sy) {
+            for (int u = -hw; u < hw; u++) {
+
+                xr = xi + u;
+                if (xr >= 0 && xr < sx) {
+                    // calculate the contribution of (u,v) to (x,y)   
+                    VoteContribution vote = Saliency(
+                        u,
+                        v,
+                        sigma,
+                        &L[(yr * sx + xr) * 2],
+                        &V[(yr * sx + xr) * 2]
+                    );
+                    float scale = L[(yr * sx + xr) * 2 + 1];
+                    Votee = Votee + scale * vote.votes * vote.decay;
                 }
             }
         }
     }
-
-    return VT;
-}
-
-__global__ void voteGPU(float *data, float *VT, int sigma, int w, int width, int height)
-{
-    size_t y = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
-    size_t x = blockDim.x * blockIdx.x + threadIdx.x;
-
     
-    if (y >= height || x >= width)                                                          // if not within bounds of image, return
-        return;
-
-    float vt[4] = {0, 0, 0, 0};                                                             // initialize a tensor to zeros
-
-    for (int u = -w; u < w; u++)                                                            // for each pixel within the window
-    {
-        for (int v = -w; v < w; v++)
-        {
-            int index = ((v + y) * width + x + u);                                          // calculate a 1D index into the tensor field
-            //int indexShared = ((threadIdx.y + v) * blockDim.y + threadIdx.x + u);
-            if (index < width * height && index >= 0) {                                     // DAVID: This will cause wrap-around artifacts
-                glm::mat2 T(
-                    data[4 * index + 0],
-                    data[4 * index + 1],
-                    data[4 * index + 2],
-                    data[4 * index + 3]);
-
-                VoteContribution vc = Saliency(T, u, v, sigma);                             // calculate the saliency given the tensor at (u,v)
-                vt[0] += vc.votes[0][0] * vc.decay;                                         // sum the tensor contribution based on the saliency
-                vt[1] += vc.votes[0][1] * vc.decay;
-                vt[2] += vc.votes[1][0] * vc.decay;
-                vt[3] += vc.votes[1][1] * vc.decay;
-            }
-        }
-    }
-
-    VT[4 * (y * width + x) + 0] = vt[0];
-    VT[4 * (y * width + x) + 1] = vt[1];
-    VT[4 * (y * width + x) + 2] = vt[2];
-    VT[4 * (y * width + x) + 3] = vt[3];
+    VT[4 * (yi * sx + xi) + 0] = Votee[0][0];
+    VT[4 * (yi * sx + xi) + 1] = Votee[1][0];
+    VT[4 * (yi * sx + xi) + 2] = Votee[0][1];
+    VT[4 * (yi * sx + xi) + 3] = Votee[1][1];
 }
 
-tira::image<glm::mat2> CPUImplementation(tira::image<glm::mat2> Tn, int sigma)
-{
-    std::cout << "**********CPU**********" << std::endl;
-
-    std::chrono::high_resolution_clock::time_point start, stop;
-    start = std::chrono::high_resolution_clock::now();
-
-    tira::image<glm::mat2> T = voteCPU(Tn, sigma);
-
-    stop = std::chrono::high_resolution_clock::now();
-    std::chrono::milliseconds d;
-    d = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-    std::cout << "Elapsed time: " << d.count() / 1000.0f << " seconds" << std::endl;
-
-    return T;
-}
-
-/// <summary>
-/// Calculates one iteration of tensor voting given an input tensor field Tn
-/// </summary>
-/// <param name="Tn">Input tensor field as a 2D image of matrices</param>
-/// <param name="sigma">Standard deviation for the decay function</param>
-/// <param name="w">Window size for the decay function (usually dependent on sigma)</param>
-/// <returns></returns>
-float *CUDAImplementation(tira::image<glm::mat2> Tn, int sigma, int w)
-{
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
     cudaDeviceProp props;
-    HANDLE_ERROR(cudaGetDeviceProperties(&props, 0));
+    HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
 
-    std::cout << "**********CUDA**********" << std::endl;
+    int tensorFieldSize = 4 * sx * sy;
+    float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
+    float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
 
-    float width = Tn.shape()[1];
-    float height = Tn.shape()[0];
-    int size = 4 * width * height;
+    int hw = (int)(w / 2);                                      // calculate the half window size
 
-    float *data = (float *)Tn.data();
+    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
 
-    float *inArray;
-    float *outArray;
+    // Declare GPU arrays
+    float* gpuOutputField;
+    float* gpuV;
+    float* gpuL;
 
-    HANDLE_ERROR(cudaMalloc(&inArray, size * sizeof(float)));
-    HANDLE_ERROR(cudaMalloc(&outArray, size * sizeof(float)));
+    // Allocate GPU arrays
+    HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorFieldSize * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuV, sx * sy * 2 * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuL, sx * sy * 2 * sizeof(float)));
 
-    HANDLE_ERROR(cudaMemcpy(inArray, data, size * sizeof(float), cudaMemcpyHostToDevice));
+    // Copy input arrays
+    HANDLE_ERROR(cudaMemcpy(gpuV, V, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuL, L, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
 
+
+    // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
     dim3 threads(blockDim, blockDim);
+    dim3 blocks(sx / threads.x + 1, sy / threads.y + 1);
 
-    dim3 blocks(width / threads.x + 1, height / threads.y + 1);
+    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy);              // call the CUDA kernel for voting
 
-    int sharedBytes = props.sharedMemPerBlock;
+    // Copy the final result back from the GPU
+    HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-    cudaEventRecord(start);
-
-    voteGPU<<<blocks, threads, sharedBytes>>>(inArray, outArray, sigma, w, width, height);              // call the CUDA kernel for voting
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-
-    float *gpu_out = new float[size];
-    HANDLE_ERROR(cudaMemcpy(gpu_out, outArray, size * sizeof(float), cudaMemcpyDeviceToHost));
-
-    float totalTime;
-    cudaEventElapsedTime(&totalTime, start, stop);
-
-    std::cout << "Elapsed time: " << totalTime / 1000 << " seconds" << std::endl;
-
-    return gpu_out;
+    // Free all of the GPU arrays
+    HANDLE_ERROR(cudaFree(gpuOutputField));
+    HANDLE_ERROR(cudaFree(gpuV));
+    HANDLE_ERROR(cudaFree(gpuL));
 }
 

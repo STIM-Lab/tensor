@@ -1,15 +1,24 @@
-#!/bin/sh
+#! /usr/bin/bash
 
-# $1 = input image
-# $2 = sigma value
+for noise_level in 0 100 500 1000 5000 10000 50000 100000 500000 1000000
+do
+    if [ ! -f boxgrid$noise_level.npy ]; then 
+        ./image2tensor.exe --input "./data/boxgrid.bmp" --output "boxgrid${noise_level}.npy" --derivative 2 --order 9
+    fi
 
-# extract basename from arg 1
-FNAME=$(basename "$1")
+    if [ ! -f circlegrid$noise_level.npy ]; then
+        ./image2tensor.exe --input "./data/boxgrid.bmp" --output "circlegrid${noise_level}.npy" --derivative 2 --order 9
+    fi
 
-NPY_NAME="${FNAME%.*}.npy"
+    for sigma in 1 5 10
+    do
 
-# get structure tensor
-python structure2d.py $1 $NPY_NAME
+        if [ -f "boxgrid${noise_level}_sigma${sigma}.npy" ]; then
+            rm "boxgrid${noise_level}_sigma${sigma}.npy"
+        fi
 
-# run tensorvoting
-./tensorvote.exe $NPY_NAME $NPY_NAME $2
+
+        ./tensorvote.exe --input "boxgrid${noise_level}.npy" --output "boxgrid${noise_level}_sigma${sigma}.npy" --sigma $sigma
+        ./tensorvote.exe --input "circlegrid${noise_level}.npy" --output "circlegrid${noise_level}_sigma${sigma}.npy" --sigma $sigma
+    done
+done
