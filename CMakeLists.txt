@@ -39,6 +39,10 @@ configure_file(structen.py
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
 
+# shell scripts
+configure_file(tensorvote.sh
+				tensorvote.sh COPYONLY)
+
 
 # copy the script to generate example data sets
 configure_file(generate_data.py 
