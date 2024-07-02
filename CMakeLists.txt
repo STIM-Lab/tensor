@@ -68,6 +68,7 @@ target_link_libraries(tensorview2
 				PRIVATE GLEW::GLEW
 				${OPENGL_LIBRARIES}
 				${CMAKE_DL_LIBS}
+				Boost::program_options
 				PRIVATE imgui::imgui
 )
 

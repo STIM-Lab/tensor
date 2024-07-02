@@ -1,6 +1,8 @@
 #include <iostream>
 #include <chrono>
 
+#include <boost/program_options.hpp>
+
 #include "tira/graphics_gl.h"
 #include "tira/graphics/glShader.h"
 #include "tira/graphics/shapes/circle.h"
@@ -40,6 +42,7 @@ const std::string glyph_shader_string =
 
 tira::image<glm::mat2> T0;
 tira::image<glm::mat2> Tn;
+tira::image<float> SCALAR;
 bool FIELD_LOADED = false;
 
 float MINVAL, MAXVAL;
@@ -63,10 +66,14 @@ float Viewport[2];
 
 const char* FileName = "";
 
+// command line arguments
+std::string in_inputname;
+std::string in_l0_outputname;
+
 
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
-int SCALARTYPE = ScalarType::NoScalar;
+int SCALARTYPE = ScalarType::EVal0;
 bool RENDER_GLYPHS = true;
 
 void FitRectangleToWindow(float rect_width, float rect_height, float window_width, float window_height, float& viewport_width, float& viewport_height) {
@@ -183,17 +190,17 @@ void GaussianFilter(float sigma) {
 /// <param name="v"></param>
 void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
 
-    tira::image<float> img(Tn.shape()[1], Tn.shape()[0], 1);
+    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);
     float val;
     for (int yi = 0; yi < Tn.shape()[0]; yi++) {
         for (int xi = 0; xi < Tn.shape()[1]; xi++) {
             val = Timg(xi, yi, u, v);
-            img(xi, yi, 0) = val;
+            SCALAR(xi, yi, 0) = val;
         }
     }
-    MAXVAL = img.maxv();
-    MINVAL = img.minv();
-    CMAP_MATERIAL->SetTexture("scalar", img, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    MAXVAL = SCALAR.maxv();
+    MINVAL = SCALAR.minv();
+    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
 }
 
 /// <summary>
@@ -202,19 +209,19 @@ void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
 /// <param name="i"></param>
 void ScalarFrom_Eval(unsigned int i) {
 
-    tira::image<float> img(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
+    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
     //float* npy_data = NPY.data<float>();                        // get the raw data from the tensor field
 
     float t, d;
     for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
         for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            img(xi, yi) = Eigenvalue2D(xi, yi, i);
+            SCALAR(xi, yi) = Eigenvalue2D(xi, yi, i);
         }
     }
     // update texture
-    MAXVAL = img.maxv();
-    MINVAL = img.minv();
-    CMAP_MATERIAL->SetTexture("scalar", img, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    MAXVAL = SCALAR.maxv();
+    MINVAL = SCALAR.minv();
+    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
 }
 
 /// <summary>
@@ -223,7 +230,7 @@ void ScalarFrom_Eval(unsigned int i) {
 /// <param name="i"></param>
 void ScalarFrom_Eccentricity() {
 
-    tira::image<float> img(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
+    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
     //float* npy_data = NPY.data<float>();                        // get the raw data from the tensor field
 
     float t, d;
@@ -232,16 +239,16 @@ void ScalarFrom_Eccentricity() {
             float l0 = Eigenvalue2D(xi, yi, 0);
             float l1 = Eigenvalue2D(xi, yi, 1);
             if (l0 == 0.0f)
-                img(xi, yi) = 0.0f;
+                SCALAR(xi, yi) = 0.0f;
             else
-                img(xi, yi) = sqrt(1.0f - (l1 * l1) / (l0 * l0));
+                SCALAR(xi, yi) = sqrt(1.0f - (l1 * l1) / (l0 * l0));
             //img(xi, yi) = sqrt((l0 * l0) - (l1 * l1));
         }
     }
     // update texture
-    MAXVAL = img.maxv();
-    MINVAL = img.minv();
-    CMAP_MATERIAL->SetTexture("scalar", img, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    MAXVAL = SCALAR.maxv();
+    MINVAL = SCALAR.minv();
+    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
 }
 
 /// <summary>
@@ -250,19 +257,19 @@ void ScalarFrom_Eccentricity() {
 /// <param name="i"></param>
 void ScalarFrom_Evec(unsigned int i, unsigned int component) {
 
-    tira::image<float> img(Tn.width(), Tn.height(), 1);      // allocate a scalar image
+    SCALAR = tira::image<float>(Tn.width(), Tn.height(), 1);      // allocate a scalar image
 
     float t, d;
     for (int yi = 0; yi < Tn.height(); yi++) {                                     // for each tensor in the field
         for (int xi = 0; xi < Tn.width(); xi++) {
             glm::vec2 evec = Eigenvector2D(xi, yi, i);
-            img(xi, yi) = evec[component];
+            SCALAR(xi, yi) = evec[component];
         }
     }
     // update texture
-    MAXVAL = img.maxv();
-    MINVAL = img.minv();
-    CMAP_MATERIAL->SetTexture("scalar", img, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    MAXVAL = SCALAR.maxv();
+    MINVAL = SCALAR.minv();
+    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
 }
 
 
@@ -375,6 +382,36 @@ void RenderFieldSpecs() {
     ImGui::Text(("Field Size: " + ss.str()).c_str());
     ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
+
+/*void UpdateScalar() {
+    if (SCALARTYPE==ScalarType::Tensor11) {
+        ScalarFrom_TensorElement2D(1, 1);
+    }
+    if (SCALARTYPE==ScalarType::Tensor01) {
+        ScalarFrom_TensorElement2D(0, 1);
+    }
+    if (SCALARTYPE==ScalarType::EVal0) {
+        ScalarFrom_Eval(0);
+    }
+    if (SCALARTYPE==ScalarType::EVal1) {
+        ScalarFrom_Eval(1);
+    }
+    if (SCALARTYPE==ScalarType::EVec0x) {
+        ScalarFrom_Evec(0, 0);
+    }
+    if (SCALARTYPE==ScalarType::EVec0y) {
+        ScalarFrom_Evec(0, 1);
+    }
+    if (SCALARTYPE==ScalarType::EVec1x) {
+        ScalarFrom_Evec(1, 0);
+    }
+    if (SCALARTYPE==ScalarType::EVec1y) {
+        ScalarFrom_Evec(1, 1);
+    }
+    if (SCALARTYPE==ScalarType::Eccentricity) {
+        ScalarFrom_Eccentricity();
+    }
+}*/
 /// This function renders the user interface every frame
 void RenderUI() {
     // Start the Dear ImGui frame
@@ -407,31 +444,31 @@ void RenderUI() {
     // select scalar component
     ImGui::RadioButton("None", &SCALARTYPE, (int)ScalarType::NoScalar);
     if (ImGui::RadioButton("[0, 0] = dxdx", &SCALARTYPE, (int)ScalarType::Tensor00)) {
-        ScalarFrom_TensorElement2D(0, 0);
+        ScalarRefresh();
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("[1, 1] = dydy", &SCALARTYPE, (int)ScalarType::Tensor11)) {
-        ScalarFrom_TensorElement2D(1, 1);
+        ScalarRefresh();
     }
     if (ImGui::RadioButton("[0, 1] = dxdy", &SCALARTYPE, (int)ScalarType::Tensor01)) {
-        ScalarFrom_TensorElement2D(0, 1);
+        ScalarRefresh();
     }
     if (ImGui::RadioButton("lambda 0", &SCALARTYPE, (int)ScalarType::EVal0)) {
-        ScalarFrom_Eval(0);
+        ScalarRefresh();
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("lambda 1", &SCALARTYPE, (int)ScalarType::EVal1)) {
-        ScalarFrom_Eval(1);
+        ScalarRefresh();
     }
     if (ImGui::RadioButton("evec 0 (x)", &SCALARTYPE, (int)ScalarType::EVec0x)) {
-        ScalarFrom_Evec(0, 0);
+        ScalarRefresh();
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("evec 0 (y)", &SCALARTYPE, (int)ScalarType::EVec0y)) {
-        ScalarFrom_Evec(0, 1);
+        ScalarRefresh();
     }
     if (ImGui::RadioButton("evec 1 (x)", &SCALARTYPE, (int)ScalarType::EVec1x)) {
-        ScalarFrom_Evec(1, 0);
+        ScalarRefresh();
     }
     ImGui::SameLine();
     if (ImGui::RadioButton("evec 1 (y)", &SCALARTYPE, (int)ScalarType::EVec1y)) {
@@ -568,6 +605,26 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 int main(int argc, char** argv) {
 
+    // Declare the supported options.
+    boost::program_options::options_description desc("Allowed options");
+    desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
+        ("nogui", "do not provide a user interface (only files are saved)")
+        ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the largest eigenvector")
+        ("help", "produce help message");
+    boost::program_options::variables_map vm;
+
+    boost::program_options::positional_options_description p;
+    p.add("input", -1);
+    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+
+    boost::program_options::notify(vm);
+
+    // if the user passes the help parameter, output command line details
+    if (vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 1;
+    }
+
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -592,9 +649,9 @@ int main(int argc, char** argv) {
 	//std::cout << "https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html" << std::endl;
 
     // Load the tensor field if it is provided as a command-line argument
-    if (argc == 2) {
-        LoadTensorField(argv[1]);
-        FileName = argv[1];
+    if (vm.count("input")) {
+        LoadTensorField(in_inputname);
+        FileName = in_inputname.c_str();
     }
     else {
         std::cout << "ERROR: No tensor field specified." << std::endl;
@@ -607,7 +664,21 @@ int main(int argc, char** argv) {
 
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
     CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
-    SCALARTYPE = ScalarType::NoScalar;
+    //SCALARTYPE = ScalarType::NoScalar;
+    if (vm.count("l0")) {
+        int old = SCALARTYPE;
+        SCALARTYPE = ScalarType::EVal0;
+        ScalarRefresh();
+        tira::image<unsigned char> C = SCALAR.cmap(ColorMap::Magma);
+        C.save(in_l0_outputname);
+        SCALARTYPE = old;
+    }
+    if (vm.count("nogui")) {
+        return 0;
+    }
+
+    ScalarRefresh();
+    
 
     GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
     GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
