@@ -49,15 +49,15 @@ def genBoxGrid2T(N, b, linewidth, noise):
 
 def genCircleGrid2(N, circles, linewidth, noise=0):
     
-    x = np.linspace(0, 1, N)
+    x = np.linspace(0, N, N)                    # create a meshgrid of coordinates
     X, Y = np.meshgrid(x, x)
-    width = 1/N * linewidth
+    #width = 1/N * linewidth
     
-    diameter = 1.0 / circles
+    diameter = N / circles                    # calculate the radius and diameter of the circles
     radius = diameter / 2.0
     
-    R = np.ones((N, N))
-    for cxi in range(circles):
+    R = np.ones((N, N)) * 100000
+    for cxi in range(circles):                  # for each circle along x and y
         for cyi in range(circles):
             cx = radius + diameter * cxi
             cy = radius + diameter * cyi
@@ -65,11 +65,15 @@ def genCircleGrid2(N, circles, linewidth, noise=0):
             DY = Y - cy
             D = np.sqrt(DX**2 + DY**2)
             R = np.minimum(R, D)
+            
+    I = R
+    I[R<radius] = 0.0
+    I[R>=radius] = 1.0
     
-    I = np.logical_and(R >= (radius - width), R <= radius ).astype(np.float32)
+    #I = np.logical_and(R >= (radius - width), R <= radius ).astype(np.float32)
     if noise != 0:
         I = np.random.normal(0, noise, I.shape) + I
-    I[I<0] = 0
+    #I[I<0] = 0
             
     return np.floor(((I - np.min(I)) / (np.max(I) - np.min(I))) * 255)
 

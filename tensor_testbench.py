@@ -258,49 +258,18 @@ def main():
 
 sigma = 3
 iterations = 4
-noise = 0.3
-line_width = 1
+noise = 0.0
+line_width = 2
 num_boxes = 2
-resolution = 51
+resolution = 101
 structure_sigma = 1
 
-G = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
-skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/grid.bmp", G.astype(np.uint8))
-plt.imshow(G)
-
-#S = st.hessian(G, 3)
-S = st.structure2d(G, structure_sigma, 1)
+B = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
+skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/box.bmp", B.astype(np.uint8))
 plt.figure()
-tv.visualize(S, mode="eccentricity")
-TV = tv.iterative_stick2(S, sigma, iterations, 1)
+plt.imshow(B)
+
+C = gen.genCircleGrid2(resolution, num_boxes, line_width, noise)
+skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/circle.bmp", C.astype(np.uint8))
 plt.figure()
-tv.visualize(TV[iterations], mode="eccentricity")
-np.save("votetest.npy", TV[-1].astype(np.float32))
-#display_fields(1, 1, N=21, sigma_max=10, sigma_min=7)
-
-
-#plt.imshow(G)
-
-# N = 21
-# R = 21
-# sigma = 10
-# dtheta = np.pi / N
-
-# T = np.zeros((R, R, 2, 2))
-# for n in range(N):
-#     x = np.cos(dtheta * n)
-#     y = np.sin(dtheta * n)
-    
-#     T = T + tv.testfield(x, y, R, sigma)
-#     print(n)
-
-# np.save("circle_field.npy", T.astype(np.float32))
-# tv.visualize(T, mode="eccentricity")
-# TV = tv.iterative_vote(T, 1, 1)[-1]
-# N = 5
-# sigma = 2
-# VF = tv.testfield(1, 0, N, sigma)
-# T = tv.generate_stick_field(1, 0, N)
-# VF = tv.iterative_vote(T, sigma, 1)[-1]
-
-# tv.visualize(VF)
+plt.imshow(C)
