@@ -25,6 +25,11 @@
 #include <stdio.h>
 #include <complex>
 
+// command line arguments
+std::string in_inputname;
+std::string in_l0_outputname;
+float in_blur_strength;
+
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);   // specify the OpenGL color used to clear the back buffer
@@ -65,12 +70,6 @@ float MousePos[2];
 float Viewport[2];
 
 const char* FileName = "";
-
-// command line arguments
-std::string in_inputname;
-std::string in_l0_outputname;
-
-
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
 int SCALARTYPE = ScalarType::EVal0;
@@ -604,14 +603,15 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 
 
 int main(int argc, char** argv) {
-
     // Declare the supported options.
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
         ("nogui", "do not provide a user interface (only files are saved)")
         ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the largest eigenvector")
+        ("blur", boost::program_options::value<float>(&in_blur_strength)->default_value(1), "sigma for gaussian blur")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
+
 
     boost::program_options::positional_options_description p;
     p.add("input", -1);
@@ -672,6 +672,12 @@ int main(int argc, char** argv) {
         tira::image<unsigned char> C = SCALAR.cmap(ColorMap::Magma);
         C.save(in_l0_outputname);
         SCALARTYPE = old;
+    }
+    if (vm.count ("blur")) {
+        SIGMA = in_blur_strength;
+        BLUR = true;
+        GaussianFilter(SIGMA);
+        ScalarRefresh();
     }
     if (vm.count("nogui")) {
         return 0;
