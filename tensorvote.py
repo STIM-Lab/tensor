@@ -60,7 +60,7 @@ def stickvote2(T, sigma=3, sigma2=0):
     # perform the eigendecomposition of the field
     evals, evecs = np.linalg.eigh(T)
     
-    # store the eigenvector corresponding to the largest eigenvector
+    # store the eigenvector corresponding to the largest eigenvalue
     E = evecs[:, :, :, 1]
     
     # calculate the optimal window size
@@ -74,9 +74,7 @@ def stickvote2(T, sigma=3, sigma2=0):
     
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
-        #vfx0 = x0 + pad
         for x1 in range(T.shape[1]):
-            #vfx1 = x1 + pad
             scale = evals[x0, x1, 1] - evals[x0, x1, 0]
             S = scale * stickfield2(E[x0, x1, 0], E[x0, x1, 1], X0, X1, sigma, sigma2)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S

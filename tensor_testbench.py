@@ -256,9 +256,9 @@ def main():
 #T = tv.testfield(1, 1, 75, 20)
 #tv.visualize(T)
 
-sigma = 2
+sigma = 5
 iterations = 4
-noise = 10000
+noise = 5000
 line_width = 2
 num_boxes = 2
 
