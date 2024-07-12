@@ -265,11 +265,15 @@ resolution = 101
 structure_sigma = 1
 
 B = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
+B = sp.ndimage.gaussian_filter(B, line_width/2.0)
 skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/box.bmp", B.astype(np.uint8))
 plt.figure()
 plt.imshow(B)
 
 C = gen.genCircleGrid2(resolution, num_boxes, line_width, noise)
+C = sp.ndimage.gaussian_filter(C, line_width/2.0)
 skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/circle.bmp", C.astype(np.uint8))
 plt.figure()
 plt.imshow(C)
+
+Cx, Cy = np.gradient(C, edge_order=2)

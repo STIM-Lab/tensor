@@ -140,17 +140,19 @@ int main(int argc, char** argv) {
 		}
 	}
 
-	std::random_device rd{};
-	std::mt19937 gen{ rd() };
+	if (in_noise > 0) {
+		std::random_device rd{};
+		std::mt19937 gen{ rd() };
 
-	// values near the mean are the most likely
-	// standard deviation affects the dispersion of generated values from the mean
-	std::normal_distribution d{0.0, (double)in_noise };
+		// values near the mean are the most likely
+		// standard deviation affects the dispersion of generated values from the mean
+		std::normal_distribution d{ 0.0, (double)in_noise };
 
 
 
-	for (tira::volume<float>::iterator i = ST.begin(); i != ST.end(); i++)
-		*i = *i + (float)d(gen);
+		for (tira::volume<float>::iterator i = ST.begin(); i != ST.end(); i++)
+			*i = *i + (float)d(gen);
+	}
 
 	ST.save_npy(in_outputname);
 }
