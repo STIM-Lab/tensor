@@ -5,7 +5,7 @@ import scipy as sp
 from skimage.color import rgb2gray
 import sys
 
-def structure2d(I, sigma=3, deriv=1):
+def structure2d(I, sigma=3, deriv=1, noise=0):
 
     if(len(I.shape) > 2):
         img = I[:, :, 0]
@@ -23,21 +23,29 @@ def structure2d(I, sigma=3, deriv=1):
 
     # create the structure tensor
     T = np.zeros((img.shape[0], img.shape[1], 2, 2))
+    
     T[:, :, 0, 0] = dIdx * dIdx
+    if noise > 0:
+        T[:, :, 0, 0] = T[:, :, 0, 0] + np.abs(np.random.normal(0.0, noise, T[:, :, 0, 0].shape))
+        
     T[:, :, 1, 1] = dIdy * dIdy
+    if noise > 0:
+        T[:, :, 1, 1] = T[:, :, 1, 1] + np.abs(np.random.normal(0.0, noise, T[:, :, 1, 1].shape))
+        
     T[:, :, 0, 1] = dIdx * dIdy
+    if noise > 0:
+        T[:, :, 0, 1] = T[:, :, 0, 1] + np.random.normal(0.0, noise, T[:, :, 0, 1].shape)
+        
     T[:, :, 1, 0] = T[:, :, 0, 1]
 
     #if the sigma value is 0, don't do any blurring or resampling
-    if sigma == 0:
-        return T
-        
-    # otherwise blur the image
-    else:    
+    if sigma > 0:
         window = np.ones((sigma, sigma, 1, 1))
-        T_blur = sp.signal.convolve(T, window, mode="same")
+        T = sp.signal.convolve(T, window, mode="same") 
+    
+        
 
-    return T_blur
+    return T
 
 def structure2d_nz(I, w=3):
     

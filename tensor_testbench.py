@@ -256,24 +256,35 @@ def main():
 #T = tv.testfield(1, 1, 75, 20)
 #tv.visualize(T)
 
-sigma = 3
+sigma = 2
 iterations = 4
-noise = 0.0
+noise = 10000
 line_width = 2
 num_boxes = 2
-resolution = 101
+
+resolution = 201
 structure_sigma = 1
 
-B = gen.genBoxGrid2(resolution, num_boxes, line_width, noise)
-B = sp.ndimage.gaussian_filter(B, line_width/2.0)
+B = gen.genBoxGrid2(resolution, num_boxes, line_width, 0)
+B = sp.ndimage.gaussian_filter(B, line_width/3.0)
 skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/box.bmp", B.astype(np.uint8))
 plt.figure()
 plt.imshow(B)
 
-C = gen.genCircleGrid2(resolution, num_boxes, line_width, noise)
-C = sp.ndimage.gaussian_filter(C, line_width/2.0)
+C = gen.genCircleGrid2(resolution, num_boxes, line_width, 0)
+C = sp.ndimage.gaussian_filter(C, line_width/3.0)
 skimage.io.imsave("C:/Users/david/Documents/build/tensor-bld/circle.bmp", C.astype(np.uint8))
+
+T = st.structure2d(C, sigma=0, deriv=1, noise=noise)
+tv.visualize(T, glyphs=False, title="Tensor Field")
+
+V = tv.vote2(T, sigma)
 plt.figure()
-plt.imshow(C)
+tv.visualize(V, glyphs=False, title="Full Vote")
+
+S = tv.stickvote2(T, sigma)
+plt.figure()
+tv.visualize(S, glyphs=False, title="Stick Vote")
+
 
 Cx, Cy = np.gradient(C, edge_order=2)

@@ -608,7 +608,7 @@ int main(int argc, char** argv) {
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
         ("nogui", "do not provide a user interface (only files are saved)")
         ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the largest eigenvector")
-        ("blur", boost::program_options::value<float>(&in_blur_strength)->default_value(1), "sigma for gaussian blur")
+        ("blur", boost::program_options::value<float>(&in_blur_strength), "sigma for gaussian blur")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
 
@@ -665,6 +665,14 @@ int main(int argc, char** argv) {
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
     CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
     //SCALARTYPE = ScalarType::NoScalar;
+    if (vm.count("blur")) {
+        SIGMA = in_blur_strength;
+        bool temp = BLUR;
+        BLUR = true;
+        GaussianFilter(SIGMA);
+        ScalarRefresh();
+        BLUR = temp;
+    }
     if (vm.count("l0")) {
         int old = SCALARTYPE;
         SCALARTYPE = ScalarType::EVal0;
@@ -673,12 +681,7 @@ int main(int argc, char** argv) {
         C.save(in_l0_outputname);
         SCALARTYPE = old;
     }
-    if (vm.count ("blur")) {
-        SIGMA = in_blur_strength;
-        BLUR = true;
-        GaussianFilter(SIGMA);
-        ScalarRefresh();
-    }
+    
     if (vm.count("nogui")) {
         return 0;
     }

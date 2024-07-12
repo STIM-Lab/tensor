@@ -199,18 +199,19 @@ def generate2(x=0, y=1, N=51, sigma1=20, sigma2=10):
     
 
 # visualize a tensor field T (NxMx2x2)
-def visualize(T, plot_title = "Tensor Field", fontsize=10, mode=None):
+def visualize(T, title = "Tensor Field", fontsize=10, mode=None, glyphs=True):
     
     font = {'size' : fontsize}
 
     plt.rc('font', **font)
     #plt.figure()
     Eval, Evec = np.linalg.eigh(T)
-    plt.quiver(Evec[:, :, 0, 1], Evec[:, :, 1, 1], pivot="middle", headwidth=0, headlength=0, headaxislength=0, width=0.002)
+    if(glyphs == True):
+        plt.quiver(Evec[:, :, 0, 1], Evec[:, :, 1, 1], pivot="middle", headwidth=0, headlength=0, headaxislength=0, width=0.002)
     plt.xlabel("X axis")
     plt.ylabel("Y axis")
     if mode is None or mode == "eval":
-        plt.imshow(Eval[:, :, 1], origin="lower", cmap="RdYlBu_r")
+        plt.imshow(Eval[:, :, 1], origin="lower", cmap="magma")
     if mode == "eccentricity":
         e0_2 = Eval[:, :, 0] ** 2
         e1_2 = Eval[:, :, 1] ** 2
@@ -218,7 +219,7 @@ def visualize(T, plot_title = "Tensor Field", fontsize=10, mode=None):
         ecc = np.sqrt(1 - ratio)
         plt.imshow(ecc, origin="lower", cmap="RdYlBu_r")
     plt.colorbar()
-    plt.title(plot_title)
+    plt.title(title)
     #plt.show()
     
 # performs iterative voting on a tensor field T

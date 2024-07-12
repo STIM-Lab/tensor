@@ -107,9 +107,29 @@ int main(int argc, char** argv) {
 
 		D.push_back(Dx);
 		D.push_back(Dy);
+
+		std::vector<size_t> field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
+		tira::field<float> ST(field_shape);
+
+		std::random_device rd{};
+		std::mt19937 gen{ rd() };
+		std::normal_distribution d{ 0.0, (double)in_noise };
+
+		for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
+			for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
+				ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 }) + abs((float)d(gen));
+				ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 }) + abs((float)d(gen));
+				ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 }) + (float)d(gen);
+				ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+			}
+		}
+
+		ST.save_npy(in_outputname);
 	}
 	else if (dim == 3) {
-		tira::volume<float> I(in_inputname);
+		std::cout << "Doesn't support 3D images yet" << std::endl;
+		return 0;
+		/*tira::volume<float> I(in_inputname);
 		//tira::volume<float> grey = I.channel(0);
 		tira::field<float> Dx = I.derivative(2, in_derivative, in_order);
 		tira::field<float> Dy = I.derivative(1, in_derivative, in_order);
@@ -118,41 +138,9 @@ int main(int argc, char** argv) {
 		D.push_back(Dx);
 		D.push_back(Dy);
 		D.push_back(Dz);
+		*/
 	}
 
-	std::vector<size_t> tensor_shape = D[0].shape();						// get the shape of the tensor field
-	tensor_shape[dim] = dim;												// push two additional dimensions representing the square matrix
-	tensor_shape.push_back(dim);
-
-	tira::field<float> ST(tensor_shape);
-
-	std::vector<size_t> st_coord, i_coord;
-	for (tira::field<float>::iterator i = D[0].begin(); i != D[0].end(); i++) {
-		i_coord = i.coord();
-		st_coord = i_coord;
-		st_coord.resize(dim + 2);
-		for (unsigned int d0 = 0; d0 < dim; d0++) {
-			st_coord[dim + 0] = d0;
-			for (unsigned int d1 = 0; d1 < dim; d1++) {
-				st_coord[dim + 1] = d1;
-				ST(st_coord) = D[d0](i_coord) * D[d1](i_coord);
-			}
-		}
-	}
-
-	if (in_noise > 0) {
-		std::random_device rd{};
-		std::mt19937 gen{ rd() };
-
-		// values near the mean are the most likely
-		// standard deviation affects the dispersion of generated values from the mean
-		std::normal_distribution d{ 0.0, (double)in_noise };
-
-
-
-		for (tira::volume<float>::iterator i = ST.begin(); i != ST.end(); i++)
-			*i = *i + (float)d(gen);
-	}
-
-	ST.save_npy(in_outputname);
+	return 0;
+	
 }
