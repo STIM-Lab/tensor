@@ -5,6 +5,7 @@
 #include "tensorvote.cuh"
 
 #include <iostream>
+#include <numbers>
 
 
 static void HandleError(cudaError_t err, const char* file, int line)
@@ -79,14 +80,29 @@ __host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, flo
     }
 }
 
-__host__ __device__ float Decay(float cos_theta, float length, float sigma) {
+__host__ __device__ float StickDecay(float cos_theta, float length, float sigma) {
     float c = exp(-(length * length) / (sigma * sigma));
     float radial = 1 - (cos_theta * cos_theta);
     float D = c * radial;
     return D;
 }
 
-__host__ __device__  VoteContribution Saliency(float u, float v, float sigma, float* eigenvalues, float* eigenvectors) {
+__host__ __device__ float PlateDecay(float length, float sigma) {
+    float c = std::numbers::pi * exp(-(length * length) / (sigma * sigma)) / 2.0f;
+    //float radial = 1 - (cos_theta * cos_theta);
+    //float D = c * radial;
+    return c;
+}
+
+/// <summary>
+/// Calculate the stick vote for the relative position (u, v) given the voter eigenvales and eigenvectors
+/// </summary>
+/// <param name="u">u coordinate for the relative position of the receiver</param>
+/// <param name="v">v coordinate for the relative position of the receiver</param>
+/// <param name="sigma">decay value (standard deviation)</param>
+/// <param name="eigenvectors">array containing the largest eigenvector</param>
+/// <returns></returns>
+__host__ __device__  VoteContribution StickVote(float u, float v, float sigma, float* eigenvectors) {
 
     glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
     float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
@@ -102,7 +118,7 @@ __host__ __device__  VoteContribution Saliency(float u, float v, float sigma, fl
         radius = 0.0;
     else
         radius = length / (2 * eTv);
-    float d = Decay(eTv, length, sigma);
+    float d = StickDecay(eTv, length, sigma);
 
     float tvx, tvy;
     if (radius == 0.0) {
@@ -124,6 +140,32 @@ __host__ __device__  VoteContribution Saliency(float u, float v, float sigma, fl
     return R;
 }
 
+__host__ __device__  VoteContribution PlateVote(float u, float v, float sigma) {
+
+    //glm::vec2 ev(eigenvectors[0], eigenvectors[1]);         // get the eigenvector
+    float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
+
+    VoteContribution R;
+    R.decay = PlateDecay(length, sigma);
+
+    glm::mat2 TV;
+    TV[0][0] = 1.0f;                                // initialize the receiver vote to I
+    TV[1][1] = 1.0f;
+    TV[0][1] = TV[1][0] = 0.0f;
+    
+    if (length >= 0) {
+        float d[2] = { u / length, v / length };
+        float phi = atan2(v, u);
+        TV[0][0] = TV[0][0] - 0.25f * (cos(2.0f * phi) + 2);
+        TV[1][1] = TV[1][1] - 0.25f * (2 - cos(2.0f * phi));
+        TV[0][1] = TV[0][1] - 0.25f * (sin(2.0f * phi));
+        TV[1][0] = TV[0][1];
+    }
+
+    R.votes = TV;
+    return R;
+}
+
 
 /// @brief The kernel to perform the tensor voting on the GPU
 /// @param data Input tensor field
@@ -134,7 +176,7 @@ __host__ __device__  VoteContribution Saliency(float u, float v, float sigma, fl
 /// @param w Window size
 /// @param width Tensor field width in pixels
 /// @param height Tensor field height in pixels
-__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int sx, int sy) {
+__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int sx, int sy, bool PLATE) {
     int yi = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
     int xi = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -154,15 +196,21 @@ __global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, in
                 xr = xi + u;
                 if (xr >= 0 && xr < sx) {
                     // calculate the contribution of (u,v) to (x,y)   
-                    VoteContribution vote = Saliency(
+                    VoteContribution vote = StickVote(
                         u,
                         v,
                         sigma,
-                        &L[(yr * sx + xr) * 2],
+                        //&L[(yr * sx + xr) * 2],
                         &V[(yr * sx + xr) * 2]
                     );
-                    float scale = L[(yr * sx + xr) * 2 + 1];
+                    float scale = L[(yr * sx + xr) * 2 + 1] - L[(yr * sx + xr) * 2 + 0];
                     Votee = Votee + scale * vote.votes * vote.decay;
+
+                    if (PLATE) {
+                        vote = PlateVote(u, v, sigma);
+                        scale = L[(yr * sx + xr) * 2 + 0];
+                        Votee = Votee + scale * vote.votes * vote.decay;
+                    }
                 }
             }
         }
@@ -174,7 +222,7 @@ __global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, in
     VT[4 * (yi * sx + xi) + 3] = Votee[1][1];
 }
 
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device) {
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device, bool PLATE) {
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
 
@@ -206,7 +254,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     dim3 threads(blockDim, blockDim);
     dim3 blocks(sx / threads.x + 1, sy / threads.y + 1);
 
-    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy);              // call the CUDA kernel for voting
+    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy, PLATE);              // call the CUDA kernel for voting
 
     // Copy the final result back from the GPU
     HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
