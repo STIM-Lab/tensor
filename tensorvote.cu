@@ -88,7 +88,8 @@ __host__ __device__ float StickDecay(float cos_theta, float length, float sigma)
 }
 
 __host__ __device__ float PlateDecay(float length, float sigma) {
-    float c = std::numbers::pi * exp(-(length * length) / (sigma * sigma)) / 2.0f;
+    float c = 3.1415926535897932384626433832795028841971693993751058209749445923078164062
+        * exp(-(length * length) / (sigma * sigma)) / 2.0f;
     //float radial = 1 - (cos_theta * cos_theta);
     //float D = c * radial;
     return c;
