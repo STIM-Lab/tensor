@@ -16,7 +16,7 @@ do
     echo "Noise level: $noise_level"
 
     ./image2tensor.exe --input "./data/boxgrid.bmp" --output "./data/image2tensor/npy/box/boxgrid${noise_level}.npy" --derivative 2 --order 9 --noise $noise_level
-    ./image2tensor.exe --input "./data/circlegrid.bmp" --output "./data/image2tensor/npy/circle/circlegrid${noise_level}.npy" --derivative 2 --order 9 --noise $noise_level
+    ./image2tensor.exe --input "./data/circlegrid.bmp" --output "./data/image2tensor/npy/circle/circlegrid${noise_level}.npy" --derivative 1 --order 2 --noise $noise_level
 
     for sigma in 1 5 10
     do
@@ -58,4 +58,18 @@ do
         echo $(basename $file .npy).bmp
         ./tensorview2.exe --input $file --l0 ./data/tensorvoting/images/box/sigma-${sigma}/$(basename $file .npy).bmp --nogui
     done
+done
+
+for file in ./data/image2tensor/npy/box/*.npy
+do
+    echo $(basename $file .npy).bmp
+    ./tensorview2.exe --input $file --l0 ./data/image2tensor/images/non-blurred/box/$(basename $file .npy).bmp --nogui
+    ./tensorview2.exe --input $file --l0 ./data/image2tensor/images/blurred/box/$(basename $file .npy).bmp --nogui --blur 3
+done
+
+for file in ./data/image2tensor/npy/circle/*.npy
+do
+    echo $(basename $file .npy).bmp
+    ./tensorview2.exe --input $file --l0 ./data/image2tensor/images/non-blurred/circle/$(basename $file .npy).bmp --nogui
+    ./tensorview2.exe --input $file --l0 ./data/image2tensor/images/blurred/circle/$(basename $file .npy).bmp --nogui --blur 3
 done
