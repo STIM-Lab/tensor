@@ -14,6 +14,7 @@ std::string in_outputname;
 unsigned int in_order;
 unsigned int in_derivative;
 float in_noise;
+bool in_crop = false;
 
 
 /// <summary>
@@ -78,6 +79,7 @@ int main(int argc, char** argv) {
 		("derivative", boost::program_options::value<unsigned int>(&in_derivative)->default_value(1), "output file storing the tensor field")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
 		("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
+		("crop", "crop the edges of the field to fit the finite difference window")
 		("help", "produce help message")
 		;
 	boost::program_options::variables_map vm;
@@ -92,6 +94,8 @@ int main(int argc, char** argv) {
 		std::cout << desc << std::endl;
 		return 1;
 	}
+
+	if (vm.count("crop")) in_crop = true;
 
 	int dim = 3;															// number of dimensions
 	std::vector< tira::field<float> > D;									// vector stores the derivatives
@@ -111,20 +115,41 @@ int main(int argc, char** argv) {
 		std::vector<size_t> field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
 		tira::field<float> ST(field_shape);
 
-		std::random_device rd{};
-		std::mt19937 gen{ rd() };
-		std::normal_distribution d{ 0.0, (double)in_noise };
+		
 
 		for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
 			for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-				ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 }) + abs((float)d(gen));
-				ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 }) + abs((float)d(gen));
-				ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 }) + (float)d(gen);
+				ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 });
+				ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 });
+				ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 });
 				ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 			}
 		}
 
-		ST.save_npy(in_outputname);
+		if (in_noise != 0) {
+			std::random_device rd{};
+			std::mt19937 gen{ rd() };
+			std::normal_distribution d{ 0.0, (double)in_noise };
+
+			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
+				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
+					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 1 }) + abs((float)d(gen));
+					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 0, 1 }) + abs((float)d(gen));
+					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + (float)d(gen);
+					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+				}
+			}
+		}
+
+		if (in_crop) {
+			size_t window_width = (in_order + in_derivative) / 2;
+			std::vector<size_t> min_crop = { window_width, window_width, 0, 0 };
+			std::vector<size_t> max_crop = { ST.shape()[0] - window_width, ST.shape()[1] - window_width, 2, 2};
+			tira::field<float> C = ST.crop(min_crop, max_crop);
+			C.save_npy(in_outputname);
+		}
+		else
+			ST.save_npy(in_outputname);
 	}
 	else if (dim == 3) {
 		std::cout << "Doesn't support 3D images yet" << std::endl;
