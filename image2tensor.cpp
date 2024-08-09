@@ -14,6 +14,7 @@ std::string in_outputname;
 unsigned int in_order;
 unsigned int in_derivative;
 float in_noise;
+float in_sigma;
 bool in_crop = false;
 
 
@@ -78,6 +79,7 @@ int main(int argc, char** argv) {
 		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "output file storing the tensor field")
 		("derivative", boost::program_options::value<unsigned int>(&in_derivative)->default_value(1), "output file storing the tensor field")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
+		("blur", boost::program_options::value<float>(&in_sigma)->default_value(0.0f), "sigma value for a Gaussian blur")
 		("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
 		("crop", "crop the edges of the field to fit the finite difference window")
 		("help", "produce help message")
@@ -115,8 +117,8 @@ int main(int argc, char** argv) {
 		std::vector<size_t> field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
 		tira::field<float> ST(field_shape);
 
-		
-
+		std::cout << "Generating tensor field...";
+		// build the tensor field
 		for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
 			for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
 				ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 });
@@ -125,8 +127,49 @@ int main(int argc, char** argv) {
 				ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 			}
 		}
+		std::cout << "done." << std::endl;
 
+		if (in_sigma > 0) {
+			std::cout << "Blurring tensor field (axis 0)...";
+			size_t window = (int)(in_sigma + 1);
+			float kernel_value = 1.0 / window;
+
+			std::vector<size_t> kernel_size1 = {window, 1, 1, 1};
+			tira::field<float> K1(kernel_size1);
+			
+
+			for (size_t yi = 0; yi < window; yi++) {
+				//for (size_t xi = 0; xi < window; xi++) {
+				K1({ yi, 0, 0, 0 }) = kernel_value;
+				//K1({ yi, 0, 0, 1 }) = kernel_value;
+				//K1({ yi, 0, 1, 0 }) = kernel_value;
+				//K1({ yi, 0, 1, 1 }) = kernel_value;
+				//}
+			}
+			ST = ST.convolve(K1);
+			std::cout << "done." << std::endl;
+
+			std::cout << "Blurring tensor field (axis 1)...";
+			std::vector<size_t> kernel_size2 = {1, window, 1, 1};
+			tira::field<float> K2(kernel_size2);
+			//float kernel_value = 1.0 / window;
+
+			for (size_t xi = 0; xi < window; xi++) {
+				//for (size_t xi = 0; xi < window; xi++) {
+				K2({ 0, xi, 0, 0 }) = kernel_value;
+				//K2({ 0, xi, 0, 1 }) = kernel_value;
+				//K2({ 0, xi, 1, 0 }) = kernel_value;
+				//K2({ 0, xi, 1, 1 }) = kernel_value;
+				//}
+			}
+			ST = ST.convolve(K2);
+
+			std::cout << "done." << std::endl;
+		}
+
+		// add noise to the final tensor field
 		if (in_noise != 0) {
+			std::cout << "Adding noise...";
 			std::random_device rd{};
 			std::mt19937 gen{ rd() };
 			std::normal_distribution d{ 0.0, (double)in_noise };
@@ -139,14 +182,17 @@ int main(int argc, char** argv) {
 					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 				}
 			}
+			std::cout << "done." << std::endl;
 		}
 
 		if (in_crop) {
+			std::cout << "Cropping...";
 			size_t window_width = (in_order + in_derivative) / 2;
 			std::vector<size_t> min_crop = { window_width, window_width, 0, 0 };
 			std::vector<size_t> max_crop = { ST.shape()[0] - window_width, ST.shape()[1] - window_width, 2, 2};
 			tira::field<float> C = ST.crop(min_crop, max_crop);
 			C.save_npy(in_outputname);
+			std::cout << "done." << std::endl;
 		}
 		else
 			ST.save_npy(in_outputname);
