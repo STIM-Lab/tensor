@@ -152,15 +152,9 @@ int main(int argc, char** argv) {
 			std::cout << "Blurring tensor field (axis 1)...";
 			std::vector<size_t> kernel_size2 = {1, window, 1, 1};
 			tira::field<float> K2(kernel_size2);
-			//float kernel_value = 1.0 / window;
 
 			for (size_t xi = 0; xi < window; xi++) {
-				//for (size_t xi = 0; xi < window; xi++) {
 				K2({ 0, xi, 0, 0 }) = kernel_value;
-				//K2({ 0, xi, 0, 1 }) = kernel_value;
-				//K2({ 0, xi, 1, 0 }) = kernel_value;
-				//K2({ 0, xi, 1, 1 }) = kernel_value;
-				//}
 			}
 			ST = ST.convolve(K2);
 
@@ -176,8 +170,8 @@ int main(int argc, char** argv) {
 
 			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
 				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 1 }) + abs((float)d(gen));
-					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 0, 1 }) + abs((float)d(gen));
+					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + abs((float)d(gen));
+					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + abs((float)d(gen));
 					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + (float)d(gen);
 					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 				}
