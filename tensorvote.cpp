@@ -27,6 +27,17 @@ bool debug = false;
 bool PLATE = true;
 bool in_time = false;
 
+// timing variables
+float t_voting;
+float t_device2host;
+float t_host2device;
+float t_eigendecomposition;
+float t_total;
+float t_devicealloc;
+float t_devicefree;
+float t_deviceprops;
+
+
 /// <summary>
 /// Save a field of floating point values as a NumPy file
 /// </summary>
@@ -50,12 +61,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
     auto start = std::chrono::high_resolution_clock::now();
     cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
     auto end = std::chrono::high_resolution_clock::now();
-
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    if (time) {
-        std::cout << "eigendecomposition duration: " << duration.count() << "ms" << std::endl;
-    }
+    t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     if (debug) {
         save_field(&L[0], sx, sy, 2, "debug_eigenvalues.npy");
@@ -118,11 +124,11 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int sx, unsigne
     }
     end = std::chrono::high_resolution_clock::now();
 
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    if (time) {
-        std::cout << "tensor vote duration: " << duration.count() << "ms" << std::endl;
-    }
+    //if (time) {
+    //    std::cout << "tensor vote duration: " << duration.count() << "ms" << std::endl;
+    //}
 
     if(debug)
         save_field(&debug_decay[0], sx, sy, 1, "debug_decay.npy");
@@ -190,7 +196,6 @@ int main(int argc, char *argv[]) {
     tira::field<float> Tr(T.shape());   // create a field to store the vote result
 
     auto start = std::chrono::high_resolution_clock::now();
-
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, PLATE, in_time);
@@ -198,12 +203,21 @@ int main(int argc, char *argv[]) {
     else {
         cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_cuda, PLATE, in_time);
     }
-
     auto end = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    t_total = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     if (in_time) {
-        std::cout << "Total: " << duration.count() << "ms" << std::endl;
+        std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
+        std::cout << "Voting: " << t_voting << " ms" << std::endl;
+
+        if (in_cuda >= 0) {
+            std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
+            std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
+            std::cout << "cudaMalloc: " << t_devicealloc << " ms" << std::endl;
+            std::cout << "cudaFree: " << t_devicefree << " ms" << std::endl;
+            std::cout << "cudaDeviceProps: " << t_deviceprops << " ms" << std::endl;
+        }
+        std::cout << "Total: " << t_total << " ms" << std::endl;
     }
 
 

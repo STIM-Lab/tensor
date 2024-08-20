@@ -249,5 +249,12 @@ def main():
     #    difference = tensor_field_difference(python_votefields[i], c_votefields[i], 1, visualize=True, name = input_filenames[i].split('.')[0])
     #    print("Test case " + input_filenames[i].split('.')[0] + " error = " + str(difference))
 
-P = np.load("physarum1.npy")
-V = tv.vote2(P)
+I = skimage.io.imread("grid.bmp")
+T = st.structure2d(I, noise=5000)
+V = tv.vote2(T, 2)
+
+plt.figure()
+tv.visualize(T)
+
+plt.figure()
+tv.visualize(V)

@@ -8,6 +8,15 @@
 #include <numbers>
 #include <chrono>
 
+extern float t_voting;
+extern float t_device2host;
+extern float t_host2device;
+extern float t_eigendecomposition;
+extern float t_total;
+extern float t_devicealloc;
+extern float t_devicefree;
+extern float t_deviceprops;
+
 
 static void HandleError(cudaError_t err, const char* file, int line)
 {
@@ -225,8 +234,12 @@ __global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, in
 }
 
 void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device, bool PLATE, bool time) {
+    
+    auto start = std::chrono::high_resolution_clock::now();
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
+    auto end = std::chrono::high_resolution_clock::now();
+    t_deviceprops = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     int tensorFieldSize = 4 * sx * sy;
     float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
@@ -234,15 +247,11 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
-    auto start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
     cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
-    auto end = std::chrono::high_resolution_clock::now();
+    end = std::chrono::high_resolution_clock::now();
+    t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    if (time) {
-        std::cout << "eigendecomposition duration: " << duration.count() << "ms" << std::endl;
-    }
 
     // Declare GPU arrays
     float* gpuOutputField;
@@ -251,21 +260,22 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
 
     
     // Allocate GPU arrays
+    start = std::chrono::high_resolution_clock::now();
     HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorFieldSize * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&gpuV, sx * sy * 2 * sizeof(float)));
     HANDLE_ERROR(cudaMalloc(&gpuL, sx * sy * 2 * sizeof(float)));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   
     start = std::chrono::high_resolution_clock::now();
     // Copy input arrays
     HANDLE_ERROR(cudaMemcpy(gpuV, V, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
     HANDLE_ERROR(cudaMemcpy(gpuL, L, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
+    cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
 
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    if (time) {
-        std::cout << "host to device duration: " << duration.count() << "ms" << std::endl;
-    }
+    t_host2device = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
@@ -274,31 +284,25 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
 
     start = std::chrono::high_resolution_clock::now();
     kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy, PLATE);              // call the CUDA kernel for voting
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-
-    if (time) {
-        cudaDeviceSynchronize();
-
-        end = std::chrono::high_resolution_clock::now();
-
-        duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        std::cout << "kernel duration: " << duration.count() << "ms" << std::endl;
-    }
 
     start = std::chrono::high_resolution_clock::now();
     // Copy the final result back from the GPU
     HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
-
-    duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    if (time) {
-        std::cout << "device to host duration: " << duration.count() << "ms" << std::endl;
-    }
+    t_device2host = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Free all of the GPU arrays
+    start = std::chrono::high_resolution_clock::now();
     HANDLE_ERROR(cudaFree(gpuOutputField));
     HANDLE_ERROR(cudaFree(gpuV));
     HANDLE_ERROR(cudaFree(gpuL));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    t_devicefree = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 }
 
