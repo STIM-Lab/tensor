@@ -1,5 +1,6 @@
 #Specify the version being used aswell as the language
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.30)
+cmake_policy(VERSION 3.30)
 
 #Name your project here
 project(tensor LANGUAGES CXX CUDA)
@@ -15,6 +16,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
+find_package(Eigen3 REQUIRED)
 set(Boost_NO_WARN_NEW_VERSIONS 1)
 find_package(Boost REQUIRED COMPONENTS program_options)
 
@@ -28,7 +30,10 @@ if ( MSVC )
 	add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 	add_definitions(-D_SCL_SECURE_NO_WARNINGS)
 	add_definitions(-D_USE_MATH_DEFINES)
+else()
+	find_package(X11 REQUIRED)
 endif ( MSVC )
+
 
 configure_file(Roboto-Medium.ttf 
 				Roboto-Medium.ttf COPYONLY)
@@ -54,6 +59,7 @@ include_directories(
 			${CMAKE_CURRENT_SOURCE_DIR}
 			${GLFW_INCLUDE_DIRS}
 			${TIRA_INCLUDE_DIRS}
+			${X11_INCLUDE_DIR}
 )
 
 # tensorview executable
@@ -73,24 +79,24 @@ target_link_libraries(tensorview2
 )
 
 #create an executable
-add_executable(tensorview3
-				tensorview3.cpp
-				gui.cpp
-				gui.h
-				ImGuiFileBrowser/ImGuiFileBrowser.cpp
-				ImGuiFileBrowser/ImGuiFileBrowser.h
-				ImGuiFileBrowser/dirent.h
-)
+#add_executable(tensorview3
+#				tensorview3.cpp
+#				gui.cpp
+#				gui.h
+#				ImGuiFileBrowser/ImGuiFileBrowser.cpp
+#				ImGuiFileBrowser/ImGuiFileBrowser.h
+#				ImGuiFileBrowser/dirent.h
+#)
 
-target_link_libraries(tensorview3
-				PRIVATE glm::glm
-				PRIVATE glfw
-				PRIVATE GLEW::GLEW
-				${OPENGL_LIBRARIES}
-				${CMAKE_DL_LIBS}
-				Boost::program_options
-				PRIVATE imgui::imgui
-)
+#target_link_libraries(tensorview3
+#				PRIVATE glm::glm
+#				PRIVATE glfw
+#				PRIVATE GLEW::GLEW
+#				${OPENGL_LIBRARIES}
+#				${CMAKE_DL_LIBS}
+#				Boost::program_options
+#				PRIVATE imgui::imgui
+#)
 
 #create an executable
 add_executable(image2tensor
@@ -99,6 +105,8 @@ add_executable(image2tensor
 
 target_link_libraries(image2tensor
 				Boost::program_options
+				${X11_LIBRARIES}
+
 )
 
 # tensorvote executable

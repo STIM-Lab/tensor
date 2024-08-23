@@ -73,7 +73,7 @@ const char* FileName = "";
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
 int SCALARTYPE = ScalarType::EVal0;
-bool RENDER_GLYPHS = true;
+bool RENDER_GLYPHS = false;
 
 void FitRectangleToWindow(float rect_width, float rect_height, float window_width, float window_height, float& viewport_width, float& viewport_height) {
  
@@ -163,7 +163,8 @@ void GaussianFilter(float sigma) {
     float dx = 1.0f;
     float start = -(float)(size - 1) / 2.0f;
 
-    tira::image<float> K({ size, size });
+    std::vector<size_t> s = {size, size};
+    tira::image<float> K(s);
     for (size_t vi = 0; vi < size; vi++) {
         float gv = normaldist(start + dx * vi, sigma);
         for (size_t ui = 0; ui < size; ui++) {

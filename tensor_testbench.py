@@ -250,11 +250,43 @@ def main():
     #    print("Test case " + input_filenames[i].split('.')[0] + " error = " + str(difference))
 
 I = skimage.io.imread("grid.bmp")
-T = st.structure2d(I, noise=5000)
-V = tv.vote2(T, 2)
+T = st.structure2d(I, noise=2000)
+
+
+
+Tval, Tvec = np.linalg.eigh(T)
+plt.figure()
+plt.imshow(Tval[:, :, 1], cmap="magma")
+plt.title("Original Image")
 
 plt.figure()
-tv.visualize(T)
 
-plt.figure()
-tv.visualize(V)
+sigma_step = 0.5
+sigma_start = 1.0
+nsigma = 4
+for si in range(nsigma):
+    sigma = sigma_start + si * sigma_step
+    B = sp.ndimage.gaussian_filter(T, (sigma, sigma, 0, 0))
+    V = tv.vote2(T, sigma)
+    
+    
+    Bval, Bvec = np.linalg.eigh(B)
+    Vval, Vvec = np.linalg.eigh(V)
+    
+    plt.subplot(2, nsigma, 1 + si)
+    plt.imshow(Bval[:, :, 1], cmap="magma")
+    plt.title("Gaussian Blur, sigma = " + str(sigma))
+    
+    plt.subplot(2, nsigma, nsigma + 1 + si)
+    plt.imshow(Vval[:, :, 1], cmap="magma")
+    plt.title("Gaussian Blur, sigma = " + str(sigma))
+
+
+#plt.figure()
+#tv.visualize(T, glyphs=None)
+
+#plt.figure()
+#tv.visualize(B, glyphs=None)
+
+#plt.figure()
+#tv.visualize(V, glyphs=None)

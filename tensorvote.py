@@ -69,7 +69,7 @@ def stickvote2(T, sigma=3, sigma2=0):
     X0, X1 = np.meshgrid(x, x)
     
     # create a padded vote field to store the vote results
-    pad = int(3*sigma)
+    pad = int(3*sigma+1)
     VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
@@ -136,7 +136,7 @@ def platevote2(T, sigma=3, sigma2=0):
     X0, X1 = np.meshgrid(x, x)
     
     # create a padded vote field to store the vote results
-    pad = int(3*sigma)
+    pad = int(3*sigma+1)
     VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
@@ -150,6 +150,7 @@ def platevote2(T, sigma=3, sigma2=0):
 
 def vote2(T, sigma=3, sigma2=0):
     
+    print("Stick ")
     S = stickvote2(T, sigma, sigma2)
     P = platevote2(T, sigma, sigma2)
     
