@@ -7,6 +7,8 @@
 #include <iostream>
 #include <numbers>
 #include <chrono>
+#include <driver_types.h>
+#include <cuda_runtime_api.h>
 
 extern float t_voting;
 extern float t_device2host;
