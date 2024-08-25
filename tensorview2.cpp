@@ -163,7 +163,7 @@ void GaussianFilter(float sigma) {
     float dx = 1.0f;
     float start = -(float)(size - 1) / 2.0f;
 
-    std::vector<size_t> s = {size, size};
+    std::vector<size_t> s = {size, size, 1};
     tira::image<float> K(s);
     for (size_t vi = 0; vi < size; vi++) {
         float gv = normaldist(start + dx * vi, sigma);
