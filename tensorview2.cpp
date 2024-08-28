@@ -221,7 +221,9 @@ void ScalarFrom_Eval(unsigned int i) {
     // update texture
     MAXVAL = SCALAR.maxv();
     MINVAL = SCALAR.minv();
-    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    if (CMAP_MATERIAL) {
+        CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    }
 }
 
 /// <summary>
@@ -635,20 +637,8 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-    // Create window with graphics context
-    window = glfwCreateWindow(1600, 1200, "ImGui GLFW+OpenGL3 Hello World Program", NULL, NULL);
-    if (window == NULL)
-        return 1;
-    glfwMakeContextCurrent(window);
-    glfwSwapInterval(1); // Enable vsync
-    glfwSetCursorPosCallback(window, mouse_callback);
 
-    InitUI(window, glsl_version);
-
-    if (glewInit() != GLEW_OK)
-        std::cout << "Error!" << std::endl;
 	//std::cout << "https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html" << std::endl;
-
     // Load the tensor field if it is provided as a command-line argument
     if (vm.count("input")) {
         LoadTensorField(in_inputname);
@@ -662,9 +652,6 @@ int main(int argc, char** argv) {
     if (argc > 0) {
         GLYPH_ROWS = Tn.shape()[0];
     }
-
-    CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
-    CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
     //SCALARTYPE = ScalarType::NoScalar;
     if (vm.count("blur")) {
         SIGMA = in_blur_strength;
@@ -686,7 +673,20 @@ int main(int argc, char** argv) {
     if (vm.count("nogui")) {
         return 0;
     }
+    // Create window with graphics context
+    window = glfwCreateWindow(1600, 1200, "ImGui GLFW+OpenGL3 Hello World Program", NULL, NULL);
+    if (window == NULL)
+        return 1;
+    glfwMakeContextCurrent(window);
+    glfwSwapInterval(1); // Enable vsync
+    glfwSetCursorPosCallback(window, mouse_callback);
 
+    InitUI(window, glsl_version);
+    if (glewInit() != GLEW_OK)
+        std::cout << "Error!" << std::endl;
+
+    CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
+    CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
     ScalarRefresh();
     
 
