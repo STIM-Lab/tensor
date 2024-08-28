@@ -1,6 +1,6 @@
 #Specify the version being used aswell as the language
-cmake_minimum_required(VERSION 3.30)
-cmake_policy(VERSION 3.30)
+cmake_minimum_required(VERSION 3.29)
+cmake_policy(VERSION 3.29)
 
 #Name your project here
 project(tensor LANGUAGES CXX CUDA)
