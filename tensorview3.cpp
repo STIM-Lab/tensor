@@ -15,7 +15,7 @@ const char* glsl_version = "#version 130";              // specify the version o
 tira::camera camera;
 
 extern bool perspective;
-extern float move[] = {0.0f, 0.0f};						// UP and RIGH, respectively
+float move[2] = {0.0f, 0.0f};						// UP and RIGHT, respectively
 bool ctrl = false;
 bool dragging = false;
 double xprev, yprev;

@@ -18,7 +18,7 @@ float zoom = 1.0f;
 int cmap = 1;
 float opacity = 1.0f;
 float thresh = 0.0f;
-float move[];
+extern float move[2];
 bool perspective = false;
 
 bool OPEN_TENSOR = false;
@@ -43,9 +43,9 @@ bool CenteredButton(const char* direc, ImGuiStyle& style) {
     if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
     style.FrameRounding = 10.f;
     if(direc == "D")
-        return ImGui::ArrowButton("D", 3);
+        return ImGui::ArrowButton("D", ImGuiDir_Down);
     else
-        return ImGui::ArrowButton("U", 2);
+        return ImGui::ArrowButton("U", ImGuiDir_Up);
 }
 
 void OpenFileDialog() {

@@ -79,24 +79,25 @@ target_link_libraries(tensorview2
 )
 
 #create an executable
-#add_executable(tensorview3
-#				tensorview3.cpp
-#				gui.cpp
-#				gui.h
-#				ImGuiFileBrowser/ImGuiFileBrowser.cpp
-#				ImGuiFileBrowser/ImGuiFileBrowser.h
-#				ImGuiFileBrowser/dirent.h
-#)
+add_executable(tensorview3
+				tensorview3.cpp
+				volumetric.h
+				gui.cpp
+				gui.h
+				ImGuiFileBrowser/ImGuiFileBrowser.cpp
+				ImGuiFileBrowser/ImGuiFileBrowser.h
+				ImGuiFileBrowser/dirent.h
+)
 
-#target_link_libraries(tensorview3
-#				PRIVATE glm::glm
-#				PRIVATE glfw
-#				PRIVATE GLEW::GLEW
-#				${OPENGL_LIBRARIES}
-#				${CMAKE_DL_LIBS}
-#				Boost::program_options
-#				PRIVATE imgui::imgui
-#)
+target_link_libraries(tensorview3
+				PRIVATE glm::glm
+				PRIVATE glfw
+				PRIVATE GLEW::GLEW
+				${OPENGL_LIBRARIES}
+				${CMAKE_DL_LIBS}
+				Boost::program_options
+				PRIVATE imgui::imgui
+)
 
 #create an executable
 add_executable(image2tensor
