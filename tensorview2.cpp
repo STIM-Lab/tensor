@@ -385,46 +385,6 @@ void RenderFieldSpecs() {
     ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
 
-void RenderGlyphs(glm::mat4 Mview) {
-    tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
-    GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
-    GLYPH_MATERIAL->Begin();                                                                                    // bind the material
-    int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
-    float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
-    float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
-    float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
-    float tex_sample_size_y = 1.0f / (float)glyph_cols;
-    float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
-    glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
-
-    float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
-    float glyph_start_y = -(float)Ti.height() / 2.0f + scale / 2.0f;
-    for (int yi = 0; yi < GLYPH_ROWS; yi++) {                                                                   // for each row
-        for (int xi = 0; xi < glyph_cols; xi++) {                                                               // for each column
-            // create a translation matrix moving the glyph to its appropriate position
-            glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f),
-                glm::vec3(glyph_start_x + xi * scale,
-                    glyph_start_y + yi * scale,
-                    1.0f));
-            glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
-
-            GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
-            float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
-            float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
-            //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
-            GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
-            GLYPH_MATERIAL->SetUniform1f("ty", ty);
-            if (SCALE_BY_NORM)
-                GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
-            else
-                GLYPH_MATERIAL->SetUniform1f("maxnorm", 0.0f);
-            GLYPH_MATERIAL->SetUniform1f("scale", SCALE);                                                       // pass the glyph scale factor (input by the user)
-            GLYPH_GEOMETRY.Draw();                                                                              // draw the glyph
-        }
-    }
-    GLYPH_MATERIAL->End();                                                                                      // unbind the glyph material
-}
-
 /// This function renders the user interface every frame
 void RenderUI() {
     // Start the Dear ImGui frame
@@ -437,7 +397,6 @@ void RenderUI() {
 
     if (ImGui::Button("Load File"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
-    //ImGui::SameLine();
     if (ImGuiFileDialog::Instance()->Display("ChooseNpyFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
@@ -446,7 +405,13 @@ void RenderUI() {
                 LoadTensorField(filename);
                 SCALARTYPE = ScalarType::EVal0;
                 ScalarRefresh();
+                FIELD_LOADED = true;
                 RENDER_GLYPHS = true;
+
+                if (GLYPH_MATERIAL == NULL) {
+                    GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
+                    GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
+                }
             }
         }
         ImGuiFileDialog::Instance()->Close();									// close the file dialog box		
@@ -673,6 +638,7 @@ int main(int argc, char** argv) {
         SCALARTYPE = ScalarType::EVal0;
         ScalarRefresh();
         tira::image<unsigned char> C = SCALAR.cmap(ColorMap::Magma);
+        
         C.save(in_l0_outputname);
         SCALARTYPE = old;
     }
@@ -737,7 +703,43 @@ int main(int argc, char** argv) {
                 CMAP_MATERIAL->End();                                                                                       // stop using the material
             }
             if (RENDER_GLYPHS) {
-                RenderGlyphs(Mview);
+                tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
+                GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
+                GLYPH_MATERIAL->Begin();                                                                                    // bind the material
+                int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
+                float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
+                float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
+                float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
+                float tex_sample_size_y = 1.0f / (float)glyph_cols;
+                float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
+                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
+
+                float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
+                float glyph_start_y = -(float)Ti.height() / 2.0f + scale / 2.0f;
+                for (int yi = 0; yi < GLYPH_ROWS; yi++) {                                                                   // for each row
+                    for (int xi = 0; xi < glyph_cols; xi++) {                                                               // for each column
+                        // create a translation matrix moving the glyph to its appropriate position
+                        glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f),
+                            glm::vec3(glyph_start_x + xi * scale,
+                                glyph_start_y + yi * scale,
+                                1.0f));
+                        glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
+
+                        GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
+                        float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
+                        float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
+                        //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
+                        GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
+                        GLYPH_MATERIAL->SetUniform1f("ty", ty);
+                        if (SCALE_BY_NORM)
+                            GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
+                        else
+                            GLYPH_MATERIAL->SetUniform1f("maxnorm", 0.0f);
+                        GLYPH_MATERIAL->SetUniform1f("scale", SCALE);                                                       // pass the glyph scale factor (input by the user)
+                        GLYPH_GEOMETRY.Draw();                                                                              // draw the glyph
+                    }
+                }
+                GLYPH_MATERIAL->End();
             }
         }
 
