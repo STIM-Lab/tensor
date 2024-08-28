@@ -1,4 +1,4 @@
-#Specify the version being used aswell as the language
+#Specify the version being used as well as the language
 cmake_minimum_required(VERSION 3.29)
 cmake_policy(VERSION 3.29)
 

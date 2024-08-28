@@ -379,7 +379,7 @@ void RenderFieldSpecs() {
     std::stringstream ss;
     ss << Tn.shape()[0] << " x " << Tn.shape()[1];
 
-    ImGui::Text(("Field Size: " + ss.str()).c_str());
+    ImGui::Text("%s", ("Field Size: " + ss.str()).c_str());
     ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
 
@@ -479,7 +479,7 @@ void RenderUI() {
     }
     std::stringstream ss;
     ss << "Min: " << MINVAL << "\t Max: " << MAXVAL;
-    ImGui::Text(ss.str().c_str());
+    ImGui::Text("%s", ss.str().c_str());
 
     if (ImGui::Checkbox("Blur", &BLUR)) {
         if (BLUR) {

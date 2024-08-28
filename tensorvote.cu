@@ -167,7 +167,6 @@ __host__ __device__  VoteContribution PlateVote(float u, float v, float sigma) {
     TV[0][1] = TV[1][0] = 0.0f;
     
     if (length >= 0) {
-        float d[2] = { u / length, v / length };
         float phi = atan2(v, u);
         TV[0][0] = TV[0][0] - 0.25f * (cos(2.0f * phi) + 2);
         TV[1][1] = TV[1][1] - 0.25f * (2 - cos(2.0f * phi));
@@ -197,7 +196,6 @@ __global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, in
         return;
 
     glm::mat2 Votee(0.0f);
-    float scale = 0.0f;
 
     int hw = w / 2;
     int yr, xr;
@@ -247,7 +245,6 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
     float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
 
-    int hw = (int)(w / 2);                                      // calculate the half window size
 
     start = std::chrono::high_resolution_clock::now();
     cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
