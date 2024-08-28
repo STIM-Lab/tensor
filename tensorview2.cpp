@@ -385,35 +385,46 @@ void RenderFieldSpecs() {
     ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
 
-/*void UpdateScalar() {
-    if (SCALARTYPE==ScalarType::Tensor11) {
-        ScalarFrom_TensorElement2D(1, 1);
+void RenderGlyphs(glm::mat4 Mview) {
+    tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
+    GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
+    GLYPH_MATERIAL->Begin();                                                                                    // bind the material
+    int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
+    float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
+    float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
+    float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
+    float tex_sample_size_y = 1.0f / (float)glyph_cols;
+    float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
+    glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
+
+    float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
+    float glyph_start_y = -(float)Ti.height() / 2.0f + scale / 2.0f;
+    for (int yi = 0; yi < GLYPH_ROWS; yi++) {                                                                   // for each row
+        for (int xi = 0; xi < glyph_cols; xi++) {                                                               // for each column
+            // create a translation matrix moving the glyph to its appropriate position
+            glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f),
+                glm::vec3(glyph_start_x + xi * scale,
+                    glyph_start_y + yi * scale,
+                    1.0f));
+            glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
+
+            GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
+            float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
+            float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
+            //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
+            GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
+            GLYPH_MATERIAL->SetUniform1f("ty", ty);
+            if (SCALE_BY_NORM)
+                GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
+            else
+                GLYPH_MATERIAL->SetUniform1f("maxnorm", 0.0f);
+            GLYPH_MATERIAL->SetUniform1f("scale", SCALE);                                                       // pass the glyph scale factor (input by the user)
+            GLYPH_GEOMETRY.Draw();                                                                              // draw the glyph
+        }
     }
-    if (SCALARTYPE==ScalarType::Tensor01) {
-        ScalarFrom_TensorElement2D(0, 1);
-    }
-    if (SCALARTYPE==ScalarType::EVal0) {
-        ScalarFrom_Eval(0);
-    }
-    if (SCALARTYPE==ScalarType::EVal1) {
-        ScalarFrom_Eval(1);
-    }
-    if (SCALARTYPE==ScalarType::EVec0x) {
-        ScalarFrom_Evec(0, 0);
-    }
-    if (SCALARTYPE==ScalarType::EVec0y) {
-        ScalarFrom_Evec(0, 1);
-    }
-    if (SCALARTYPE==ScalarType::EVec1x) {
-        ScalarFrom_Evec(1, 0);
-    }
-    if (SCALARTYPE==ScalarType::EVec1y) {
-        ScalarFrom_Evec(1, 1);
-    }
-    if (SCALARTYPE==ScalarType::Eccentricity) {
-        ScalarFrom_Eccentricity();
-    }
-}*/
+    GLYPH_MATERIAL->End();                                                                                      // unbind the glyph material
+}
+
 /// This function renders the user interface every frame
 void RenderUI() {
     // Start the Dear ImGui frame
@@ -508,47 +519,49 @@ void RenderUI() {
     ImGui::Checkbox("Scale by Norm", &SCALE_BY_NORM);
 
     int FieldIndex[2] = { (int)MousePos[0], (int)MousePos[1] };
-    if((FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width()) && (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height()))
-        ImGui::Text("Field Index: ---, ---");
-    else if(FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height())
-        ImGui::Text("Field Index: %d, ---", FieldIndex[0]);
-    else if (FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width())
-        ImGui::Text("Field Index: ---, %d", FieldIndex[1]);
-    else {
-        ImGui::Text("Field Index: %d, %d", FieldIndex[0], FieldIndex[1]);
+
+    if (FIELD_LOADED) {
+        if ((FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width()) && (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height()))
+            ImGui::Text("Field Index: ---, ---");
+        else if (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height())
+            ImGui::Text("Field Index: %d, ---", FieldIndex[0]);
+        else if (FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width())
+            ImGui::Text("Field Index: ---, %d", FieldIndex[1]);
+        else {
+            ImGui::Text("Field Index: %d, %d", FieldIndex[0], FieldIndex[1]);
 
 
-        // get the current tensor value
-        glm::mat2 T = Tn(FieldIndex[0], FieldIndex[1]);
+            // get the current tensor value
+            glm::mat2 T = Tn(FieldIndex[0], FieldIndex[1]);
 
-        // display the current tensor as a matrix
-        ImGui::Text("Tensor:");
-        float Row0[2] = { T[0][0], T[0][1] };
-        ImGui::InputFloat2("##Row0", Row0, "%1.3e");
-        float Row1[2] = { T[1][0], T[1][1] };
-        ImGui::InputFloat2("##Row1", Row1, "%1.3e");
+            // display the current tensor as a matrix
+            ImGui::Text("Tensor:");
+            float Row0[2] = { T[0][0], T[0][1] };
+            ImGui::InputFloat2("##Row0", Row0, "%1.3e");
+            float Row1[2] = { T[1][0], T[1][1] };
+            ImGui::InputFloat2("##Row1", Row1, "%1.3e");
 
-        // calculate the eigenvalues
-        glm::vec2 evals = Eigenvalues2D(T);
+            // calculate the eigenvalues
+            glm::vec2 evals = Eigenvalues2D(T);
 
-        // display the eigenvalues
-        ImGui::Text("Eigenvalues:");
-        float lambdas[2] = { evals[0], evals[1] };
-        ImGui::InputFloat2("##lambdas", lambdas, "%1.3e");
+            // display the eigenvalues
+            ImGui::Text("Eigenvalues:");
+            float lambdas[2] = { evals[0], evals[1] };
+            ImGui::InputFloat2("##lambdas", lambdas, "%1.3e");
 
-        // calculate the eigenvectors
-        glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
-        glm::vec2 ev1 = Eigenvector2D(T, evals[1]);
+            // calculate the eigenvectors
+            glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
+            glm::vec2 ev1 = Eigenvector2D(T, evals[1]);
 
-        // display the eigenvectors
-        ImGui::Text("Eigenvectors:");
-        float evx[2] = { ev0[0], ev1[0] };
-        float evy[2] = { ev0[1], ev1[1] };
-        ImGui::InputFloat2("##evx", evx, "%1.3e");
-        ImGui::InputFloat2("##evy", evy, "%1.3e");
+            // display the eigenvectors
+            ImGui::Text("Eigenvectors:");
+            float evx[2] = { ev0[0], ev1[0] };
+            float evy[2] = { ev0[1], ev1[1] };
+            ImGui::InputFloat2("##evx", evx, "%1.3e");
+            ImGui::InputFloat2("##evy", evy, "%1.3e");
 
+        }
     }
-
 
     ImGui::Render();                                                            // Render all windows
 }
@@ -604,7 +617,6 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
 }
 
 
-
 int main(int argc, char** argv) {
     // Declare the supported options.
     boost::program_options::options_description desc("Allowed options");
@@ -643,16 +655,11 @@ int main(int argc, char** argv) {
     if (vm.count("input")) {
         LoadTensorField(in_inputname);
         FileName = in_inputname.c_str();
-    }
-    else {
-        std::cout << "ERROR: No tensor field specified." << std::endl;
-        exit(1);
-    }
-
-    if (argc > 0) {
         GLYPH_ROWS = Tn.shape()[0];
     }
-    //SCALARTYPE = ScalarType::NoScalar;
+    else {
+    }
+
     if (vm.count("blur")) {
         SIGMA = in_blur_strength;
         bool temp = BLUR;
@@ -679,7 +686,9 @@ int main(int argc, char** argv) {
         return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
-    glfwSetCursorPosCallback(window, mouse_callback);
+    if (FIELD_LOADED) {
+        glfwSetCursorPosCallback(window, mouse_callback);
+    }
 
     InitUI(window, glsl_version);
     if (glewInit() != GLEW_OK)
@@ -687,19 +696,15 @@ int main(int argc, char** argv) {
 
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
     CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
-    ScalarRefresh();
     
-
-    GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
-    GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
-
-    //ScalarFrom_TensorElement2D(1, 1);
-    
-    //colormap_material.SetTexture("scalar", SCALAR, GL_LUMINANCE, GL_NEAREST);
+    if (FIELD_LOADED) {
+        ScalarRefresh();
+        GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
+        GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
+    }
 
     // Main loop
-    while (!glfwWindowShouldClose(window))
-    {
+    while (!glfwWindowShouldClose(window)) {
 
         // Poll and handle events (inputs, window resize, etc.)
         glfwPollEvents();
@@ -710,9 +715,6 @@ int main(int argc, char** argv) {
 
         glViewport(0, 0, display_w, display_h);                     // specifies the area of the window where OpenGL can render
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-
-        
-        
 
         glClear(GL_COLOR_BUFFER_BIT);                               // clear the Viewport using the clear color
 
@@ -735,80 +737,9 @@ int main(int argc, char** argv) {
                 CMAP_MATERIAL->End();                                                                                       // stop using the material
             }
             if (RENDER_GLYPHS) {
-                tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
-                GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
-                GLYPH_MATERIAL->Begin();                                                                                    // bind the material
-                int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
-                float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
-                float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
-                float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
-                float tex_sample_size_y = 1.0f / (float)glyph_cols;
-                float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
-                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
-
-                float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
-                float glyph_start_y = -(float)Ti.height() / 2.0f + scale / 2.0f;
-                for (int yi = 0; yi < GLYPH_ROWS; yi++) {                                                                   // for each row
-                    for (int xi = 0; xi < glyph_cols; xi++) {                                                               // for each column
-                                                                                                                            // create a translation matrix moving the glyph to its appropriate position
-                        glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), 
-                                                          glm::vec3(glyph_start_x + xi * scale, 
-                                                          glyph_start_y + yi * scale, 
-                                                          1.0f));
-                        glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
-
-                        GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
-                        float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
-                        float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
-                        //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
-                        GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
-                        GLYPH_MATERIAL->SetUniform1f("ty", ty);
-                        if (SCALE_BY_NORM)
-                            GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
-                        else
-                            GLYPH_MATERIAL->SetUniform1f("maxnorm", 0.0f);
-                        GLYPH_MATERIAL->SetUniform1f("scale", SCALE);                                                       // pass the glyph scale factor (input by the user)
-                        GLYPH_GEOMETRY.Draw();                                                                              // draw the glyph
-                    }
-                }
-                GLYPH_MATERIAL->End();                                                                                      // unbind the glyph material
-                
+                RenderGlyphs(Mview);
             }
         }
-
-        /****************************************************/
-        /*      Draw Stuff To The Viewport                  */
-        /****************************************************/
-
-        /*
-            projection matrix: world to screen coordinates
-            view matrix: transforms from world space to camera
-            model matrix: converts coordinates in space of a geometric object to world space
-        */
-
-        // FOR each pixel in the loaded image
-            // calculate the position of the tensor (in the example you can use the image index)
-
-        //for (int i = 0; i < T_npy.shape[0]; i++) {
-        //    for (int j = 0; j < T_npy.shape[1]; j++) {
-        //        int index = i * T_npy.shape[1] + j;
-
-        //        glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(gui_tensor_scale, gui_tensor_scale, gui_tensor_scale));    // generate a scale matrix
-        //        glm::vec3 tensor_position((float)i, (float)j, 0.0f);
-        //        glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), tensor_position);
-        //        glm::mat4 Mrot = glm::rotate(glm::mat4(1.0f), T_theta[index], glm::vec3(0, 0, 1));
-        //        glm::mat4 M = Mtrans * Mrot * Mscale;
-
-        //        float l0 = T_lambda0[index];
-        //        float l1 = T_lambda1[index];
-
-        //        shader->Bind();
-        //        shader->SetUniformMat4f("MVP", P * M);
-        //        shader->SetUniform1f("l0", 1.0f);
-        //        shader->SetUniform1f("l1", l1 / l0);
-        //        circle[index].Draw();
-        //    }
-        //}
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 
