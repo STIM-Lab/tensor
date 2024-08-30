@@ -1,4 +1,5 @@
 import numpy as np
+import scipy as sp
 import matplotlib.pyplot as plt
 import structen as st
 import tensorvote as tv
@@ -36,6 +37,7 @@ def genBoxGrid2(N, b, linewidth, noise=0):
         
     return np.floor(((I - np.min(I)) / (np.max(I) - np.min(I))) * 255)
 
+# generates an NxN axis-aligned grid tensor field with b boxes
 def genBoxGrid2T(N, b, linewidth, noise):
     
     I = genBoxGrid2(N, b, linewidth, 0).astype(np.float32) / 255
@@ -85,35 +87,100 @@ def genCircleGrid2T(N, b, linewidth, noise):
     if noise != 0:
         T = np.random.normal(0, noise, T.shape) + T
         
-    return T           
+    return T
 
-# generates an NxNxN axis-aligned grid with b boxes along each dimension
-# thickness is the width of each grid line
-def axis_grid_3d(N, b, linewidth, noise=0):
+def genSpiral3(N, d):
     
-    # calculate the number of grid lines
-    nlines = b - 1
+    I = np.zeros((N, N, N)).astype(np.float32)
     
-    # calculate the total number of pixels taken up by grid lines
-    linepixels = int(nlines * linewidth)
+    dt = 0.00001
+    t = 0
     
-    # calculate the size of each box
-    boxwidth = int((N - linepixels) / b)
+    while True:
+        x = t * np.cos(t)
+        y = t * np.sin(t)
+        z = 2 * t
+        
+        xp = (x / (2 * d) + 0.5) * N
+        yp = (y / (2 * d) + 0.5) * N
+        zp = (z / (2 * d)) * N
+        
+        xi = int(xp)
+        yi = int(yp)
+        zi = int(zp)
+        if(xi < 0 or yi < 0 or zi < 0 or xi >= N or yi >= N or zi >= N):
+            return I
+        
+        I[zi, yi, xi] = 1.0
+        
+        t = t + dt
+        
+
+def genSpiral2T(N, d):
     
-    I = np.zeros((N, N, N))
-    for i in range(nlines):
-        startpixel = boxwidth + (linewidth + boxwidth) * i
-        endpixel = startpixel + linewidth
+    T = np.zeros((N, N, 2, 2)).astype(np.float32)
+    
+    dt = 0.001
+    
+    t = 0
+    while True:
+        x = t * np.cos(t)
+        y = t * np.sin(t)
         
         
-        I[startpixel:endpixel, :, :] = 1
-        I[:, startpixel:endpixel, :] = 1
-        I[:, :, startpixel:endpixel] = 1
+        # calculate the direction of the spiral (as the derivative)
+        dx_dt = np.cos(t) - t * np.sin(t)
+        dy_dt = t * np.cos(t) + np.sin(t)
         
-    if noise != 0:
-        I = np.random.normal(0, noise, I.shape) + I        
+        xp = (x / (2 * d) + 0.5) * N
+        yp = (y / (2 * d) + 0.5) * N
         
-    return (I - np.min(I)) / (np.max(I) - np.min(I))
+        
+        xi = int(xp)
+        yi = int(yp)
+        if(xi < 0 or yi < 0 or xi >= N or yi >= N):
+            return T
+        
+        
+        
+        l = np.sqrt(dx_dt ** 2 + dy_dt ** 2)
+        
+        tx = -dy_dt / l
+        ty = dx_dt / l
+        
+        T[yi, xi, 0, 0] = tx * tx
+        T[yi, xi, 0, 1] = tx * ty
+        T[yi, xi, 1, 0] = T[yi, xi, 0, 1]
+        T[yi, xi, 1, 1] = ty * ty
+        
+        t = t + dt
+
+# adds Gaussian noise to a symmetric second order tensor field        
+def noiseGaussianT(T, sigma):
+
+    xx = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
+    xy = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
+    yy = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
+    T[:, :, 0, 0] = T[:, :, 0, 0] + np.abs(xx)
+    T[:, :, 1, 1] = T[:, :, 1, 1] + np.abs(yy)
+    T[:, :, 0, 1] = T[:, :, 0, 1] + xy
+    T[:, :, 1, 0] = T[:, :, 1, 0] + xy
+    return T
+
+       
+# saves an image stack, assuming the color value is the fastest (last) dimension    
+def saveColorStack(filename, I):
+    # get the number of images to save
+    nz = I.shape[0]
+    digits = len(str(nz))
+    
+    # uint conversion
+    I8 = (I * 255).astype(np.uint8)
+    
+    for zi in range(nz):
+        filestring = filename + "%0" + str(digits) + "d.bmp"
+        ski.io.imsave(filestring %zi, I8[zi, :, :, :])
+    
 
 # saves a stack of images
 def savestack(filename, I):
@@ -129,59 +196,67 @@ def savestack(filename, I):
         filestring = filename + "%0" + str(digits) + "d.bmp"
         ski.io.imsave(filestring %zi, I8[:, :, zi])
     
-if __name__ == "__main__":    
-    N = 1000
-    boxes = 5
-    width = 1
-    max_noise = 1.0
-    n_noise = 5
-    noise = np.linspace(0.0, 1.0, n_noise)
+# if __name__ == "__main__":    
+#     N = 1000
+#     boxes = 5
+#     width = 1
+#     max_noise = 1.0
+#     n_noise = 5
+#     noise = np.linspace(0.0, 1.0, n_noise)
     
-    if not os.path.exists("data"):
-        os.mkdir("data")
+#     if not os.path.exists("data"):
+#         os.mkdir("data")
     
-    for ni in range(len(noise)):
+#     for ni in range(len(noise)):
     
-        I = genBoxGrid2(N, boxes, width, noise[ni])
-        ski.io.imsave("data/boxgrid2_" + str(noise[ni]*10) + ".png", I.astype(np.uint8))
+#         I = genBoxGrid2(N, boxes, width, noise[ni])
+#         ski.io.imsave("data/boxgrid2_" + str(noise[ni]*10) + ".png", I.astype(np.uint8))
         
-        I = genCircleGrid2(N, boxes, width, noise[ni])
-        ski.io.imsave("data/circlegrid2_"+ str(noise[ni]*10) + ".png", I.astype(np.uint8))
+#         I = genCircleGrid2(N, boxes, width, noise[ni])
+#         ski.io.imsave("data/circlegrid2_"+ str(noise[ni]*10) + ".png", I.astype(np.uint8))
         
-        T = genBoxGrid2T(N, boxes, width, noise[ni])
-        np.save("data/boxgrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
+#         T = genBoxGrid2T(N, boxes, width, noise[ni])
+#         np.save("data/boxgrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
         
-        T = genCircleGrid2T(N, boxes, width, noise[ni])
-        np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
-    
-    
-    # tensor fields to benchmark visualization
-    T = genCircleGrid2T(100, boxes, width, 0)
-    np.save("data/circlegrid2t_small.npy", T.astype(np.float32))
-    T = genBoxGrid2T(100, boxes, width, 0)
-    np.save("data/boxgrid2t_small.npy", T.astype(np.float32))
-    T = tv.generate2()
-    tv.visualize(T)
-    np.save("data/votefield.npy", T.astype(np.float32))
-    
-    #T = genCircleGrid2T(100, boxes, width, 0.2)
-    #tv.visualize(T)
-    #T2 = st.structen(I, 1)
-    
-    #plt.figure()
-    #plt.imshow(I)
-    #plt.title("Original Image")
-    
-    
-    #plt.figure()
-    #tv.visualize(T2)
-    #plt.title("Structure Tensor Field")
-    
-    #ski.io.imsave("grid2D.bmp", np.uint8(I * 255))
-    #np.save("grid2D.npy", T2.astype(np.float32))
-    
-    #grid3D = axis_grid_3d(N, boxes, width, noise)
-    #T3 = st.structen(grid3D, 1)
-    #np.save("grid3D.npy", T3.astype(np.float32))
-    #savestack("grid3D/grid3D", grid3D)
+#         T = genCircleGrid2T(N, boxes, width, noise[ni])
+#         np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
 
+N = 100
+d = 60
+T = genSpiral2T(N, d)
+T = noiseGaussianT(T, 0.3)
+tv.visualize(T)
+
+V = tv.platevote2(T)
+plt.figure()
+tv.visualize(V)
+#plt.figure()
+#plt.imshow(T[:, :, 0, 1])
+
+#%%    
+N = 1000
+d = 60
+I = genSpiral3(N, d)
+sigma = 3
+I = sp.ndimage.gaussian_filter(I, (sigma, sigma, sigma))
+I = I * 15
+I[I > 1] = 1
+
+# convert the single-channel image into a color image
+c = np.linspace(0, 1, N).astype(np.float32)
+cr = np.linspace(1, 0, N).astype(np.float32)
+R, G, B = np.meshgrid(cr, c, c)
+
+C = np.zeros((N, N, N, 3))
+C[:, :, :, 0] = I * R
+C[:, :, :, 1] = I * G
+C[:, :, :, 2] = I * B
+
+plt.imshow(C[60])
+saveColorStack("test", C)
+
+#T = genSpiral2T(N, 20)
+#B = T #sp.ndimage.gaussian_filter(T, (sigma, sigma, 0, 0))
+#tv.visualize(B)
+#V = tv.vote2(T)
+#tv.visualize(V)
