@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
         ("output", boost::program_options::value<std::string>(&in_outputname)->default_value("result.npy"), "optional image field corresponding to the tensors")
-        ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(5.0f), "order used to calculate the first derivative")
+        ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(3.0f), "order used to calculate the first derivative")
         ("window", boost::program_options::value<unsigned int>(&in_window), "window size (6 * sigma + 1 as default)")
         ("cuda", boost::program_options::value<int>(&in_cuda)->default_value(0), "cuda device index (-1 for CPU)")
         ("votefield", boost::program_options::value<std::vector<float> >(&in_votefield)->multitoken(), "generate a test field based on a 2D orientation")

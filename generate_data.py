@@ -242,14 +242,16 @@ def savestack(filename, I):
 #         T = genCircleGrid2T(N, boxes, width, noise[ni])
 #         np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
 
-N = 100
-d = 60
+N = 2000
+d = 200
+sigma = 3
 T = genSpiral2T(N, d, 1)
-tv.visualize(T)
+np.save("spiral.npy", T)
+tv.visualize(T, glyphs=False)
 
-V = tv.vote2(T)
-plt.figure()
-tv.visualize(V)
+#V = tv.vote2(T, sigma)
+#plt.figure()
+#tv.visualize(V)
 #plt.figure()
 #plt.imshow(T[:, :, 0, 1])
 
