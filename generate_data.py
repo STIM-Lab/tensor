@@ -6,6 +6,34 @@ import tensorvote as tv
 import skimage as ski
 import os
 
+# adds Gaussian noise to a symmetric second order tensor field        
+def NoiseGaussianT(T, sigma1, sigma0 = None):
+    
+    if sigma0 is None:
+        sigma0 = sigma1
+        
+    THETA = np.random.uniform(0, np.pi * 2, (T.shape[0], T.shape[1]))
+    X = np.cos(THETA)
+    Y = np.sin(THETA)
+    
+    lambda_0 = np.abs(np.random.normal(0.0, sigma0, (T.shape[0], T.shape[1])))
+    lambda_1 = np.abs(np.random.normal(0.0, sigma1, (T.shape[0], T.shape[1])))
+    
+    ETA1 = np.zeros_like(T)
+    ETA1[:, :, 0, 0] = X * X * lambda_1
+    ETA1[:, :, 0, 1] = X * Y * lambda_1
+    ETA1[:, :, 1, 0] = ETA1[:, :, 0, 1]
+    ETA1[:, :, 1, 1] = Y * Y * lambda_1
+    
+    ETA0 = np.zeros_like(T)
+    X0 = Y
+    Y0 = -X
+    ETA0[:, :, 0, 0] = X0 * X0 * lambda_0
+    ETA0[:, :, 0, 1] = X0 * Y0 * lambda_0
+    ETA0[:, :, 1, 0] = ETA0[:, :, 0, 1]
+    ETA0[:, :, 1, 1] = Y0 * Y0 * lambda_0
+    
+    return T + ETA1 + ETA0
 
 # generates an NxN axis-aligned grid with b boxes
 # thickness is the width of each grid line
@@ -44,7 +72,7 @@ def genBoxGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = np.random.normal(0, noise, T.shape) + T
+        T = NoiseGaussianT(T, noise, 0)
         
     return T
     
@@ -85,7 +113,7 @@ def genCircleGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = np.random.normal(0, noise, T.shape) + T
+        T = NoiseGaussianT(T, noise, 0)
         
     return T
 
@@ -116,7 +144,7 @@ def genSpiral3(N, d):
         t = t + dt
         
 
-def genSpiral2T(N, d):
+def genSpiral2T(N, d, noise = 0):
     
     T = np.zeros((N, N, 2, 2)).astype(np.float32)
     
@@ -139,7 +167,7 @@ def genSpiral2T(N, d):
         xi = int(xp)
         yi = int(yp)
         if(xi < 0 or yi < 0 or xi >= N or yi >= N):
-            return T
+            break
         
         
         
@@ -154,18 +182,11 @@ def genSpiral2T(N, d):
         T[yi, xi, 1, 1] = ty * ty
         
         t = t + dt
-
-# adds Gaussian noise to a symmetric second order tensor field        
-def noiseGaussianT(T, sigma):
-
-    xx = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
-    xy = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
-    yy = np.random.normal(0.0, sigma, (T.shape[0], T.shape[1]))
-    T[:, :, 0, 0] = T[:, :, 0, 0] + np.abs(xx)
-    T[:, :, 1, 1] = T[:, :, 1, 1] + np.abs(yy)
-    T[:, :, 0, 1] = T[:, :, 0, 1] + xy
-    T[:, :, 1, 0] = T[:, :, 1, 0] + xy
+        
+    if noise != 0:
+        T = NoiseGaussianT(T, noise, 0)
     return T
+
 
        
 # saves an image stack, assuming the color value is the fastest (last) dimension    
@@ -223,40 +244,39 @@ def savestack(filename, I):
 
 N = 100
 d = 60
-T = genSpiral2T(N, d)
-T = noiseGaussianT(T, 0.3)
+T = genSpiral2T(N, d, 1)
 tv.visualize(T)
 
-V = tv.platevote2(T)
+V = tv.vote2(T)
 plt.figure()
 tv.visualize(V)
 #plt.figure()
 #plt.imshow(T[:, :, 0, 1])
 
 #%%    
-N = 1000
-d = 60
-I = genSpiral3(N, d)
-sigma = 3
-I = sp.ndimage.gaussian_filter(I, (sigma, sigma, sigma))
-I = I * 15
-I[I > 1] = 1
+# N = 1000
+# d = 60
+# I = genSpiral3(N, d)
+# sigma = 3
+# I = sp.ndimage.gaussian_filter(I, (sigma, sigma, sigma))
+# I = I * 15
+# I[I > 1] = 1
 
-# convert the single-channel image into a color image
-c = np.linspace(0, 1, N).astype(np.float32)
-cr = np.linspace(1, 0, N).astype(np.float32)
-R, G, B = np.meshgrid(cr, c, c)
+# # convert the single-channel image into a color image
+# c = np.linspace(0, 1, N).astype(np.float32)
+# cr = np.linspace(1, 0, N).astype(np.float32)
+# R, G, B = np.meshgrid(cr, c, c)
 
-C = np.zeros((N, N, N, 3))
-C[:, :, :, 0] = I * R
-C[:, :, :, 1] = I * G
-C[:, :, :, 2] = I * B
+# C = np.zeros((N, N, N, 3))
+# C[:, :, :, 0] = I * R
+# C[:, :, :, 1] = I * G
+# C[:, :, :, 2] = I * B
 
-plt.imshow(C[60])
-saveColorStack("test", C)
+# plt.imshow(C[60])
+# saveColorStack("test", C)
 
-#T = genSpiral2T(N, 20)
-#B = T #sp.ndimage.gaussian_filter(T, (sigma, sigma, 0, 0))
-#tv.visualize(B)
-#V = tv.vote2(T)
-#tv.visualize(V)
+# #T = genSpiral2T(N, 20)
+# #B = T #sp.ndimage.gaussian_filter(T, (sigma, sigma, 0, 0))
+# #tv.visualize(B)
+# #V = tv.vote2(T)
+# #tv.visualize(V)

@@ -35,8 +35,8 @@ else()
 endif ( MSVC )
 
 
-configure_file(Roboto-Medium.ttf 
-				Roboto-Medium.ttf COPYONLY)
+configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
+configure_file(boxgrid.bmp boxgrid.bmp COPYONLY)
 
 # copy python scripts
 configure_file(structen.py 

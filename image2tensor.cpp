@@ -107,7 +107,8 @@ int main(int argc, char** argv) {
 
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);												// load the input image
-		tira::image<float> grey = I.channel(0);											// get the first channel if this is a color image
+		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
+		grey = grey * (1.0f / 255.0f);
 		tira::field<float> Dx = grey.derivative(1, in_derivative, in_order);			// calculate the derivative along the x axis	
 		tira::field<float> Dy = grey.derivative(0, in_derivative, in_order);			// calculate the derivative along the y axis
 
@@ -166,13 +167,18 @@ int main(int argc, char** argv) {
 			std::cout << "Adding noise...";
 			std::random_device rd{};
 			std::mt19937 gen{ rd() };
-			std::normal_distribution d{ 0.0, (double)in_noise };
+			std::uniform_real_distribution<> d_theta(0, M_PI * 2);
+			std::normal_distribution d_sigma{ 0.0, (double)in_noise };
 
 			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
 				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + abs((float)d(gen));
-					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + abs((float)d(gen));
-					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + (float)d(gen);
+					float theta = d_theta(gen);
+					float x = std::cos(theta);
+					float y = std::sin(theta);
+					float mag = std::abs(d_sigma(gen));
+					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + x * x * mag;
+					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + y * y * mag;
+					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + x * y * mag;
 					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 				}
 			}

@@ -144,8 +144,6 @@ def platevote2(T, sigma=3, sigma2=0):
         #vfx0 = x0 + pad
         for x1 in range(T.shape[1]):
             scale = evals[x0, x1, 0]
-            if(scale < 0):
-                print("negative ev0: " + str(scale))
             S = scale * platefield2(X0, X1, sigma, sigma2)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
