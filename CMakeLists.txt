@@ -32,11 +32,15 @@ if ( MSVC )
 	add_definitions(-D_USE_MATH_DEFINES)
 else()
 	find_package(X11 REQUIRED)
+	set(CMAKE_CXX_FLAGS "-Wall -Wextra")
+	set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+	set(CMAKE_CXX_FLAGS_DEBUG "-g")
 endif ( MSVC )
 
 
 configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
 configure_file(boxgrid.bmp boxgrid.bmp COPYONLY)
+configure_file(circlegrid.bmp circlegrid.bmp COPYONLY)
 configure_file(spiral.npy spiral.npy COPYONLY)
 
 # copy python scripts

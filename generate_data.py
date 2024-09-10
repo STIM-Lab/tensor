@@ -7,7 +7,7 @@ import skimage as ski
 import os
 
 # adds Gaussian noise to a symmetric second order tensor field        
-def NoiseGaussianT(T, sigma1, sigma0 = None):
+def addGaussianT(T, sigma1, sigma0 = None):
     
     if sigma0 is None:
         sigma0 = sigma1
@@ -34,6 +34,25 @@ def NoiseGaussianT(T, sigma1, sigma0 = None):
     ETA0[:, :, 1, 1] = Y0 * Y0 * lambda_0
     
     return T + ETA1 + ETA0
+
+def addShiftT(T, sigmax, sigmay = None):
+    if sigmay is None:
+        sigmay = sigmax
+        
+    x = np.array(range(0, T.shape[0]))
+    y = np.array(range(0, T.shape[1]))
+    X, Y = np.meshgrid(x, y)
+    etaX = np.random.normal(0.0, sigmax, size=(T.shape[0], T.shape[1])).astype(int)
+    etaY = np.random.normal(0.0, sigmay, size=(T.shape[0], T.shape[1])).astype(int)
+    
+    iX = X + etaX
+    iY = Y + etaY
+    iX[iX >= T.shape[0]] = 0
+    iY[iY >= T.shape[1]] = 0
+    iX[iX <= 0] = 0
+    iY[iY <= 0] = 0
+    T_out = T[iX, iY, :, :]
+    return T_out
 
 # generates an NxN axis-aligned grid with b boxes
 # thickness is the width of each grid line
@@ -72,7 +91,7 @@ def genBoxGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = NoiseGaussianT(T, noise, 0)
+        T = addGaussianT(T, noise, 0)
         
     return T
     
@@ -113,7 +132,7 @@ def genCircleGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = NoiseGaussianT(T, noise, 0)
+        T = addGaussianT(T, noise, 0)
         
     return T
 
@@ -173,8 +192,8 @@ def genSpiral2T(N, d, noise = 0):
         
         l = np.sqrt(dx_dt ** 2 + dy_dt ** 2)
         
-        tx = -dy_dt / l
-        ty = dx_dt / l
+        ty = -dy_dt / l
+        tx = dx_dt / l
         
         T[yi, xi, 0, 0] = tx * tx
         T[yi, xi, 0, 1] = tx * ty
@@ -184,7 +203,7 @@ def genSpiral2T(N, d, noise = 0):
         t = t + dt
         
     if noise != 0:
-        T = NoiseGaussianT(T, noise, 0)
+        T = addGaussianT(T, noise, 0)
     return T
 
 
@@ -243,23 +262,33 @@ def savestack(filename, I):
 #         np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
 
 N = 2000
-d = 200
+spiral_size = 200
 sigma = 3
-T = genSpiral2T(N, d, 1)
+noise = 1
+grid_size = 10
+line_width = 1
+
+T = genSpiral2T(N, spiral_size, 0)
 np.save("spiral.npy", T)
+T = addShiftT(T, 3)
+T = addGaussianT(T, 0.2)
+plt.figure()
 tv.visualize(T, glyphs=False)
 
-#V = tv.vote2(T, sigma)
+#V = tv.vote2(T)
 #plt.figure()
-#tv.visualize(V)
-#plt.figure()
-#plt.imshow(T[:, :, 0, 1])
+#tv.visualize(V, glyphs=False)
 
+I = genBoxGrid2(N, grid_size, line_width)
+ski.io.imsave("boxgrid.bmp", I.astype(np.uint8))
+
+I = genCircleGrid2(N, grid_size, line_width)
+ski.io.imsave("circlegrid.bmp", I.astype(np.uint8))
 #%%    
-# N = 1000
+# N = 500
 # d = 60
 # I = genSpiral3(N, d)
-# sigma = 3
+# sigma = 2
 # I = sp.ndimage.gaussian_filter(I, (sigma, sigma, sigma))
 # I = I * 15
 # I[I > 1] = 1

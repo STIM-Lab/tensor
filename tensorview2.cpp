@@ -172,11 +172,25 @@ void GaussianFilter(float sigma) {
             K(ui, vi) = gv * gu;
         }
     }
-
     auto t_start = std::chrono::steady_clock::now();
+
+    /*std::vector<size_t> su = {size, 1, 1};
+    tira::image<float> Ku(su);
+    std::vector<size_t> sv = {1, size, 1};
+    tira::image<float> Kv(sv);
+    for (size_t ui = 0; ui < size; ui++) {
+        float gu = normaldist(start + dx * ui, sigma);
+        Ku(ui, 0) = gu;
+        Kv(0, ui) = gu;
+    }
+    tira::image<glm::mat2> Tx = T0.convolve2(Ku);
+    Tn = Tx.convolve2(Kv);
+    */
+
+
     
-    //Tn = T0.convolve(K);
-    Tn = T0.convolve2(K);
+    Tn = T0.convolve(K);
+    //Tn = T0.convolve2(K);
     auto t_end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = t_end - t_start;
     std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";

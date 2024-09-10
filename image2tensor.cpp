@@ -109,9 +109,12 @@ int main(int argc, char** argv) {
 		tira::image<float> I(in_inputname);												// load the input image
 		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
 		grey = grey * (1.0f / 255.0f);
-		tira::field<float> Dx = grey.derivative(1, in_derivative, in_order);			// calculate the derivative along the x axis	
-		tira::field<float> Dy = grey.derivative(0, in_derivative, in_order);			// calculate the derivative along the y axis
+		grey = grey.border(in_order, 0);
+		tira::image<float> Dx = grey.derivative(1, in_derivative, in_order);			// calculate the derivative along the x axis
+		tira::image<float> Dy = grey.derivative(0, in_derivative, in_order);			// calculate the derivative along the y axis
 
+		Dx = Dx.border_remove(in_order);
+		Dy = Dy.border_remove(in_order);
 		D.push_back(Dx);
 		D.push_back(Dy);
 
