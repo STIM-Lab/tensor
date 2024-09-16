@@ -64,7 +64,7 @@ include_directories(
 add_executable(tensorview2
 				tensorview2.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
-				cudakernels.cu
+				cuda_calls.cu
 )
 
 target_link_libraries(tensorview2

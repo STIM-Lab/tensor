@@ -9,6 +9,7 @@
 //#include "tira/image/tensorfield.h"
 #include "tira/image/colormap.h"
 #include "tira/image.h"
+#include "tira/cuda/cudaGaussianFilter2D.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
@@ -24,6 +25,9 @@
 #include <string>
 #include <stdio.h>
 #include <complex>
+
+glm::mat2* cudaGaussianBlur(glm::mat2* source, size_t width, size_t height, float sigma,
+                            size_t& out_width, size_t& out_height, int deviceID = 0);
 
 // command line arguments
 std::string in_inputname;
@@ -164,27 +168,36 @@ inline float normaldist(float x, float sigma) {
 /// </summary>
 /// <param name="sigma"></param>
 void GaussianFilter(float sigma) {
-    unsigned int size = ceil(sigma * 6);
-    float dx = 1.0f;
-    float start = -(float)(size - 1) / 2.0f;
+    // if a CUDA device is enabled, use a blur kernel
+    if(in_device >=0) {
+        size_t blur_width;
+        size_t blur_height;
+        glm::mat2* blurred = cudaGaussianBlur(T0.data(), T0.X(), T0.Y(), sigma, blur_width, blur_height, in_device);
 
-
-    auto t_start = std::chrono::steady_clock::now();
-    std::vector<size_t> sx = { 1, size, 1 };
-    std::vector<size_t> sy = { size, 1, 1 };
-    tira::image<float> Kx(size, 1);
-    tira::image<float> Ky(1, size);
-    for (size_t i = 0; i < size; i++) {
-        float v = normaldist(start + dx * i, sigma);
-        Kx(i, 0, 0) = v;
-        Ky(0, i, 0) = v;
+        Tn = tira::image<glm::mat2>(blurred, blur_width, blur_height);
     }
-    Tn = T0.convolve2(Kx);
-    Tn = Tn.convolve2(Ky);
+    // otherwise use the CPU
+    else {
+        unsigned int size = ceil(sigma * 6);
+        float dx = 1.0f;
+        float start = -(float)(size - 1) / 2.0f;
+        auto t_start = std::chrono::steady_clock::now();
+        std::vector<size_t> sx = { 1, size, 1 };
+        std::vector<size_t> sy = { size, 1, 1 };
+        tira::image<float> Kx(size, 1);
+        tira::image<float> Ky(1, size);
+        for (size_t i = 0; i < size; i++) {
+            float v = normaldist(start + dx * i, sigma);
+            Kx(i, 0, 0) = v;
+            Ky(0, i, 0) = v;
+        }
+        Tn = T0.convolve2(Kx);
+        Tn = Tn.convolve2(Ky);
 
-    auto t_end = std::chrono::steady_clock::now();
-    std::chrono::duration<double> elapsed_seconds = t_end - t_start;
-    std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
+        auto t_end = std::chrono::steady_clock::now();
+        std::chrono::duration<double> elapsed_seconds = t_end - t_start;
+        std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
+    }
 
 }
 
