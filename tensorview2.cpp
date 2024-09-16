@@ -56,6 +56,7 @@ int DIMENSION;
 float SIGMA = 1;                        // blur kernel size
 float SCALE = 0.3;
 bool BLUR = false;
+float SCALE_FIELD = 1.0f;               // scale factor for the field (for zooming)
 
 tira::glGeometry CMAP_GEOMETRY;
 tira::glMaterial* CMAP_MATERIAL;
@@ -585,8 +586,7 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
-{
+void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
     float x_adjustment = (Viewport[0] - (float)Tn.width()) / 2.0f;
@@ -594,6 +594,11 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn)
     MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
     MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
 }
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    SCALE_FIELD += SCALE_FIELD * (yoffset * 0.25);
+}
+
 
 
 int main(int argc, char** argv) {
@@ -669,6 +674,7 @@ int main(int argc, char** argv) {
     if (FIELD_LOADED) {
         glfwSetCursorPosCallback(window, mouse_callback);
     }
+    glfwSetScrollCallback(window, scroll_callback);
 
     InitUI(window, glsl_version);
     if (glewInit() != GLEW_OK)
@@ -698,15 +704,18 @@ int main(int argc, char** argv) {
 
         glClear(GL_COLOR_BUFFER_BIT);                               // clear the Viewport using the clear color
 
+        // if a tensor field is loaded
         if (FIELD_LOADED) {
 
             
             FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
             glm::mat4 Mview = glm::ortho(-Viewport[0] / 2.0f, Viewport[0] / 2.0f, -Viewport[1] / 2.0f, Viewport[1] / 2.0f);   // create a view matrix
 
+            // if the user is visualizing a scalar component of the tensor field as a color map
             if (SCALARTYPE != ScalarType::NoScalar) {
 
-                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3((float)Tn.width(), (float)Tn.height(), 1.0f));     // compose the scale matrix from the width and height of the tensor field
+                glm::vec3 scale(SCALE_FIELD * (float)Tn.width(), SCALE_FIELD * (float)Tn.height(), 1.0f);
+                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), scale);                                                      // compose the scale matrix from the width and height of the tensor field
                 glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
                 glm::mat4 M = Mview * Mtrans * Mscale;                                                                      // create the transformation matrix
                 CMAP_MATERIAL->Begin();                                                                                     // begin using the scalar colormap material
@@ -716,6 +725,7 @@ int main(int argc, char** argv) {
                 CMAP_GEOMETRY.Draw();                                                                                       // draw the rectangle
                 CMAP_MATERIAL->End();                                                                                       // stop using the material
             }
+            // if the user is rendering glyphs
             if (RENDER_GLYPHS) {
                 tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
                 GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
