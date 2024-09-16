@@ -37,26 +37,22 @@ else()
 	set(CMAKE_CXX_FLAGS_DEBUG "-g")
 endif ( MSVC )
 
+execute_process(COMMAND python generate_data.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 
 configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
-configure_file(boxgrid.bmp boxgrid.bmp COPYONLY)
-configure_file(circlegrid.bmp circlegrid.bmp COPYONLY)
-configure_file(spiral.npy spiral.npy COPYONLY)
 
 # copy python scripts
 configure_file(structen.py 
 				structen.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
+configure_file(gendata.py 
+				gendata.py COPYONLY)
 
 # shell scripts
 configure_file(tensorvote.sh
 				tensorvote.sh COPYONLY)
-
-
-# copy the script to generate example data sets
-configure_file(generate_data.py 
-				generate_data.py COPYONLY)
 				
 #set the include directories
 include_directories(
