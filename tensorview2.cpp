@@ -29,6 +29,7 @@
 std::string in_inputname;
 std::string in_l0_outputname;
 float in_blur_strength;
+int in_device;                              // CUDA device ID
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
@@ -76,17 +77,20 @@ enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Ten
 int SCALARTYPE = ScalarType::EVal0;
 bool RENDER_GLYPHS = false;
 
-void FitRectangleToWindow(float rect_width, float rect_height, float window_width, float window_height, float& viewport_width, float& viewport_height) {
+// Calculate the viewport width and height in field pixels given the size of the field and window
+void FitRectangleToWindow(float field_width_pixels, float field_height_pixels, 
+                          float window_width, float window_height, float scale,
+                          float& viewport_width, float& viewport_height) {
  
     float display_aspect = window_width / window_height;
-    float image_aspect = rect_width / rect_height;
+    float image_aspect = field_width_pixels / field_height_pixels;
     if (image_aspect > display_aspect) {
-        viewport_width = rect_width;
-        viewport_height = rect_width / display_aspect;
+        viewport_width = field_width_pixels / scale;
+        viewport_height = field_width_pixels / display_aspect / scale;
     }
     else {
-        viewport_height = rect_height;
-        viewport_width = rect_height * display_aspect;
+        viewport_height = field_height_pixels / scale;
+        viewport_width = field_height_pixels * display_aspect / scale;
     }
 }
 
@@ -164,34 +168,20 @@ void GaussianFilter(float sigma) {
     float dx = 1.0f;
     float start = -(float)(size - 1) / 2.0f;
 
-    std::vector<size_t> s = {size, size, 1};
-    tira::image<float> K(s);
-    for (size_t vi = 0; vi < size; vi++) {
-        float gv = normaldist(start + dx * vi, sigma);
-        for (size_t ui = 0; ui < size; ui++) {
-            float gu = normaldist(start + dx * ui, sigma);
-            K(ui, vi) = gv * gu;
-        }
-    }
+
     auto t_start = std::chrono::steady_clock::now();
-
-    /*std::vector<size_t> su = {size, 1, 1};
-    tira::image<float> Ku(su);
-    std::vector<size_t> sv = {1, size, 1};
-    tira::image<float> Kv(sv);
-    for (size_t ui = 0; ui < size; ui++) {
-        float gu = normaldist(start + dx * ui, sigma);
-        Ku(ui, 0) = gu;
-        Kv(0, ui) = gu;
+    std::vector<size_t> sx = { 1, size, 1 };
+    std::vector<size_t> sy = { size, 1, 1 };
+    tira::image<float> Kx(size, 1);
+    tira::image<float> Ky(1, size);
+    for (size_t i = 0; i < size; i++) {
+        float v = normaldist(start + dx * i, sigma);
+        Kx(i, 0, 0) = v;
+        Ky(0, i, 0) = v;
     }
-    tira::image<glm::mat2> Tx = T0.convolve2(Ku);
-    Tn = Tx.convolve2(Kv);
-    */
+    Tn = T0.convolve2(Kx);
+    Tn = Tn.convolve2(Ky);
 
-
-    
-    Tn = T0.convolve(K);
-    //Tn = T0.convolve2(K);
     auto t_end = std::chrono::steady_clock::now();
     std::chrono::duration<double> elapsed_seconds = t_end - t_start;
     std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
@@ -435,6 +425,7 @@ void RenderUI() {
     RenderFieldSpecs();
 
     // select scalar component
+    if (ImGui::Button("Reset View")) SCALE_FIELD = 1.0f;
     ImGui::RadioButton("None", &SCALARTYPE, (int)ScalarType::NoScalar);
     if (ImGui::RadioButton("[0, 0] = dxdx", &SCALARTYPE, (int)ScalarType::Tensor00)) {
         ScalarRefresh();
@@ -608,6 +599,7 @@ int main(int argc, char** argv) {
         ("nogui", "do not provide a user interface (only files are saved)")
         ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the largest eigenvector")
         ("blur", boost::program_options::value<float>(&in_blur_strength), "sigma for gaussian blur")
+        ("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
 
@@ -708,13 +700,14 @@ int main(int argc, char** argv) {
         if (FIELD_LOADED) {
 
             
-            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
-            glm::mat4 Mview = glm::ortho(-Viewport[0] / 2.0f, Viewport[0] / 2.0f, -Viewport[1] / 2.0f, Viewport[1] / 2.0f);   // create a view matrix
+            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
+            float view_extent[2] = { Viewport[0] / (2.0), Viewport[1] / (2.0) };
+            glm::mat4 Mview = glm::ortho(-view_extent[0], view_extent[0], -view_extent[1], view_extent[1]);   // create a view matrix
 
             // if the user is visualizing a scalar component of the tensor field as a color map
             if (SCALARTYPE != ScalarType::NoScalar) {
 
-                glm::vec3 scale(SCALE_FIELD * (float)Tn.width(), SCALE_FIELD * (float)Tn.height(), 1.0f);
+                glm::vec3 scale((float)Tn.width(), (float)Tn.height(), 1.0f);
                 glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), scale);                                                      // compose the scale matrix from the width and height of the tensor field
                 glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
                 glm::mat4 M = Mview * Mtrans * Mscale;                                                                      // create the transformation matrix

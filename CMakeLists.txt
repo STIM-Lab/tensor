@@ -17,7 +17,6 @@ find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
 find_package(Eigen3 REQUIRED)
-set(Boost_NO_WARN_NEW_VERSIONS 1)
 find_package(Boost REQUIRED COMPONENTS program_options)
 
 
@@ -37,8 +36,6 @@ else()
 	set(CMAKE_CXX_FLAGS_DEBUG "-g")
 endif ( MSVC )
 
-execute_process(COMMAND python generate_data.py
-    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR})
 
 configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
 
@@ -67,6 +64,7 @@ include_directories(
 add_executable(tensorview2
 				tensorview2.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
+				cudakernels.cu
 )
 
 target_link_libraries(tensorview2

@@ -269,11 +269,9 @@ grid_size = 10
 line_width = 1
 
 T = genSpiral2T(N, spiral_size, 0)
-np.save("spiral.npy", T)
 T = addShiftT(T, 3)
 T = addGaussianT(T, 0.2)
-plt.figure()
-tv.visualize(T, glyphs=False)
+np.save("spiral.npy", T)
 
 #V = tv.vote2(T)
 #plt.figure()
