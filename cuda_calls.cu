@@ -8,7 +8,7 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
     cudaSetDevice(deviceID);
-    glm::mat2* dest = GaussianFilter2D_cpu<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
+    glm::mat2* dest = GaussianFilter2D<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
 
     return dest;
 }
