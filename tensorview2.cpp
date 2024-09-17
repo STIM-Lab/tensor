@@ -26,8 +26,8 @@
 #include <stdio.h>
 #include <complex>
 
-glm::mat2* cudaGaussianBlur(glm::mat2* source, size_t width, size_t height, float sigma,
-                            size_t& out_width, size_t& out_height, int deviceID = 0);
+glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+                            unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
 // command line arguments
 std::string in_inputname;
@@ -170,8 +170,8 @@ inline float normaldist(float x, float sigma) {
 void GaussianFilter(float sigma) {
     // if a CUDA device is enabled, use a blur kernel
     if(in_device >=0) {
-        size_t blur_width;
-        size_t blur_height;
+        unsigned int blur_width;
+        unsigned int blur_height;
         glm::mat2* blurred = cudaGaussianBlur(T0.data(), T0.X(), T0.Y(), sigma, blur_width, blur_height, in_device);
 
         Tn = tira::image<glm::mat2>(blurred, blur_width, blur_height);
