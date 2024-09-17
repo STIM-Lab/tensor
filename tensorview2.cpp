@@ -9,7 +9,6 @@
 //#include "tira/image/tensorfield.h"
 #include "tira/image/colormap.h"
 #include "tira/image.h"
-#include "tira/cuda/cudaGaussianFilter2D.h"
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
