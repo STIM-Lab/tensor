@@ -28,6 +28,9 @@
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
+void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
+void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
+
 // command line arguments
 std::string in_inputname;
 std::string in_l0_outputname;
@@ -227,14 +230,22 @@ void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
 void ScalarFrom_Eval(unsigned int i) {
 
     SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
-    //float* npy_data = NPY.data<float>();                        // get the raw data from the tensor field
 
-    float t, d;
-    for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
-        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            SCALAR(xi, yi) = Eigenvalue2D(xi, yi, i);
+    if (in_device < 0) {                                    // if there is no CUDA device, use the CPU
+        float t, d;
+        for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
+            for (int xi = 0; xi < Tn.shape()[1]; xi++) {
+                SCALAR(xi, yi) = Eigenvalue2D(xi, yi, i);
+            }
         }
     }
+    else {                                                  // otherwise use the CUDA device to calculate the eigenvalue
+        if (i == 0)
+            cudaEigenvalue0((float*)Tn.data(), Tn.shape()[0] * Tn.shape()[1], SCALAR.data());
+        else
+            cudaEigenvalue1((float*)Tn.data(), Tn.shape()[0] * Tn.shape()[1], SCALAR.data());
+    }
+
     // update texture
     MAXVAL = SCALAR.maxv();
     MINVAL = SCALAR.minv();
@@ -713,7 +724,7 @@ int main(int argc, char** argv) {
 
             
             FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
-            float view_extent[2] = { Viewport[0] / (2.0), Viewport[1] / (2.0) };
+            float view_extent[2] = { Viewport[0] / (2.0f), Viewport[1] / (2.0f) };
             glm::mat4 Mview = glm::ortho(-view_extent[0], view_extent[0], -view_extent[1], view_extent[1]);   // create a view matrix
 
             // if the user is visualizing a scalar component of the tensor field as a color map
