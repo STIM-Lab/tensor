@@ -1,6 +1,10 @@
 #Specify the version being used as well as the language
-cmake_minimum_required(VERSION 3.29)
-cmake_policy(VERSION 3.29)
+cmake_minimum_required(VERSION 3.30)
+cmake_policy(VERSION 3.30)
+
+if(POLICY CMP0167)
+   cmake_policy(SET CMP0167 OLD)
+endif()
 
 #Name your project here
 project(tensor LANGUAGES CXX CUDA)
@@ -18,6 +22,7 @@ find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
+#find_package(Boost CONFIG)
 
 
 #build the executable in the binary directory on MS Visual Studio
