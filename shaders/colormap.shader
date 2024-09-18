@@ -26,10 +26,11 @@ in vec2 vertex_texcoord;
 
 uniform float maxval;
 uniform float minval;
-uniform sampler2D scalar;
+uniform sampler2D mapped_image;
 
 void main() {
 	//color = vec4(1.0, 0.0, 0.0, 1.0);
-	color = (texture(scalar, vertex_texcoord) - minval) / (maxval - minval);
+	//color = (texture(scalar, vertex_texcoord) - minval) / (maxval - minval);
+	color = texture(mapped_image, vertex_texcoord);
 };
 )"

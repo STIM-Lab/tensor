@@ -1,6 +1,6 @@
 #Specify the version being used as well as the language
-cmake_minimum_required(VERSION 3.30)
-cmake_policy(VERSION 3.30)
+cmake_minimum_required(VERSION 3.29)
+cmake_policy(VERSION 3.29)
 
 if(POLICY CMP0167)
    cmake_policy(SET CMP0167 OLD)

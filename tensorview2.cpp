@@ -30,10 +30,15 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 
 void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
+float* cudaEigenvalues(float* tensors, unsigned int n);
+float* cudaEigenvectors(float* tensors, float* evals, unsigned int n);
 
 // command line arguments
 std::string in_inputname;
 std::string in_l0_outputname;
+std::string in_l1_outputname;
+std::string in_v0_outputname;
+std::string in_v1_outputname;
 float in_blur_strength;
 int in_device;                              // CUDA device ID
 
@@ -51,9 +56,13 @@ const std::string glyph_shader_string =
 ;
 
 // TENSOR FIELD DATA
+tira::image<glm::mat2> T0;              // initial tensor field passed to the visualization program
+tira::image<glm::mat2> Tn;              // current tensor field being rendered (after processing)
 
-tira::image<glm::mat2> T0;
-tira::image<glm::mat2> Tn;
+// TENSOR FIELD DERIVATIVES
+tira::image<float> Ln;                  // eigenvalues of the current tensor field
+tira::image<float> THETAn;          // eigenvectors of the current tensor field (in polar coordinates)
+
 tira::image<float> SCALAR;
 bool FIELD_LOADED = false;
 
@@ -79,8 +88,8 @@ float Viewport[2];
 
 const char* FileName = "";
 
-enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor02, Tensor11, Tensor12, Tensor22, EVal0, EVal1, EVal2, EVec0x, EVec0y, EVec1x, EVec1y, Eccentricity};
-int SCALARTYPE = ScalarType::EVal0;
+enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity};
+int SCALARTYPE = ScalarType::EVal1;
 bool RENDER_GLYPHS = false;
 
 // Calculate the viewport width and height in field pixels given the size of the field and window
@@ -100,9 +109,40 @@ void FitRectangleToWindow(float field_width_pixels, float field_height_pixels,
     }
 }
 
+tira::image<float> CalculateEccentricity() {
+    tira::image<float> result(Tn.shape()[1], Tn.shape()[0]);
+
+    for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
+        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
+            float l0 = Ln(xi, yi, 0);
+            float l1 = Ln(xi, yi, 1);
+            if (l0 == 0.0f)
+                result(xi, yi) = 0.0f;
+            else
+                result(xi, yi) = sqrt(1.0f - (l0 * l0) / (l1 * l1));
+        }
+    }
+    return result;
+}
+
+/// <summary>
+/// Update the field eigenvectors and eigenvalues
+/// </summary>
+void UpdateEigens() {
+    float* eigenvalues_raw = cudaEigenvalues((float*)Tn.data(), Tn.X() * Tn.Y());
+    Ln = tira::image<float>(eigenvalues_raw, Tn.X(), Tn.Y(), 2);
+    float* eigenvectors_raw = cudaEigenvectors((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y());
+    THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
+    free(eigenvalues_raw);
+    free(eigenvectors_raw);
+
+
+}
+
 void LoadTensorField(std::string filename) {
     T0.load_npy<float>(filename);
     Tn = T0;
+    UpdateEigens();
     FIELD_LOADED = true;
 }
 
@@ -177,13 +217,13 @@ void GaussianFilter(float sigma) {
         glm::mat2* blurred = cudaGaussianBlur(T0.data(), T0.X(), T0.Y(), sigma, blur_width, blur_height, in_device);
 
         Tn = tira::image<glm::mat2>(blurred, blur_width, blur_height);
+        free(blurred);
     }
     // otherwise use the CPU
     else {
         unsigned int size = ceil(sigma * 6);
         float dx = 1.0f;
         float start = -(float)(size - 1) / 2.0f;
-        auto t_start = std::chrono::steady_clock::now();
         std::vector<size_t> sx = { 1, size, 1 };
         std::vector<size_t> sy = { size, 1, 1 };
         tira::image<float> Kx(size, 1);
@@ -195,14 +235,42 @@ void GaussianFilter(float sigma) {
         }
         Tn = T0.convolve2(Kx);
         Tn = Tn.convolve2(Ky);
-
-        auto t_end = std::chrono::steady_clock::now();
-        std::chrono::duration<double> elapsed_seconds = t_end - t_start;
-        std::cout << "elapsed time: " << elapsed_seconds.count() << "s\n";
     }
+
+    UpdateEigens();                                     // update the field eigendecomposition
 
 }
 
+tira::image<unsigned char> ColormapTensor(unsigned int row, unsigned int col) {
+    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);
+    float val;
+    for (int yi = 0; yi < Tn.shape()[0]; yi++) {
+        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
+            val = Timg(xi, yi, row, col);
+            SCALAR(xi, yi, 0) = val;
+        }
+    }
+    float maxmag = std::max(std::abs(SCALAR.maxv()), std::abs(SCALAR.minv()));  // calculate the highest magnitude scalar value
+    MAXVAL = maxmag;
+    MINVAL = -maxmag;
+    tira::image<unsigned char> C = SCALAR.cmap(MINVAL, MAXVAL, ColorMap::Brewer);
+    return C;
+}
+
+tira::image<unsigned char> ColormapEval(unsigned int i) {
+    tira::image<unsigned char> C = Ln.channel(i).cmap(ColorMap::Magma);
+    return C;
+}
+
+tira::image<unsigned char> ColormapEvec(unsigned int i) {
+
+    tira::image<float> AngleColor = THETAn.channel(i).cmap(-std::numbers::pi, std::numbers::pi, ColorMap::RainbowCycle);
+    tira::image<float> White(AngleColor.X(), AngleColor.Y(), AngleColor.C());
+    White = 255;
+    tira::image<float> eccentricity = CalculateEccentricity();
+    tira::image<unsigned char> C = AngleColor * eccentricity + (-eccentricity + 1) * White;
+    return C;
+}
 /// <summary>
 /// Create a scalar image from the specified tensor component
 /// </summary>
@@ -218,9 +286,10 @@ void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
             SCALAR(xi, yi, 0) = val;
         }
     }
-    MAXVAL = SCALAR.maxv();
-    MINVAL = SCALAR.minv();
-    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+
+    tira::image<unsigned char> C = ColormapTensor(u, v);
+
+    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
 }
 
 /// <summary>
@@ -229,30 +298,17 @@ void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
 /// <param name="i"></param>
 void ScalarFrom_Eval(unsigned int i) {
 
-    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
-
-    if (in_device < 0) {                                    // if there is no CUDA device, use the CPU
-        float t, d;
-        for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
-            for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-                SCALAR(xi, yi) = Eigenvalue2D(xi, yi, i);
-            }
-        }
-    }
-    else {                                                  // otherwise use the CUDA device to calculate the eigenvalue
-        if (i == 0)
-            cudaEigenvalue0((float*)Tn.data(), Tn.shape()[0] * Tn.shape()[1], SCALAR.data());
-        else
-            cudaEigenvalue1((float*)Tn.data(), Tn.shape()[0] * Tn.shape()[1], SCALAR.data());
-    }
+    SCALAR = Ln.channel(i);
 
     // update texture
     MAXVAL = SCALAR.maxv();
     MINVAL = SCALAR.minv();
     if (CMAP_MATERIAL) {
-        CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+        tira::image<unsigned char> C = ColormapEval(i);
+        CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
     }
 }
+
 
 /// <summary>
 /// Create a scalar image from the specified eigenvalue
@@ -261,23 +317,24 @@ void ScalarFrom_Eval(unsigned int i) {
 void ScalarFrom_Eccentricity() {
 
     SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
-    //float* npy_data = NPY.data<float>();                        // get the raw data from the tensor field
 
     float t, d;
     for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
         for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            float l0 = Eigenvalue2D(xi, yi, 0);
-            float l1 = Eigenvalue2D(xi, yi, 1);
+            float l0 = Ln(xi, yi, 0);
+            float l1 = Ln(xi, yi, 1);
             if (l0 == 0.0f)
                 SCALAR(xi, yi) = 0.0f;
             else
-                SCALAR(xi, yi) = sqrt(1.0f - (l1 * l1) / (l0 * l0));
+                SCALAR(xi, yi) = sqrt(1.0f - (l0 * l0) / (l1 * l1));
             //img(xi, yi) = sqrt((l0 * l0) - (l1 * l1));
         }
     }
     // update texture
-    MAXVAL = SCALAR.maxv();
-    MINVAL = SCALAR.minv();
+    //MAXVAL = SCALAR.maxv();
+    //MINVAL = SCALAR.minv();
+    MAXVAL = 1.0f;
+    MINVAL = 0.0f;
     CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
 }
 
@@ -285,21 +342,13 @@ void ScalarFrom_Eccentricity() {
 /// Create a scalar image from the specified eigenvector and component
 /// </summary>
 /// <param name="i"></param>
-void ScalarFrom_Evec(unsigned int i, unsigned int component) {
+void ScalarFrom_Evec(unsigned int i) {
 
-    SCALAR = tira::image<float>(Tn.width(), Tn.height(), 1);      // allocate a scalar image
+    SCALAR = THETAn.channel(i);
 
-    float t, d;
-    for (int yi = 0; yi < Tn.height(); yi++) {                                     // for each tensor in the field
-        for (int xi = 0; xi < Tn.width(); xi++) {
-            glm::vec2 evec = Eigenvector2D(xi, yi, i);
-            SCALAR(xi, yi) = evec[component];
-        }
-    }
-    // update texture
-    MAXVAL = SCALAR.maxv();
-    MINVAL = SCALAR.minv();
-    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    tira::image<unsigned char> C = ColormapEvec(i);
+
+    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
 }
 
 
@@ -369,20 +418,11 @@ void ScalarRefresh() {
     case ScalarType::EVal1:
         ScalarFrom_Eval(1);
         break;
-    case ScalarType::EVal2:
-        ScalarFrom_Eval(2);
+    case ScalarType::EVec0:
+        ScalarFrom_Evec(0);
         break;
-    case ScalarType::EVec0x:
-        ScalarFrom_Evec(0, 0);
-        break;
-    case ScalarType::EVec0y:
-        ScalarFrom_Evec(0, 1);
-        break;
-    case ScalarType::EVec1x:
-        ScalarFrom_Evec(1, 0);
-        break;
-    case ScalarType::EVec1y:
-        ScalarFrom_Evec(1, 1);
+    case ScalarType::EVec1:
+        ScalarFrom_Evec(1);
         break;
     case ScalarType::Tensor00:
         ScalarFrom_TensorElement2D(0, 0);
@@ -467,19 +507,12 @@ void RenderUI() {
     if (ImGui::RadioButton("lambda 1", &SCALARTYPE, (int)ScalarType::EVal1)) {
         ScalarRefresh();
     }
-    if (ImGui::RadioButton("evec 0 (x)", &SCALARTYPE, (int)ScalarType::EVec0x)) {
+    if (ImGui::RadioButton("evec 0 (theta)", &SCALARTYPE, (int)ScalarType::EVec0)) {
         ScalarRefresh();
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("evec 0 (y)", &SCALARTYPE, (int)ScalarType::EVec0y)) {
+    if (ImGui::RadioButton("evec 1 (theta)", &SCALARTYPE, (int)ScalarType::EVec1)) {
         ScalarRefresh();
-    }
-    if (ImGui::RadioButton("evec 1 (x)", &SCALARTYPE, (int)ScalarType::EVec1x)) {
-        ScalarRefresh();
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("evec 1 (y)", &SCALARTYPE, (int)ScalarType::EVec1y)) {
-        ScalarFrom_Evec(1, 1);
     }
     if (ImGui::RadioButton("eccentricity", &SCALARTYPE, (int)ScalarType::Eccentricity)) {
         ScalarFrom_Eccentricity();
@@ -494,6 +527,7 @@ void RenderUI() {
         }
         else {
             Tn = T0;
+            UpdateEigens();
         }
         ScalarRefresh();
     }
@@ -620,7 +654,10 @@ int main(int argc, char** argv) {
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
         ("nogui", "do not provide a user interface (only files are saved)")
-        ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the largest eigenvector")
+        ("l0", boost::program_options::value<std::string>(&in_l0_outputname), "color map image file for the smallest eigenvalue")
+        ("l1", boost::program_options::value<std::string>(&in_l1_outputname), "color map image file for the largest eigenvalue")
+        ("v0", boost::program_options::value<std::string>(&in_v0_outputname), "color map image file for the smallest eigenvector")
+        ("v1", boost::program_options::value<std::string>(&in_v1_outputname), "color map image file for the largest eigenvector")
         ("blur", boost::program_options::value<float>(&in_blur_strength), "sigma for gaussian blur")
         ("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
         ("help", "produce help message");
@@ -639,6 +676,29 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // Load the tensor field if it is provided as a command-line argument
+    if (vm.count("input")) {
+        LoadTensorField(in_inputname);
+        FileName = in_inputname.c_str();
+        GLYPH_ROWS = Tn.shape()[0];
+    }
+    else {
+    }
+
+    if(FIELD_LOADED) {
+        if (vm.count("blur")) {
+            GaussianFilter(in_blur_strength);
+        }
+        if (vm.count("l0")) ColormapEval(0).save(in_l0_outputname);
+        if (vm.count("l1")) ColormapEval(1).save(in_l1_outputname);
+        if (vm.count("v0")) ColormapEvec(0).save(in_v0_outputname);
+        if (vm.count("v1")) ColormapEvec(1).save(in_v1_outputname);
+
+        if (vm.count("nogui")) {
+            return 0;
+        }
+    }
+
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
@@ -649,37 +709,7 @@ int main(int argc, char** argv) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
 
-	//std::cout << "https://people.math.harvard.edu/~knill/teaching/math21b2004/exhibits/2dmatrices/index.html" << std::endl;
-    // Load the tensor field if it is provided as a command-line argument
-    if (vm.count("input")) {
-        LoadTensorField(in_inputname);
-        FileName = in_inputname.c_str();
-        GLYPH_ROWS = Tn.shape()[0];
-    }
-    else {
-    }
 
-    if (vm.count("blur")) {
-        SIGMA = in_blur_strength;
-        bool temp = BLUR;
-        BLUR = true;
-        GaussianFilter(SIGMA);
-        ScalarRefresh();
-        BLUR = temp;
-    }
-    if (vm.count("l0")) {
-        int old = SCALARTYPE;
-        SCALARTYPE = ScalarType::EVal0;
-        ScalarRefresh();
-        tira::image<unsigned char> C = SCALAR.cmap(ColorMap::Magma);
-        
-        C.save(in_l0_outputname);
-        SCALARTYPE = old;
-    }
-    
-    if (vm.count("nogui")) {
-        return 0;
-    }
     // Create window with graphics context
     window = glfwCreateWindow(1600, 1200, "ImGui GLFW+OpenGL3 Hello World Program", NULL, NULL);
     if (window == NULL)
@@ -735,8 +765,8 @@ int main(int argc, char** argv) {
                 glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
                 glm::mat4 M = Mview * Mtrans * Mscale;                                                                      // create the transformation matrix
                 CMAP_MATERIAL->Begin();                                                                                     // begin using the scalar colormap material
-                CMAP_MATERIAL->SetUniform1f("maxval", MAXVAL);                                                              // pass the max and min values so that the color map can be scaled
-                CMAP_MATERIAL->SetUniform1f("minval", MINVAL);
+                //CMAP_MATERIAL->SetUniform1f("maxval", MAXVAL);                                                              // pass the max and min values so that the color map can be scaled
+                //CMAP_MATERIAL->SetUniform1f("minval", MINVAL);
                 CMAP_MATERIAL->SetUniformMat4f("Mview", M);                                                                 // pass the transformation matrix as a uniform
                 CMAP_GEOMETRY.Draw();                                                                                       // draw the rectangle
                 CMAP_MATERIAL->End();                                                                                       // stop using the material
