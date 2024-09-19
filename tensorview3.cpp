@@ -4,6 +4,7 @@
 
 #include "tira/graphics_gl.h"
 #include "tira/volume.h"
+#include "volumetric.h"
 #include "gui.h"
 #include <glm/gtc/quaternion.hpp>
 #include <boost/program_options.hpp>
@@ -22,7 +23,7 @@ double xprev, yprev;
 size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
-tira::volume<glm::mat3> T;								// 3D tensor field (3x3)
+tira::volumetric<glm::mat3> T;								// 3D tensor field (3x3)
 tira::volume<unsigned char> I;							// 3D raw image volume
 int gui_VolumeSize[] = { 0, 0, 0 };
 float gui_PixelSize[] = { 1.0f, 1.0f, 1.0f };
@@ -52,7 +53,7 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 	if (dragging) {
 		double dx = xpos - xprev;
 		double dy = ypos - yprev;
-		camera.OrbitFocus(-dx * ANGLE_SCALE, dy * ANGLE_SCALE);
+		camera.orbit(-dx * ANGLE_SCALE, dy * ANGLE_SCALE);
 		xprev = xpos;
 		yprev = ypos;
 	}
@@ -105,9 +106,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void resetPlane(float frame) {
 	// Reset camera view to initial state
-	camera.setPosition(glm::vec3(0, 0, 0));
-	camera.LookAt(glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-	camera.setFOV(60);
+	camera.position(glm::vec3(0, 0, 0));
+	camera.lookat(glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+	camera.fov(60.f);
 
 	move[1] = 0.0f;
 	move[0] = 0.0f;
@@ -195,7 +196,6 @@ tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
 void LoadTensorField3(std::string npy_filename, tira::glMaterial& shader) {
 	// Load the tensor field
 	T.load_npy<float>(npy_filename);
-
 	// Separate the diagonal and off-diagonal elements to be sent off to GPU as RGB volume texture-maps
 	tira::volume<float> diagonal_elem = GetDiagValues(T);
 	tira::volume<float> triangular_elem = GetOffDiagValues(T);
@@ -214,7 +214,7 @@ void LoadVolume3(std::string npy_filename, tira::glMaterial& material) {
 	I.load_npy(npy_filename);
 
 	material.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
-
+	
 	// save everything how it's supposed to be saved for rendering
 	VOLUME_LOADED = true;
 }
@@ -303,6 +303,9 @@ int main(int argc, char** argv) {
 			LoadTensorField3(TensorFileName, shader);								// Load the tensor field and set the texture-map
 			OPEN_TENSOR = false;
 			std::cout << "Tensor loaded successfully\n" << std::endl;
+			std::cout << T.X() << ", " << T.Y() << ", " << T.Z() << std::endl;
+			std::cout << T.dx() << ", " << T.dy() << ", " << T.dz() << std::endl;
+			std::cout << T.sx() << ", " << T.sy() << ", " << T.sz() << std::endl;
 		}
 		// If the load command for volume is from ImGui file dialog
 		if (OPEN_VOLUME) {
@@ -316,8 +319,9 @@ int main(int argc, char** argv) {
 			gui_VolumeSize[0] = T.sx();
 			gui_VolumeSize[1] = T.sy();
 			gui_VolumeSize[2] = T.sz();
-
-			T.set_size((double)gui_PixelSize[0], (double)gui_PixelSize[1], (double)gui_PixelSize[2]);
+			
+			T.set_spacing((double)gui_PixelSize[0], (double)gui_PixelSize[1], (double)gui_PixelSize[2]);
+			
 			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
 
 			// Reset the visualization to initial state if reset button is pushed
@@ -336,10 +340,10 @@ int main(int argc, char** argv) {
 					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
 			}
 
-			Mview = camera.getMatrix();						// generate a view matrix from the camera
+			Mview = camera.matrix();						// generate a view matrix from the camera
 		}
 
-
+		
 		glViewport(0, 0, display_w, display_h);									// specifies the area of the window where OpenGL can render
 
 		glClearColor(0, 0, 0, 0);
