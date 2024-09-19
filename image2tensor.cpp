@@ -108,30 +108,69 @@ int main(int argc, char** argv) {
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);												// load the input image
 		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
-		grey = grey * (1.0f / 255.0f);
+		grey = grey / 255.0f;
 		grey = grey.border(in_order, 0);
-		tira::image<float> Dx = grey.derivative(1, in_derivative, in_order);			// calculate the derivative along the x axis
-		tira::image<float> Dy = grey.derivative(0, in_derivative, in_order);			// calculate the derivative along the y axis
 
-		Dx = Dx.border_remove(in_order);
-		Dy = Dy.border_remove(in_order);
-		D.push_back(Dx);
-		D.push_back(Dy);
+		tira::field<float> ST;
+		std::vector<size_t> field_shape;
+		if (in_derivative == 1) {
+			tira::image<float> Dx = grey.derivative(1, 1, in_order);			// calculate the derivative along the x axis
+			tira::image<float> Dy = grey.derivative(0, 1, in_order);			// calculate the derivative along the y axis
 
-		std::vector<size_t> field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
-		tira::field<float> ST(field_shape);
+			Dx = Dx.border_remove(in_order);
+			Dy = Dy.border_remove(in_order);
+			D.push_back(Dx);
+			D.push_back(Dy);
 
-		std::cout << "Generating tensor field...";
-		// build the tensor field
-		for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
-			for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-				ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 });
-				ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 });
-				ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 });
-				ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+			field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
+			ST = tira::field<float>(field_shape);
+
+			std::cout << "Generating tensor field...";
+			// build the tensor field
+			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
+				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
+					ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 });
+					ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 });
+					ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 });
+					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+				}
 			}
+			std::cout << "done." << std::endl;
 		}
-		std::cout << "done." << std::endl;
+		else if (in_derivative == 2) {
+
+			tira::image<float> D2x2 = grey.derivative(1, 2, in_order);			// calculate the derivative along the x axis
+			tira::image<float> D2y2 = grey.derivative(0, 2, in_order);			// calculate the derivative along the y axis
+			tira::image<float> Dx = grey.derivative(1, 1, in_order);
+			tira::image<float> Dxy = Dx.derivative(0, 1, in_order);
+
+			D2x2 = D2x2.border_remove(in_order);
+			D2y2 = D2y2.border_remove(in_order);
+			Dxy = Dxy.border_remove(in_order);
+			D.push_back(D2x2);
+			D.push_back(D2y2);
+			D.push_back(Dxy);
+
+			field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
+			ST = tira::field<float>(field_shape);
+
+			std::cout << "Generating tensor field...";
+			// build the tensor field
+			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
+				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
+					ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 });
+					ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 });
+					ST({ x0, x1, 0, 1 }) = D[2]({ x0, x1 });
+					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+				}
+			}
+			std::cout << "done." << std::endl;
+
+		}
+		else {
+			std::cout << "Only 1st and 2nd order derivatives are supported." << std::endl;
+			exit(1);
+		}
 
 		if (in_sigma > 0) {
 			std::cout << "Blurring tensor field (axis 0)...";
@@ -173,11 +212,22 @@ int main(int argc, char** argv) {
 					float theta = d_theta(gen);
 					float x = std::cos(theta);
 					float y = std::sin(theta);
-					float mag0 = std::abs(d_sigma(gen));
-					float mag1 = std::abs(d_sigma(gen));
-					float N00 = ((x * x * mag0) + (y * y * mag1)) / 2.0f;
-					float N11 = ((y * y * mag0) + (x * x * mag1)) / 2.0f;
-					float N01 = ((x * y * mag0) + ((-y) * x * mag1)) / 2.0f;
+					float N00, N01, N11;
+					if(in_derivative == 1) {
+						float mag0 = std::abs(d_sigma(gen));
+						float mag1 = std::abs(d_sigma(gen));
+						N00 = ((x * x * mag0) + (y * y * mag1)) / 2.0f;
+						N11 = ((y * y * mag0) + (x * x * mag1)) / 2.0f;
+						N01 = ((x * y * mag0) + ((-y) * x * mag1)) / 2.0f;
+					}
+					else if(in_derivative == 2) {
+						float mag0 = d_sigma(gen);
+						float mag1 = d_sigma(gen);
+						float mag2 = d_sigma(gen);
+						N00 = (x * x * mag0);
+						N11 = (y * y * mag1);
+						N01 = (x * y * mag2);
+					}
 					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + N00;
 					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + N11;
 					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + N01;

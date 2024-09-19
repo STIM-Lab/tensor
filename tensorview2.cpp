@@ -74,6 +74,8 @@ float SCALE = 0.3;
 bool BLUR = false;
 float SCALE_FIELD = 1.0f;               // scale factor for the field (for zooming)
 
+int EIGENVALUE_SIGN = 0;                // limits eigenvector visualization to signed eigenvalues (-1 = negative eigenvalues, 0 = all, 1 = positive eigenvalues)
+
 tira::glGeometry CMAP_GEOMETRY;
 tira::glMaterial* CMAP_MATERIAL;
 
@@ -135,6 +137,7 @@ void UpdateEigens() {
     THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
     free(eigenvalues_raw);
     free(eigenvectors_raw);
+
 
 
 }
@@ -262,13 +265,30 @@ tira::image<unsigned char> ColormapEval(unsigned int i) {
     return C;
 }
 
-tira::image<unsigned char> ColormapEvec(unsigned int i) {
+tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool mag = true) {
+    
 
     tira::image<float> AngleColor = THETAn.channel(i).cmap(-std::numbers::pi, std::numbers::pi, ColorMap::RainbowCycle);
-    tira::image<float> White(AngleColor.X(), AngleColor.Y(), AngleColor.C());
-    White = 255;
-    tira::image<float> eccentricity = CalculateEccentricity();
-    tira::image<unsigned char> C = AngleColor * eccentricity + (-eccentricity + 1) * White;
+    if (ecc) {
+        tira::image<float> White(AngleColor.X(), AngleColor.Y(), AngleColor.C());
+        White = 255;
+        tira::image<float> eccentricity = CalculateEccentricity();
+        AngleColor = AngleColor * eccentricity + (-eccentricity + 1) * White;
+    }
+
+    if (mag) {
+        tira::image<float> L1 = Ln.channel(1);                  // get the magnitude of the largest eigenvector
+        if(EIGENVALUE_SIGN == -1)
+            L1 = L1.clamp(-INFINITY, 0).abs();
+        else if(EIGENVALUE_SIGN == +1)
+            L1 = L1.clamp(0, INFINITY);
+        else
+            L1 = L1.abs();
+        float L1max = L1.maxv();
+        tira::image<float> L1norm = L1 / L1max;
+        AngleColor = AngleColor * L1norm;
+    }
+    tira::image<unsigned char> C = AngleColor;
     return C;
 }
 /// <summary>
@@ -517,6 +537,11 @@ void RenderUI() {
     if (ImGui::RadioButton("eccentricity", &SCALARTYPE, (int)ScalarType::Eccentricity)) {
         ScalarFrom_Eccentricity();
     }
+    ImGui::RadioButton("Negative Evals", &EIGENVALUE_SIGN, -1);
+    ImGui::SameLine();
+    ImGui::RadioButton("Magnitude Evals", &EIGENVALUE_SIGN, 0);
+    ImGui::SameLine();
+    ImGui::RadioButton("Positive Evals", &EIGENVALUE_SIGN, 1);
     std::stringstream ss;
     ss << "Min: " << MINVAL << "\t Max: " << MAXVAL;
     ImGui::Text("%s", ss.str().c_str());
@@ -565,9 +590,9 @@ void RenderUI() {
             // display the current tensor as a matrix
             ImGui::Text("Tensor:");
             float Row0[2] = { T[0][0], T[0][1] };
-            ImGui::InputFloat2("##Row0", Row0, "%1.3e");
+            ImGui::InputFloat2("##Row0", Row0, "%1.5F");
             float Row1[2] = { T[1][0], T[1][1] };
-            ImGui::InputFloat2("##Row1", Row1, "%1.3e");
+            ImGui::InputFloat2("##Row1", Row1, "%1.5F");
 
             // calculate the eigenvalues
             glm::vec2 evals = Eigenvalues2D(T);
@@ -575,7 +600,7 @@ void RenderUI() {
             // display the eigenvalues
             ImGui::Text("Eigenvalues:");
             float lambdas[2] = { evals[0], evals[1] };
-            ImGui::InputFloat2("##lambdas", lambdas, "%1.3e");
+            ImGui::InputFloat2("##lambdas", lambdas, "%1.5F");
 
             // calculate the eigenvectors
             glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
@@ -585,8 +610,8 @@ void RenderUI() {
             ImGui::Text("Eigenvectors:");
             float evx[2] = { ev0[0], ev1[0] };
             float evy[2] = { ev0[1], ev1[1] };
-            ImGui::InputFloat2("##evx", evx, "%1.3e");
-            ImGui::InputFloat2("##evy", evy, "%1.3e");
+            ImGui::InputFloat2("##evx", evx, "%1.5F");
+            ImGui::InputFloat2("##evy", evy, "%1.5F");
 
         }
     }

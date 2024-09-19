@@ -270,7 +270,7 @@ line_width = 1
 
 T = genSpiral2T(N, spiral_size, 0)
 T = addShiftT(T, 3)
-T = addGaussianT(T, 0.2)
+#T = addGaussianT(T, 0.2)
 np.save("spiral.npy", T)
 
 #V = tv.vote2(T)
