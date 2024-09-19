@@ -51,6 +51,8 @@ configure_file(tensorvote.py
 				tensorvote.py COPYONLY)
 configure_file(gendata.py 
 				gendata.py COPYONLY)
+configure_file(physarum.bmp
+				physarum.bmp COPYONLY)
 
 # shell scripts
 configure_file(tensorvote.sh

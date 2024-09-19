@@ -188,38 +188,38 @@ __host__ __device__  VoteContribution PlateVote(float u, float v, float sigma) {
 /// @param w Window size
 /// @param width Tensor field width in pixels
 /// @param height Tensor field height in pixels
-__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int sx, int sy, bool PLATE) {
-    int yi = blockDim.y * blockIdx.y + threadIdx.y;                                       // get the x and y image coordinates for the current thread
-    int xi = blockDim.x * blockIdx.x + threadIdx.x;
+__global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, int s0, int s1, bool PLATE) {
+    int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
+    int x1 = blockDim.y * blockIdx.y + threadIdx.y;
 
-    if (yi >= sy || xi >= sx)                                                          // if not within bounds of image, return
+    if (x0 >= s0 || x1 >= s1)                                                          // if not within bounds of image, return
         return;
 
     glm::mat2 Votee(0.0f);
 
     int hw = w / 2;
-    int yr, xr;
+    int r0, r1;
     for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
-        yr = yi + v;
-        if (yr >= 0 && yr < sy) {
+        r0 = x0 + v;
+        if (r0 >= 0 && r0 < s0) {
             for (int u = -hw; u < hw; u++) {
 
-                xr = xi + u;
-                if (xr >= 0 && xr < sx) {
+                r1 = x1 + u;
+                if (r1 >= 0 && r1 < s1) {
                     // calculate the contribution of (u,v) to (x,y)   
                     VoteContribution vote = StickVote(
                         u,
                         v,
                         sigma,
                         //&L[(yr * sx + xr) * 2],
-                        &V[(yr * sx + xr) * 2]
+                        &V[(r0 * s1 + r1) * 2]
                     );
-                    float scale = L[(yr * sx + xr) * 2 + 1] - L[(yr * sx + xr) * 2 + 0];
+                    float scale = L[(r0 * s1 + r1) * 2 + 1] - L[(r0 * s1 + r1) * 2 + 0];
                     Votee = Votee + scale * vote.votes * vote.decay;
 
                     if (PLATE) {
                         vote = PlateVote(u, v, sigma);
-                        scale = L[(yr * sx + xr) * 2 + 0];
+                        scale = L[(r0 * s1 + r1) * 2 + 0];
                         Votee = Votee + scale * vote.votes * vote.decay;
                     }
                 }
@@ -227,13 +227,13 @@ __global__ void kernelVote(float* VT, float* L, float* V, float sigma, int w, in
         }
     }
     
-    VT[4 * (yi * sx + xi) + 0] = Votee[0][0];
-    VT[4 * (yi * sx + xi) + 1] = Votee[1][0];
-    VT[4 * (yi * sx + xi) + 2] = Votee[0][1];
-    VT[4 * (yi * sx + xi) + 3] = Votee[1][1];
+    VT[4 * (x0 * s1 + x1) + 0] = Votee[0][0];
+    VT[4 * (x0 * s1 + x1) + 1] = Votee[1][0];
+    VT[4 * (x0 * s1 + x1) + 2] = Votee[0][1];
+    VT[4 * (x0 * s1 + x1) + 3] = Votee[1][1];
 }
 
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device, bool PLATE, bool time) {
+void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, unsigned int w, unsigned int device, bool PLATE, bool time) {
     
     auto start = std::chrono::high_resolution_clock::now();
     cudaDeviceProp props;
@@ -241,13 +241,13 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     auto end = std::chrono::high_resolution_clock::now();
     t_deviceprops = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-    int tensorFieldSize = 4 * sx * sy;
-    float* V = new float[sx * sy * 2];                              // allocate space for the eigenvectors
-    float* L = new float[sx * sy * 2];                              // allocate space for the eigenvalues
+    int tensorFieldSize = 4 * s0 * s1;
+    float* V = new float[s0 * s1 * 2];                              // allocate space for the eigenvectors
+    float* L = new float[s0 * s1 * 2];                              // allocate space for the eigenvalues
 
 
     start = std::chrono::high_resolution_clock::now();
-    cpuEigendecomposition(input_field, &V[0], &L[0], sx, sy);   // calculate the eigendecomposition of the entire field
+    cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field
     end = std::chrono::high_resolution_clock::now();
     t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -261,16 +261,16 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     // Allocate GPU arrays
     start = std::chrono::high_resolution_clock::now();
     HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorFieldSize * sizeof(float)));
-    HANDLE_ERROR(cudaMalloc(&gpuV, sx * sy * 2 * sizeof(float)));
-    HANDLE_ERROR(cudaMalloc(&gpuL, sx * sy * 2 * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuV, s0 * s1 * 2 * sizeof(float)));
+    HANDLE_ERROR(cudaMalloc(&gpuL, s0 * s1 * 2 * sizeof(float)));
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   
     start = std::chrono::high_resolution_clock::now();
     // Copy input arrays
-    HANDLE_ERROR(cudaMemcpy(gpuV, V, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
-    HANDLE_ERROR(cudaMemcpy(gpuL, L, sx * sy * 2 * sizeof(float), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuV, V, s0 * s1 * 2 * sizeof(float), cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuL, L, s0 * s1 * 2 * sizeof(float), cudaMemcpyHostToDevice));
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
 
@@ -279,10 +279,10 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
     // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
     dim3 threads(blockDim, blockDim);
-    dim3 blocks(sx / threads.x + 1, sy / threads.y + 1);
+    dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1);
 
     start = std::chrono::high_resolution_clock::now();
-    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, sx, sy, PLATE);              // call the CUDA kernel for voting
+    kernelVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, w, s0, s1, PLATE);              // call the CUDA kernel for voting
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

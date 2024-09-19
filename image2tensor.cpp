@@ -143,12 +143,7 @@ int main(int argc, char** argv) {
 			
 
 			for (size_t yi = 0; yi < window; yi++) {
-				//for (size_t xi = 0; xi < window; xi++) {
 				K1({ yi, 0, 0, 0 }) = kernel_value;
-				//K1({ yi, 0, 0, 1 }) = kernel_value;
-				//K1({ yi, 0, 1, 0 }) = kernel_value;
-				//K1({ yi, 0, 1, 1 }) = kernel_value;
-				//}
 			}
 			ST = ST.convolve(K1);
 			std::cout << "done." << std::endl;
@@ -178,10 +173,14 @@ int main(int argc, char** argv) {
 					float theta = d_theta(gen);
 					float x = std::cos(theta);
 					float y = std::sin(theta);
-					float mag = std::abs(d_sigma(gen));
-					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + x * x * mag;
-					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + y * y * mag;
-					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + x * y * mag;
+					float mag0 = std::abs(d_sigma(gen));
+					float mag1 = std::abs(d_sigma(gen));
+					float N00 = ((x * x * mag0) + (y * y * mag1)) / 2.0f;
+					float N11 = ((y * y * mag0) + (x * x * mag1)) / 2.0f;
+					float N01 = ((x * y * mag0) + ((-y) * x * mag1)) / 2.0f;
+					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + N00;
+					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + N11;
+					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + N01;
 					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
 				}
 			}
