@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
 
 '''
 
@@ -10,7 +11,23 @@ arg: tensor voting sigma
 
 '''
 
-def stickfield2(qx, qy, RX, RY, sigma1, sigma2):
+def eigmag(T):
+    
+    eigenValues, eigenVectors = np.linalg.eigh(T)
+    magValues = np.abs(eigenValues)
+    
+    idx = np.argsort(magValues, -1)
+    
+    sortedValues = np.take_along_axis(eigenValues, idx, -1)
+    #sortedValues = eigenValues
+    sortedVectors = np.zeros_like(eigenVectors)
+    sortedVectors[..., 0, :] = np.take_along_axis(eigenVectors[..., 0, :], idx, -1)
+    sortedVectors[..., 1, :] = np.take_along_axis(eigenVectors[..., 1, :], idx, -1)
+    #eigenVectors = np.take_along_axis(eigenVectors, idx, -1)
+    
+    return sortedValues, sortedVectors
+    
+def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0):
     
     q = np.zeros((2, 1))
     q[0] = qx
@@ -21,11 +38,16 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2):
     
     # calculate the normalized direction vector
     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
-    D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
+    
+    # assume that 1 - q.d = 0
+    D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
+    D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
+    
+    # assume that 1 - q.d = 1
+    #D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
+    #D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
     
     # calculate the rotated stick direction
-    #R = np.zeros((DX.shape[0], DX.shape[1], 2, 2))
     Dt = np.transpose(D, axes=(0, 1, 3, 2))
     I = np.eye(2)
     R = I - 2 * np.matmul(D, Dt)
@@ -35,19 +57,24 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2):
     # calculate the decay based on the desired properties
     if sigma1 == 0:
         g1 = 0
+        normscale1 = 0
     else:
         g1 = np.exp(- L**2 / sigma1**2)[..., np.newaxis, np.newaxis]
+        normscale1 = 2 / (np.pi * sigma1**2)
         
     if sigma2 == 0:
         g2 = 0
+        normscale2 = 0
     else:
         g2 = np.exp(- L**2 / sigma2**2)[..., np.newaxis, np.newaxis]
+        normscale2 = 2 / (np.pi * sigma2**2)
     
     qTd = np.matmul(np.transpose(q), D)
     cos_2_theta = qTd**2
-    sin_2_theta = 1 - cos_2_theta
+    sin_2_theta = 1 - cos_2_theta    
     
-    decay = g1 * sin_2_theta + g2 * cos_2_theta
+    decay = normscale1 * g1 * sin_2_theta + normscale2 * g2 * cos_2_theta
+    #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
     V = decay * np.matmul(Rq, Rqt)
     return V
@@ -57,67 +84,133 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2):
 # sigma is the standard deviation of the vote field
 def stickvote2(T, sigma=3, sigma2=0):
     
-    # perform the eigendecomposition of the field
-    evals, evecs = np.linalg.eigh(T)
+    evals, evecs = eigmag(T)
+    evals_mag = np.abs(evals)
+    
     
     # store the eigenvector corresponding to the largest eigenvalue
     E = evecs[:, :, :, 1]
     
+    sigmax = max(sigma, sigma2)
+    
     # calculate the optimal window size
-    w = int(6 * sigma + 1)
+    w = int(6 * sigmax + 1)
     x = np.linspace(-(w-1)/2, (w-1)/2, w)
     X0, X1 = np.meshgrid(x, x)
     
     # create a padded vote field to store the vote results
-    pad = int(3*sigma+1)
+    pad = int(3 * sigmax)
     VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
         for x1 in range(T.shape[1]):
-            scale = evals[x0, x1, 1] - evals[x0, x1, 0]
+            scale = (evals_mag[x0, x1, 1] - evals_mag[x0, x1, 0]) * np.sign(evals[x0, x1, 1])
             S = scale * stickfield2(E[x0, x1, 0], E[x0, x1, 1], X0, X1, sigma, sigma2)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
 
-def platefield2(RX, RY, sigma1, sigma2):
-    # calculate the length (distance) value
+# def platefield2(RX, RY, sigma1, sigma2):
+#     # calculate the length (distance) value
+#     L = np.sqrt(RX**2 + RY**2)
+    
+#     # calculate the decay based on the desired properties
+#     if sigma1 == 0:
+#         g1 = 0
+#     else:
+#         g1 = np.exp(- L**2 / sigma1**2)[..., np.newaxis, np.newaxis]
+        
+#     if sigma2 == 0:
+#         g2 = 0
+#     else:
+#         g2 = np.exp(- L**2 / sigma2**2)[..., np.newaxis, np.newaxis]
+        
+#     # calculate each component of the integral
+#     C1 = g1 * (np.pi/2) * np.eye(2)
+    
+#     # calculate the normalized direction vector
+#     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
+#     D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
+#     D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
+    
+#     PHI = np.arctan2(D[:, :, 1, 0], D[:, :, 0, 0])
+    
+#     # calculate the matrix component
+#     I2 = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
+#     I2[:, :, 0, 0] = np.cos(2 * PHI) + 2
+#     I2[:, :, 1, 1] = 2 - np.cos(2 * PHI)
+#     I2[:, :, 0, 1] = np.sin(2 * PHI)
+#     I2[:, :, 1, 0] = I2[:, :, 0, 1]
+    
+#     C2 = g2 * (np.pi/8) * I2
+#     C3 = g1 * (np.pi/8) * I2
+    
+#     P = C1 + C2 - C3
+#     return P
+
+def platefield2(RX, RY, sigma1, sigma2=0):
+    
+    ALPHA = np.arctan2(RY, RX)
+    TWO_ALPHA = 2 * ALPHA
+    
     L = np.sqrt(RX**2 + RY**2)
     
-    # calculate the decay based on the desired properties
-    if sigma1 == 0:
-        g1 = 0
-    else:
-        g1 = np.exp(- L**2 / sigma1**2)[..., np.newaxis, np.newaxis]
-        
-    if sigma2 == 0:
-        g2 = 0
-    else:
-        g2 = np.exp(- L**2 / sigma2**2)[..., np.newaxis, np.newaxis]
-        
-    # calculate each component of the integral
-    C1 = g1 * (np.pi/2) * np.eye(2)
+    c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
     
-    # calculate the normalized direction vector
-    D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
-    D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
+    # this line assumes that there is no contribution from the voter at the voter location
+    c[L==0] = 0
     
-    PHI = np.arctan2(D[:, :, 1, 0], D[:, :, 0, 0])
+    T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
     
-    # calculate the matrix component
-    I2 = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
-    I2[:, :, 0, 0] = np.cos(2 * PHI) + 2
-    I2[:, :, 1, 1] = 2 - np.cos(2 * PHI)
-    I2[:, :, 0, 1] = np.sin(2 * PHI)
-    I2[:, :, 1, 0] = I2[:, :, 0, 1]
+    COS_2ALPHA = np.cos(TWO_ALPHA)
+    SIN_2ALPHA = np.sin(TWO_ALPHA)
     
-    C2 = g2 * (np.pi/8) * I2
-    C3 = g1 * (np.pi/8) * I2
+    T[:, :, 0, 0] = c * (1 - 0.25 * (COS_2ALPHA + 2))
+    T[:, :, 0, 1] = c * (-0.25 * SIN_2ALPHA)
+    T[:, :, 1, 0] = c * (-0.25 * SIN_2ALPHA)
+    T[:, :, 1, 1] = c * (1 - 0.25 * (2 - COS_2ALPHA))
     
-    P = C1 + C2 - C3
-    return P
+    return T
 
+def platefield2_numerical(RX, RY, sigma1, sigma2=0, N=10):
+    
+    T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
+    
+    dtheta = 2 * np.pi / N
+    for n in range(N):
+        x = np.cos(n * dtheta)
+        y = np.sin(n * dtheta)
+        T = T + (1.0 / N) * stickfield2(x, y, RX, RY, sigma1, sigma2)
+        
+    return T
+        
+# calculate the vote result of the tensor field T
+# k is the eigenvector used as the voting direction
+# sigma is the standard deviation of the vote field
+def platevote2_numerical(T, sigma1=3, sigma2=0, N=10):
+    
+    # perform the eigendecomposition of the field
+    evals, evecs = np.linalg.eigh(T)
+
+    
+    # calculate the optimal window size
+    sigma = max(sigma1, sigma2)
+    w = int(6 * sigma + 1)
+    x = np.linspace(-(w-1)/2, (w-1)/2, w)
+    X0, X1 = np.meshgrid(x, x)
+    
+    # create a padded vote field to store the vote results
+    pad = int(3*sigma)
+    VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
+    
+    # for each pixel in the tensor field
+    for x0 in range(T.shape[0]):
+        #vfx0 = x0 + pad
+        for x1 in range(T.shape[1]):
+            scale = evals[x0, x1, 0]
+            S = scale * platefield2_numerical(X0, X1, sigma, sigma2)
+            VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
+    return VF[pad:-pad, pad:-pad, :, :]
 
 # calculate the vote result of the tensor field T
 # k is the eigenvector used as the voting direction
@@ -126,9 +219,7 @@ def platevote2(T, sigma=3, sigma2=0):
     
     # perform the eigendecomposition of the field
     evals, evecs = np.linalg.eigh(T)
-    
-    # store the eigenvector corresponding to the smallest eigenvector
-    #E = evecs[:, :, :, 0]
+
     
     # calculate the optimal window size
     w = int(6 * sigma + 1)
@@ -136,7 +227,7 @@ def platevote2(T, sigma=3, sigma2=0):
     X0, X1 = np.meshgrid(x, x)
     
     # create a padded vote field to store the vote results
-    pad = int(3*sigma+1)
+    pad = int(3*sigma)
     VF = np.pad(np.zeros(T.shape), ((pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
@@ -148,11 +239,16 @@ def platevote2(T, sigma=3, sigma2=0):
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
 
-def vote2(T, sigma=3, sigma2=0):
+'''
+Main function for analytical 2D tensor voting. This function applies both stick
+and plate voting, and allows for both alpha and beta vote orientations. You can
+use beta voting by assigning sigma=0 and the desired standard deviation for sigma_beta.
+'''
+
+def vote2(T, sigma=3, sigma_beta=0):
     
-    print("Stick ")
-    S = stickvote2(T, sigma, sigma2)
-    P = platevote2(T, sigma, sigma2)
+    S = stickvote2(T, sigma, sigma_beta)
+    P = platevote2(T, sigma, sigma_beta)
     
     V = S + P
     return V
@@ -192,34 +288,115 @@ def generate2(x=0, y=1, N=51, sigma1=20, sigma2=10):
     T = stickfield2(x, y, RX, RY, sigma1, sigma2)
     
     return T
+
+# generate an impulse tensor field to test tensor voting
+def impulse(N, x, y, l1=1, l0=0):
+    T = np.zeros((N, N, 2, 2))
     
+    m = np.zeros((2, 2))
+    m[0, 0] = x * x
+    m[1, 0] = x * y
+    m[0, 1] = y * x
+    m[1, 1] = y * y
     
+    l, v = np.linalg.eigh(m)
+    
+    l[0] = l0
+    l[1] = l1
+    
+    m = v @ np.diag(l) @ v.transpose()
+    
+    T[int(N/2), int(N/2)] = m
+    
+    return T
+    
+def vec2theta(V):
+    return np.arctan2(V[..., 1], V[..., 0])
+
+def eccentricity(T):
+    L, V = eigmag(T)
+    
+    L0_2 = L[..., 0]**2
+    L1_2 = L[..., 1]**2
+    
+    ratio = np.where(L1_2 > 0, L0_2 / L1_2, 1)
+    
+    E = np.sqrt(1 - ratio)
+    return E
+
+def eccentricity_decay(T, rate):
+    
+    ecc = eccentricity(T)
+    return T * np.power(ecc[..., np.newaxis, np.newaxis], rate)
     
     
 
 # visualize a tensor field T (NxMx2x2)
-def visualize(T, title = "Tensor Field", fontsize=10, mode=None, glyphs=True):
+def visualize(T):
     
-    font = {'size' : fontsize}
-
-    plt.rc('font', **font)
-    #plt.figure()
-    Eval, Evec = np.linalg.eigh(T)
-    if(glyphs == True):
-        plt.quiver(Evec[:, :, 0, 1], Evec[:, :, 1, 1], pivot="middle", headwidth=0, headlength=0, headaxislength=0, width=0.002)
-    plt.xlabel("X axis")
-    plt.ylabel("Y axis")
-    if mode is None or mode == "eval":
-        plt.imshow(Eval[:, :, 1], origin="lower", cmap="magma")
-    if mode == "eccentricity":
-        e0_2 = Eval[:, :, 0] ** 2
-        e1_2 = Eval[:, :, 1] ** 2
-        ratio = np.divide(e0_2, e1_2, out=np.ones_like(e1_2), where=e1_2!=0)
-        ecc = np.sqrt(1 - ratio)
-        plt.imshow(ecc, origin="lower", cmap="RdYlBu_r")
+    L, V = eigmag(T)
+    THETA0 = vec2theta(V[..., :, 0])                 # convert the eigenvector to polar coordinates
+    
+    neg = THETA0 < 0                                 # normalize to [0, 1] for color mapping
+    THETA0[neg] = np.pi - np.abs(THETA0[neg])
+    THETA0 = THETA0 / np.pi
+    
+    
+    cmap = matplotlib.colormaps["hsv"]              # get the angle color
+    C0 = cmap(THETA0)
+    
+    THETA1 = vec2theta(V[..., :, 1])                 # convert the eigenvector to polar coordinates
+    
+    neg = THETA1 < 0                                 # normalize to [0, 1] for color mapping
+    THETA1[neg] = np.pi - np.abs(THETA1[neg])
+    THETA1 = THETA1 / np.pi
+    
+    
+    cmap = matplotlib.colormaps["hsv"]              # get the angle color
+    C1 = cmap(THETA1)
+    
+    
+    ecc = eccentricity(T)[..., np.newaxis]
+    
+    
+    C0 = ecc * C0 + (1 - ecc)                         # scale the saturation by the eccentricity (lower eccentricity is whiter)
+    l1_max = np.max(np.abs(L[..., 1]))
+    C0 = C0 * (np.abs(L[..., 1]) / l1_max)[..., np.newaxis]
+    
+    C1 = ecc * C1 + (1 - ecc)                         # scale the saturation by the eccentricity (lower eccentricity is whiter)
+    l1_max = np.max(np.abs(L[..., 1]))
+    C1 = C1 * (np.abs(L[..., 1]) / l1_max)[..., np.newaxis]
+    
+    plt.subplot(2, 3, 1)
+    plt.imshow(C0[:, :, 0:3], origin="lower")
+    plt.title("Vector 0 Angle")
+    
+    plt.subplot(2, 3, 2)
+    plt.imshow(C1[:, :, 0:3], origin="lower")
+    plt.title("Vector 1 Angle")
+    
+    
+    
+    plt.subplot(2, 3, 3)
+    plt.imshow(ecc, cmap="magma", origin="lower")
+    plt.title("Eccentricity")
     plt.colorbar()
-    plt.title(title)
-    #plt.show()
+    
+    plt.subplot(2, 3, 4)
+    l0_max = np.max(np.abs(L[..., 0]))
+    plt.imshow(L[:, :, 0], vmin=-l0_max, vmax=l0_max, cmap="RdYlBu_r", origin="lower")
+    plt.colorbar()
+    plt.title("Eigenvalue 0")
+    
+    plt.subplot(2, 3, 5)
+    l1_max = np.max(np.abs(L[..., 1]))
+    plt.imshow(L[:, :, 1], vmin=-l1_max, vmax=l1_max, cmap="RdYlBu_r", origin="lower")
+    plt.colorbar()
+    plt.title("Eigenvalue 1")
+    
+    
+    
+    
     
 # performs iterative voting on a tensor field T
 # sigma is the standard deviation for the first iteration

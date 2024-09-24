@@ -45,8 +45,8 @@ endif ( MSVC )
 configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
 
 # copy python scripts
-configure_file(structen.py 
-				structen.py COPYONLY)
+configure_file(image2tensor.py 
+				image2tensor.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
 configure_file(gendata.py 
@@ -108,6 +108,7 @@ target_link_libraries(tensorview3
 #create an executable
 add_executable(image2tensor
 				image2tensor.cpp
+				cuda_calls.cu
 )
 
 target_link_libraries(image2tensor
@@ -121,6 +122,7 @@ add_executable(tensorvote
 				tensorvote.cpp
 				tensorvote.cuh	
 				tensorvote.cu
+				cuda_calls.cu
 )
 
 target_link_libraries(tensorvote

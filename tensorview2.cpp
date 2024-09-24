@@ -31,7 +31,7 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
 float* cudaEigenvalues(float* tensors, unsigned int n);
-float* cudaEigenvectors(float* tensors, float* evals, unsigned int n);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
 
 // command line arguments
 std::string in_inputname;
@@ -112,19 +112,17 @@ void FitRectangleToWindow(float field_width_pixels, float field_height_pixels,
 }
 
 tira::image<float> CalculateEccentricity() {
-    tira::image<float> result(Tn.shape()[1], Tn.shape()[0]);
+    tira::image<float> ecc(Ln.X(), Ln.Y());
 
-    for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
-        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            float l0 = Ln(xi, yi, 0);
-            float l1 = Ln(xi, yi, 1);
-            if (l0 == 0.0f)
-                result(xi, yi) = 0.0f;
+    for (size_t yi = 0; yi < ecc.Y(); yi++) {
+        for (size_t xi = 0; xi < ecc.X(); xi++) {
+            if (Ln(xi, yi, 1) == 0)
+                ecc(xi, yi) = 0;
             else
-                result(xi, yi) = sqrt(1.0f - (l0 * l0) / (l1 * l1));
+                ecc(xi, yi) = std::sqrt(1 - std::pow(Ln(xi, yi, 0), 2) / std::pow(Ln(xi, yi, 1), 2));
         }
     }
-    return result;
+    return ecc;
 }
 
 /// <summary>
@@ -133,13 +131,10 @@ tira::image<float> CalculateEccentricity() {
 void UpdateEigens() {
     float* eigenvalues_raw = cudaEigenvalues((float*)Tn.data(), Tn.X() * Tn.Y());
     Ln = tira::image<float>(eigenvalues_raw, Tn.X(), Tn.Y(), 2);
-    float* eigenvectors_raw = cudaEigenvectors((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y());
+    float* eigenvectors_raw = cudaEigenvectorsPolar((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y());
     THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
     free(eigenvalues_raw);
     free(eigenvectors_raw);
-
-
-
 }
 
 void LoadTensorField(std::string filename) {
@@ -261,12 +256,15 @@ tira::image<unsigned char> ColormapTensor(unsigned int row, unsigned int col) {
 }
 
 tira::image<unsigned char> ColormapEval(unsigned int i) {
-    tira::image<unsigned char> C = Ln.channel(i).cmap(ColorMap::Magma);
+    tira::image<float> L = Ln.channel(i);
+    MAXVAL = Ln.maxv();
+    MINVAL = Ln.minv();
+    float MaxMag = std::max(std::abs(MAXVAL), std::abs(MINVAL));
+    tira::image<unsigned char> C = Ln.channel(i).cmap(-MaxMag, MaxMag, ColorMap::Brewer);
     return C;
 }
 
-tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool mag = true) {
-    
+tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool mag = true) {    
 
     tira::image<float> AngleColor = THETAn.channel(i).cmap(-std::numbers::pi, std::numbers::pi, ColorMap::RainbowCycle);
     if (ecc) {
@@ -291,6 +289,19 @@ tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool ma
     tira::image<unsigned char> C = AngleColor;
     return C;
 }
+
+tira::image<unsigned char> ColormapEccentricity() {
+
+    tira::image<float> ecc = CalculateEccentricity();
+
+
+    MAXVAL = 1.0;
+    MINVAL = 0.0;
+    tira::image<unsigned char> C = ecc.cmap(0, 1, ColorMap::Magma);
+    return C;
+}
+
+
 /// <summary>
 /// Create a scalar image from the specified tensor component
 /// </summary>
@@ -336,7 +347,7 @@ void ScalarFrom_Eval(unsigned int i) {
 /// <param name="i"></param>
 void ScalarFrom_Eccentricity() {
 
-    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
+    /*SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
 
     float t, d;
     for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
@@ -347,15 +358,14 @@ void ScalarFrom_Eccentricity() {
                 SCALAR(xi, yi) = 0.0f;
             else
                 SCALAR(xi, yi) = sqrt(1.0f - (l0 * l0) / (l1 * l1));
-            //img(xi, yi) = sqrt((l0 * l0) - (l1 * l1));
         }
     }
-    // update texture
-    //MAXVAL = SCALAR.maxv();
-    //MINVAL = SCALAR.minv();
+
     MAXVAL = 1.0f;
     MINVAL = 0.0f;
-    CMAP_MATERIAL->SetTexture("scalar", SCALAR, GL_LUMINANCE32F_ARB, GL_NEAREST);
+    */
+    tira::image<unsigned char> C = ColormapEccentricity();
+    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
 }
 
 /// <summary>
@@ -390,7 +400,7 @@ glm::vec2 Eigenvalues2D_old(glm::mat2 T) {
 }
 
 glm::vec2 Eigenvalues2D(glm::mat2 T) {
-    float a = T[0][0];
+    /*float a = T[0][0];
     float b = T[0][1];
     float c = b;
     float d = T[1][1];
@@ -403,7 +413,21 @@ glm::vec2 Eigenvalues2D(glm::mat2 T) {
     //float min = a < b ? a : b;
     //float max = a > b ? a : b;
     glm::vec2 out(e - f, e + f);
-    return out;
+    return out;*/
+    float d = T[0][0];
+    float e = T[1][0];
+    float f = T[0][1];
+    float g = T[1][1];
+
+    float dpg = d + g;
+    float disc = sqrt((4 * e * f) + pow(d - g, 2));
+    float a = (dpg + disc) / 2.0f;
+    float b = (dpg - disc) / 2.0f;
+
+    glm::vec2 result;
+    result.x = std::abs(a) < std::abs(b) ? a : b;
+    result.y = std::abs(a) > std::abs(b) ? a : b;
+    return result;
 }
 
 glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
@@ -537,11 +561,17 @@ void RenderUI() {
     if (ImGui::RadioButton("eccentricity", &SCALARTYPE, (int)ScalarType::Eccentricity)) {
         ScalarFrom_Eccentricity();
     }
-    ImGui::RadioButton("Negative Evals", &EIGENVALUE_SIGN, -1);
+    if(ImGui::RadioButton("Negative Evals", &EIGENVALUE_SIGN, -1)) {
+        ScalarRefresh();
+    }
     ImGui::SameLine();
-    ImGui::RadioButton("Magnitude Evals", &EIGENVALUE_SIGN, 0);
+    if(ImGui::RadioButton("Magnitude Evals", &EIGENVALUE_SIGN, 0)) {
+        ScalarRefresh();
+    }
     ImGui::SameLine();
-    ImGui::RadioButton("Positive Evals", &EIGENVALUE_SIGN, 1);
+    if(ImGui::RadioButton("Positive Evals", &EIGENVALUE_SIGN, 1)) {
+        ScalarRefresh();
+    }
     std::stringstream ss;
     ss << "Min: " << MINVAL << "\t Max: " << MAXVAL;
     ImGui::Text("%s", ss.str().c_str());
@@ -780,7 +810,7 @@ int main(int argc, char** argv) {
             
             FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
             float view_extent[2] = { Viewport[0] / (2.0f), Viewport[1] / (2.0f) };
-            glm::mat4 Mview = glm::ortho(-view_extent[0], view_extent[0], -view_extent[1], view_extent[1]);   // create a view matrix
+            glm::mat4 Mview = glm::ortho(-view_extent[0], view_extent[0], view_extent[1], -view_extent[1]);   // create a view matrix
 
             // if the user is visualizing a scalar component of the tensor field as a color map
             if (SCALARTYPE != ScalarType::NoScalar) {

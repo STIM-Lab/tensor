@@ -16,8 +16,8 @@ float* cudaEigenvalues(float* tensors, unsigned int n) {
     return tira::cuda::Eigenvalues2D<float>(tensors, n);
 }
 
-float* cudaEigenvectors(float* tensors, float* evals, unsigned int n) {
-    return tira::cuda::Eigenvectors2D<float>(tensors, evals, n);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n) {
+    return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n);
 }
 
 void cudaEigenvalue0(float* tensors, unsigned int n, float* evals) {

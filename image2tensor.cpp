@@ -4,6 +4,8 @@
 #include <chrono>
 #include <random>
 
+#include <glm/glm.hpp>
+
 #include <tira/image.h>
 #include <tira/volume.h>
 
@@ -12,10 +14,12 @@
 std::string in_inputname;
 std::string in_outputname;
 unsigned int in_order;
-unsigned int in_derivative;
 float in_noise;
 float in_sigma;
 bool in_crop = false;
+
+glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
 
 /// <summary>
@@ -77,9 +81,9 @@ int main(int argc, char** argv) {
 	desc.add_options()
 		("input", boost::program_options::value<std::string>(&in_inputname), "input image")
 		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "output file storing the tensor field")
-		("derivative", boost::program_options::value<unsigned int>(&in_derivative)->default_value(1), "output file storing the tensor field")
-		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(6), "order used to calculate the first derivative")
-		("blur", boost::program_options::value<float>(&in_sigma)->default_value(0.0f), "sigma value for a Gaussian blur")
+		("hessian", "calculate the Hessian")
+		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(2), "order used to calculate the derivative")
+		("blur", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for a Gaussian blur")
 		("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
 		("crop", "crop the edges of the field to fit the finite difference window")
 		("help", "produce help message")
@@ -111,9 +115,36 @@ int main(int argc, char** argv) {
 		grey = grey / 255.0f;
 		grey = grey.border(in_order, 0);
 
-		tira::field<float> ST;
+		tira::image<glm::mat2> T;
 		std::vector<size_t> field_shape;
-		if (in_derivative == 1) {
+
+		// Evaluate the Hessian at each pixel
+		if (vm.count("hessian")) {
+
+			tira::image<float> D2x2 = grey.derivative(1, 2, in_order);			// calculate the derivative along the x axis
+			tira::image<float> D2y2 = grey.derivative(0, 2, in_order);			// calculate the derivative along the y axis
+			tira::image<float> Dx = grey.derivative(1, 1, in_order);
+			tira::image<float> Dxy = Dx.derivative(0, 1, in_order);
+
+
+			//field_shape = { Dx, D[0].shape()[1], (size_t)dim, (size_t)dim };
+			T = tira::image<glm::mat2>(Dx.X(), Dx.Y());
+
+			std::cout << "Generating tensor field...";
+			// build the tensor field
+			for (size_t yi = 0; yi < T.Y(); yi++) {
+				for (size_t xi = 0; xi < T.X(); xi++) {
+					T(xi, yi)[0][0] = D2x2(xi, yi);
+					T(xi, yi)[1][1] = D2y2(xi, yi);
+					T(xi, yi)[0][1] = Dxy(xi, yi);
+					T(xi, yi)[1][0] = Dxy(xi, yi);
+				}
+			}
+			std::cout << "done." << std::endl;
+
+		}
+		// Evaluate the structure tensor at each pixel
+		else {
 			tira::image<float> Dx = grey.derivative(1, 1, in_order);			// calculate the derivative along the x axis
 			tira::image<float> Dy = grey.derivative(0, 1, in_order);			// calculate the derivative along the y axis
 
@@ -122,146 +153,37 @@ int main(int argc, char** argv) {
 			D.push_back(Dx);
 			D.push_back(Dy);
 
-			field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
-			ST = tira::field<float>(field_shape);
+			T = tira::image<glm::mat2>(Dx.X(), Dx.Y());
 
 			std::cout << "Generating tensor field...";
 			// build the tensor field
-			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
-				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-					ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 }) * D[0]({ x0, x1 });
-					ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 }) * D[1]({ x0, x1 });
-					ST({ x0, x1, 0, 1 }) = D[0]({ x0, x1 }) * D[1]({ x0, x1 });
-					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
+			for (size_t yi = 0; yi < T.Y(); yi++) {
+				for (size_t xi = 0; xi < T.X(); xi++) {
+					T(xi, yi)[0][0] = std::pow(Dx(xi, yi), 2);
+					T(xi, yi)[1][1] = std::pow(Dy(xi, yi), 2);
+					T(xi, yi)[0][1] = Dx(xi, yi) * Dy(xi, yi);
+					T(xi, yi)[1][0] = T(xi, yi)[0][1];
 				}
 			}
 			std::cout << "done." << std::endl;
 		}
-		else if (in_derivative == 2) {
-
-			tira::image<float> D2x2 = grey.derivative(1, 2, in_order);			// calculate the derivative along the x axis
-			tira::image<float> D2y2 = grey.derivative(0, 2, in_order);			// calculate the derivative along the y axis
-			tira::image<float> Dx = grey.derivative(1, 1, in_order);
-			tira::image<float> Dxy = Dx.derivative(0, 1, in_order);
-
-			D2x2 = D2x2.border_remove(in_order);
-			D2y2 = D2y2.border_remove(in_order);
-			Dxy = Dxy.border_remove(in_order);
-			D.push_back(D2x2);
-			D.push_back(D2y2);
-			D.push_back(Dxy);
-
-			field_shape = { D[0].shape()[0], D[0].shape()[1], (size_t)dim, (size_t)dim };
-			ST = tira::field<float>(field_shape);
-
-			std::cout << "Generating tensor field...";
-			// build the tensor field
-			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
-				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-					ST({ x0, x1, 0, 0 }) = D[0]({ x0, x1 });
-					ST({ x0, x1, 1, 1 }) = D[1]({ x0, x1 });
-					ST({ x0, x1, 0, 1 }) = D[2]({ x0, x1 });
-					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
-				}
-			}
-			std::cout << "done." << std::endl;
-
-		}
-		else {
-			std::cout << "Only 1st and 2nd order derivatives are supported." << std::endl;
-			exit(1);
-		}
+		 
 
 		if (in_sigma > 0) {
-			std::cout << "Blurring tensor field (axis 0)...";
-			size_t window = (int)(in_sigma + 1);
-			float kernel_value = 1.0 / window;
-
-			std::vector<size_t> kernel_size1 = {window, 1, 1, 1};
-			tira::field<float> K1(kernel_size1);
-			
-
-			for (size_t yi = 0; yi < window; yi++) {
-				K1({ yi, 0, 0, 0 }) = kernel_value;
-			}
-			ST = ST.convolve(K1);
-			std::cout << "done." << std::endl;
-
-			std::cout << "Blurring tensor field (axis 1)...";
-			std::vector<size_t> kernel_size2 = {1, window, 1, 1};
-			tira::field<float> K2(kernel_size2);
-
-			for (size_t xi = 0; xi < window; xi++) {
-				K2({ 0, xi, 0, 0 }) = kernel_value;
-			}
-			ST = ST.convolve(K2);
-
-			std::cout << "done." << std::endl;
+			unsigned int raw_width;
+			unsigned int raw_height;
+			glm::mat2* raw_field = cudaGaussianBlur(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height);
+			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
+			free(raw_field);
 		}
-
-		// add noise to the final tensor field
-		if (in_noise != 0) {
-			std::cout << "Adding noise...";
-			std::random_device rd{};
-			std::mt19937 gen{ rd() };
-			std::uniform_real_distribution<> d_theta(0, M_PI * 2);
-			std::normal_distribution d_sigma{ 0.0, (double)in_noise };
-
-			for (size_t x0 = 0; x0 < field_shape[0]; x0++) {
-				for (size_t x1 = 0; x1 < field_shape[1]; x1++) {
-					float theta = d_theta(gen);
-					float x = std::cos(theta);
-					float y = std::sin(theta);
-					float N00, N01, N11;
-					if(in_derivative == 1) {
-						float mag0 = std::abs(d_sigma(gen));
-						float mag1 = std::abs(d_sigma(gen));
-						N00 = ((x * x * mag0) + (y * y * mag1)) / 2.0f;
-						N11 = ((y * y * mag0) + (x * x * mag1)) / 2.0f;
-						N01 = ((x * y * mag0) + ((-y) * x * mag1)) / 2.0f;
-					}
-					else if(in_derivative == 2) {
-						float mag0 = d_sigma(gen);
-						float mag1 = d_sigma(gen);
-						float mag2 = d_sigma(gen);
-						N00 = (x * x * mag0);
-						N11 = (y * y * mag1);
-						N01 = (x * y * mag2);
-					}
-					ST({ x0, x1, 0, 0 }) = ST({ x0, x1, 0, 0 }) + N00;
-					ST({ x0, x1, 1, 1 }) = ST({ x0, x1, 1, 1 }) + N11;
-					ST({ x0, x1, 0, 1 }) = ST({ x0, x1, 0, 1 }) + N01;
-					ST({ x0, x1, 1, 0 }) = ST({ x0, x1, 0, 1 });
-				}
-			}
-			std::cout << "done." << std::endl;
-		}
-
-		if (in_crop) {
-			std::cout << "Cropping...";
-			size_t window_width = (in_order + in_derivative) / 2;
-			std::vector<size_t> min_crop = { window_width, window_width, 0, 0 };
-			std::vector<size_t> max_crop = { ST.shape()[0] - window_width, ST.shape()[1] - window_width, 2, 2};
-			tira::field<float> C = ST.crop(min_crop, max_crop);
-			C.save_npy(in_outputname);
-			std::cout << "done." << std::endl;
-		}
-		else
-			ST.save_npy(in_outputname);
+		
+		tira::field<float> Tout({ T.shape()[0], T.shape()[1], 2, 2 }, (float*)T.data());
+		Tout.save_npy(in_outputname);
 	}
 	else if (dim == 3) {
 		std::cout << "Doesn't support 3D images yet" << std::endl;
 		return 0;
-		/*tira::volume<float> I(in_inputname);
-		//tira::volume<float> grey = I.channel(0);
-		tira::field<float> Dx = I.derivative(2, in_derivative, in_order);
-		tira::field<float> Dy = I.derivative(1, in_derivative, in_order);
-		tira::field<float> Dz = I.derivative(0, in_derivative, in_order);
 
-		D.push_back(Dx);
-		D.push_back(Dy);
-		D.push_back(Dz);
-		*/
 	}
 
 	return 0;

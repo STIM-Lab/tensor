@@ -9,10 +9,12 @@
 glm::vec2 Eigenvalues2D(glm::mat2 T);
 glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
 void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
-VoteContribution StickVote(float u, float v, float sigma, float* eigenvectors);
+VoteContribution StickVote(float u, float v, float sigma, float* eigenvectors, unsigned int power);
 VoteContribution PlateVote(float u, float v, float sigma);
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int device, bool PLATE = true, bool time = false);
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int power, unsigned int device, bool PLATE = true, bool time = false);
 
+float* cudaEigenvalues(float* tensors, unsigned int n);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
 
 #include <tira/field.h>
 #include <tira/image.h>
@@ -20,6 +22,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsign
 std::string in_inputname;
 std::string in_outputname;
 float in_sigma;
+unsigned int in_power;
 unsigned int in_window;
 int in_cuda;
 std::vector<float> in_votefield;
@@ -51,14 +54,15 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
     O.save_npy(filename);
 }
 
-void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigned int s1, float sigma, unsigned int w, bool PLATE = true, bool time = false) {
-    std::vector<float> V(s0 * s1 * 2);                          // allocate space for the eigenvectors
-    std::vector<float> L(s0 * s1 * 2);                          // allocate space for the eigenvalues
+void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigned int s1, float sigma, unsigned int w, unsigned int power = 1, bool PLATE = true, bool debug = false) {
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
+    float* L = cudaEigenvalues(input_field, s0 * s1);
+    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1);
+
     auto start = std::chrono::high_resolution_clock::now();
-    cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field
+    //cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field
     auto end = std::chrono::high_resolution_clock::now();
     t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -73,9 +77,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
 
     float scale;
     int r1, r0;                                                 // x and y coordinates within the window
-    start = std::chrono::high_resolution_clock::now();
     for (unsigned int x0 = 0; x0 < s0; x0++) {                  // for each pixel in the image
-        std::cout << x0 << std::endl;
         for (unsigned int x1 = 0; x1 < s1; x1++) {
 
             glm::mat2 receiver(0.0f);                           // initialize a receiver tensor to zero
@@ -90,13 +92,16 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
                         r1 = x1 + u;
                         if (r1 >= 0 && r1 < s1) {               // if the pixel is inside the image (along the x axis)
                                                                 // calculate the saliency (vote contribution)
-                            VoteContribution vote = StickVote(
-                                u,
-                                v,
-                                sigma,
-                                &V[(r0 * s1 + r1) * 2]
-                            );
-                            scale = L[(r0 * s1 + r1) * 2 + 1] - L[(r0 * s1 + r1) * 2 + 0];
+                            float l0 = L[(r0 * s1 + r1) * 2 + 0];
+                            float l1 = L[(r0 * s1 + r1) * 2 + 1];
+
+                            glm::vec2 Vcart;                    // calculate the largest eigenvector in cartesian coordinates
+                            Vcart.x = std::cos(V[(r0 * s1 + r1) * 2 + 1]);
+                            Vcart.y = std::sin(V[(r0 * s1 + r1) * 2 + 1]);
+                            VoteContribution vote = StickVote(u, v, sigma, (float*)&Vcart, power);
+
+                            scale = std::abs(l1) - std::abs(l0);
+                            if(l1 < 0.0f) scale = scale * (-1);
                             receiver = receiver + scale * vote.votes * vote.decay;
 
                             if (PLATE) {                        // apply the plate vote
@@ -116,6 +121,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
             output_field[(x0 * s1 + x1) * 4 + 1] += receiver[0][1];
             output_field[(x0 * s1 + x1) * 4 + 2] += receiver[1][0];
             output_field[(x0 * s1 + x1) * 4 + 3] += receiver[1][1];
+
             if (debug) {
                 debug_decay[x0 * s1 + x1] = total_decay;
             }
@@ -158,7 +164,9 @@ int main(int argc, char *argv[]) {
         ("window", boost::program_options::value<unsigned int>(&in_window), "window size (6 * sigma + 1 as default)")
         ("cuda", boost::program_options::value<int>(&in_cuda)->default_value(0), "cuda device index (-1 for CPU)")
         ("votefield", boost::program_options::value<std::vector<float> >(&in_votefield)->multitoken(), "generate a test field based on a 2D orientation")
+        ("power", boost::program_options::value<unsigned int>(&in_power)->default_value(1), "power used to refine the vote field")
         ("stick", "stick voting only")
+        ("negative", "apply votes from negative eigenvalues only")
         ("debug", "output debug information")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
@@ -193,12 +201,13 @@ int main(int argc, char *argv[]) {
     tira::field<float> Tr(T.shape());   // create a field to store the vote result
 
     auto start = std::chrono::high_resolution_clock::now();
+
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
-        cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, PLATE, debug);
+        cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_power, PLATE, debug);
     }
     else {
-        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_cuda, PLATE, debug);
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_power, in_cuda, PLATE, debug);
     }
     auto end = std::chrono::high_resolution_clock::now();
     t_total = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
