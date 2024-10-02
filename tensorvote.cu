@@ -122,12 +122,13 @@ __host__ __device__ double factorial(unsigned int n) {
     return fac;
 }
 
-__host__ __device__ double sticknorm(double sigma, unsigned int p) {
+__host__ __device__ double sticknorm(double sigma1, double sigma2, unsigned int p) {
     double pi = 3.1415926535897932384626433832795028841971693993751058209749445923078164062;
-    double num = pi * factorial(2 * p) * sigma * sigma;
+    double num = pi * factorial(2 * p);
     double ex = std::pow(2, 2 * p);
     double facp = factorial(p);
-    return num / (ex * facp * facp);
+    double trig_int = num / (ex * facp * facp);
+    return trig_int * (sigma1 * sigma1 + sigma2 * sigma2);
 }
 
 /// <summary>
@@ -329,11 +330,8 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     dim3 threads(blockDim, blockDim);
     dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1);
 
-    float sn = 0;
-    if (sigma > 0)
-        sn += 1.0 / sticknorm(sigma, power);
-    if (sigma2 > 0)
-        sn += 1.0 / sticknorm(sigma2, power);
+    float sn = 1.0 / sticknorm(sigma, sigma2, power);
+  
 
     if (debug) {
         std::cout << "Stick Area: " << sn << std::endl;
