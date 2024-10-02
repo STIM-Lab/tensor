@@ -21,6 +21,7 @@ bool in_crop = false;
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
+float* cudaEigenvalues(float* tensors, unsigned int n);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.
@@ -82,6 +83,8 @@ int main(int argc, char** argv) {
 		("input", boost::program_options::value<std::string>(&in_inputname), "input image")
 		("output", boost::program_options::value<std::string>(&in_outputname)->default_value("out.npy"), "output file storing the tensor field")
 		("hessian", "calculate the Hessian")
+		("negatives", "sets positive eigenvalues to zero")
+		("positives", "sets negative eigenvalues to zero")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(2), "order used to calculate the derivative")
 		("blur", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for a Gaussian blur")
 		("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
@@ -176,7 +179,30 @@ int main(int argc, char** argv) {
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
-		
+
+		if(vm.count("negatives") || vm.count("positives")) {
+			bool keep_positives = true;
+			if(vm.count("negatives")) keep_positives = false;
+
+			float* evals = cudaEigenvalues((float*)T.data(), T.X() * T.Y());
+			for (size_t yi = 0; yi < T.Y(); yi++) {
+				for (size_t xi = 0; xi < T.X(); xi++) {
+					size_t i = yi * T.X() + xi;
+					if(evals[i * 2 + 1] < 0) {
+						if(keep_positives) {
+							T(xi, yi) = 0;
+						}
+					}
+					else {
+						if(!keep_positives) {
+							T(xi, yi) = 0;
+						}
+					}
+				}
+			}
+		}
+
+		// save the tensor field to an output file
 		tira::field<float> Tout({ T.shape()[0], T.shape()[1], 2, 2 }, (float*)T.data());
 		Tout.save_npy(in_outputname);
 	}

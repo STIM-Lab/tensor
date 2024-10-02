@@ -40,12 +40,12 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0):
     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
     
     # assume that 1 - q.d = 0
-    D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
-    D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
+    #D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
+    #D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
     
     # assume that 1 - q.d = 1
-    #D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    #D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
+    D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
+    D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
     
     # calculate the rotated stick direction
     Dt = np.transpose(D, axes=(0, 1, 3, 2))

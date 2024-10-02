@@ -91,7 +91,7 @@ float Viewport[2];
 const char* FileName = "";
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity};
-int SCALARTYPE = ScalarType::EVal1;
+int SCALARTYPE = ScalarType::EVec1;
 bool RENDER_GLYPHS = false;
 
 // Calculate the viewport width and height in field pixels given the size of the field and window

@@ -9,9 +9,9 @@
 glm::vec2 Eigenvalues2D(glm::mat2 T);
 glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
 void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
-VoteContribution StickVote(float u, float v, float sigma, float* eigenvectors, unsigned int power);
+VoteContribution StickVote(float u, float v, float sigma, float sigma2, float* eigenvectors, unsigned int power);
 VoteContribution PlateVote(float u, float v, float sigma);
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, unsigned int w, unsigned int power, unsigned int device, bool PLATE = true, bool time = false);
+void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, float sigma2, unsigned int w, unsigned int power, unsigned int device, bool PLATE = true, bool time = false);
 
 float* cudaEigenvalues(float* tensors, unsigned int n);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
@@ -22,6 +22,7 @@ float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
 std::string in_inputname;
 std::string in_outputname;
 float in_sigma;
+float in_sigma2;
 unsigned int in_power;
 unsigned int in_window;
 int in_cuda;
@@ -54,7 +55,7 @@ void save_field(float* field, unsigned int sx, unsigned int sy, unsigned int val
     O.save_npy(filename);
 }
 
-void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigned int s1, float sigma, unsigned int w, unsigned int power = 1, bool PLATE = true, bool debug = false) {
+void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2, unsigned int w, unsigned int power = 1, bool PLATE = true, bool debug = false) {
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
@@ -98,7 +99,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
                             glm::vec2 Vcart;                    // calculate the largest eigenvector in cartesian coordinates
                             Vcart.x = std::cos(V[(r0 * s1 + r1) * 2 + 1]);
                             Vcart.y = std::sin(V[(r0 * s1 + r1) * 2 + 1]);
-                            VoteContribution vote = StickVote(u, v, sigma, (float*)&Vcart, power);
+                            VoteContribution vote = StickVote(u, v, sigma, sigma2, (float*)&Vcart, power);
 
                             scale = std::abs(l1) - std::abs(l0);
                             if(l1 < 0.0f) scale = scale * (-1);
@@ -160,13 +161,13 @@ int main(int argc, char *argv[]) {
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()("input", boost::program_options::value<std::string>(&in_inputname), "output filename for the coupled wave structure")
         ("output", boost::program_options::value<std::string>(&in_outputname)->default_value("result.npy"), "optional image field corresponding to the tensors")
-        ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(3.0f), "order used to calculate the first derivative")
+        ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(3.0f), "standard deviation for the stick decay function")
+        ("sigma2", boost::program_options::value<float>(&in_sigma2)->default_value(0.0f), "standard deviation for the orthogonal stick decay function")
         ("window", boost::program_options::value<unsigned int>(&in_window), "window size (6 * sigma + 1 as default)")
         ("cuda", boost::program_options::value<int>(&in_cuda)->default_value(0), "cuda device index (-1 for CPU)")
         ("votefield", boost::program_options::value<std::vector<float> >(&in_votefield)->multitoken(), "generate a test field based on a 2D orientation")
         ("power", boost::program_options::value<unsigned int>(&in_power)->default_value(1), "power used to refine the vote field")
         ("stick", "stick voting only")
-        ("negative", "apply votes from negative eigenvalues only")
         ("debug", "output debug information")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
@@ -187,7 +188,7 @@ int main(int argc, char *argv[]) {
     if (vm.count("stick")) PLATE = false;                     // if only stick voting is requested, set the boolean flag
 
     // calculate the window size if one isn't provided
-    if (!vm.count("window")) in_window = int(6 * in_sigma + 1);
+    if (!vm.count("window")) in_window = int(6 * std::max(in_sigma, in_sigma2) + 1);
 
     tira::field<float> T;
 
@@ -204,10 +205,10 @@ int main(int argc, char *argv[]) {
 
     // CPU IMPLEMENTATION
     if (in_cuda < 0) {
-        cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_power, PLATE, debug);
+        cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, PLATE, debug);
     }
     else {
-        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_window, in_power, in_cuda, PLATE, debug);
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, in_cuda, PLATE, debug);
     }
     auto end = std::chrono::high_resolution_clock::now();
     t_total = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

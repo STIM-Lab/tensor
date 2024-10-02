@@ -1,7 +1,7 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-import structen as st
+import image2tensor as st
 import tensorvote as tv
 import skimage as ski
 import os
@@ -35,15 +35,15 @@ def addGaussianT(T, sigma1, sigma0 = None):
     
     return T + ETA1 + ETA0
 
-def addShiftT(T, sigmax, sigmay = None):
-    if sigmay is None:
-        sigmay = sigmax
+def addShiftT(T, sigmax, dropout=0.5):
+
         
     x = np.array(range(0, T.shape[0]))
     y = np.array(range(0, T.shape[1]))
     X, Y = np.meshgrid(x, y)
-    etaX = np.random.normal(0.0, sigmax, size=(T.shape[0], T.shape[1])).astype(int)
-    etaY = np.random.normal(0.0, sigmay, size=(T.shape[0], T.shape[1])).astype(int)
+    etaX = np.random.normal(0.0, sigma, size=(T.shape[0], T.shape[1])).astype(int)
+    etaY = np.random.normal(0.0, sigma, size=(T.shape[0], T.shape[1])).astype(int)
+    delete = np.random.uniform(0.0, 1.0, size=(T.shape[0], T.shape[1]))
     
     iX = X + etaX
     iY = Y + etaY
@@ -52,6 +52,7 @@ def addShiftT(T, sigmax, sigmay = None):
     iX[iX <= 0] = 0
     iY[iY <= 0] = 0
     T_out = T[iX, iY, :, :]
+    T_out[delete < dropout, :, :] = 0
     return T_out
 
 # generates an NxN axis-aligned grid with b boxes
@@ -264,14 +265,15 @@ def savestack(filename, I):
 N = 2000
 spiral_size = 200
 sigma = 3
-noise = 1
+noise = 2
 grid_size = 10
 line_width = 1
 
 T = genSpiral2T(N, spiral_size, 0)
-T = addShiftT(T, 3)
+T = addShiftT(T, 3, 0.9)
 #T = addGaussianT(T, 0.2)
 np.save("spiral.npy", T)
+tv.visualize(T)
 
 #V = tv.vote2(T)
 #plt.figure()
@@ -282,6 +284,14 @@ ski.io.imsave("boxgrid.bmp", I.astype(np.uint8))
 
 I = genCircleGrid2(N, grid_size, line_width)
 ski.io.imsave("circlegrid.bmp", I.astype(np.uint8))
+
+I = ski.io.imread("physarum.bmp")[:, :, 0].astype(np.float32) / 255.0
+
+eta = np.random.normal(0.0, noise, I.shape)
+In = I + np.abs(eta)
+
+I = (In - np.min(In)) / (np.max(In) - np.min(In))
+ski.io.imsave("physarumn.bmp", (I * 255).astype(np.uint8))
 #%%    
 # N = 500
 # d = 60
