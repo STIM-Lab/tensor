@@ -12,6 +12,15 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
     return dest;
 }
 
+float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
+    unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
+
+    cudaSetDevice(deviceID);
+    float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);
+
+    return dest;
+}
+
 float* cudaEigenvalues(float* tensors, unsigned int n) {
     return tira::cuda::Eigenvalues2D<float>(tensors, n);
 }

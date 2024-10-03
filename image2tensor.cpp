@@ -16,9 +16,12 @@ std::string in_outputname;
 unsigned int in_order;
 float in_noise;
 float in_sigma;
+float in_blur;
 bool in_crop = false;
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
+float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
 float* cudaEigenvalues(float* tensors, unsigned int n);
@@ -86,8 +89,9 @@ int main(int argc, char** argv) {
 		("negatives", "sets positive eigenvalues to zero")
 		("positives", "sets negative eigenvalues to zero")
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(2), "order used to calculate the derivative")
-		("blur", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for a Gaussian blur")
-		("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
+		("blur", boost::program_options::value<float>(&in_blur)->default_value(0.0f), "sigma value for blurring the input image")
+		("sigma", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for the tensor field blur")
+		//("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
 		("crop", "crop the edges of the field to fit the finite difference window")
 		("help", "produce help message")
 		;
@@ -117,6 +121,16 @@ int main(int argc, char** argv) {
 		tira::image<float> I(in_inputname);												// load the input image
 		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
 		grey = grey / 255.0f;
+
+		if (in_blur > 0) {
+			unsigned int raw_width;
+			unsigned int raw_height;
+			float* raw_field = cudaGaussianBlur(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height);
+			grey = tira::image<float>(raw_field, raw_width, raw_height);
+			free(raw_field);
+			grey.cmap().save("grey.bmp");
+		}
+		
 		grey = grey.border(in_order, 0);
 
 		tira::image<glm::mat2> T;
