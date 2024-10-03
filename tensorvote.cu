@@ -293,12 +293,15 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     cudaDeviceProp props;
     HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
     auto end = std::chrono::high_resolution_clock::now();
-    t_deviceprops = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_deviceprops = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     int tensorFieldSize = 4 * s0 * s1;
 
+    start = std::chrono::high_resolution_clock::now();
     float* L = cudaEigenvalues(input_field, s0 * s1);
     float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1);
+    end = std::chrono::high_resolution_clock::now();
+    float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Declare GPU arrays
     float* gpuOutputField;
@@ -314,7 +317,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     HANDLE_ERROR(cudaMalloc(&gpuL, s0 * s1 * 2 * sizeof(float)));
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
-    t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
   
     start = std::chrono::high_resolution_clock::now();
     // Copy input arrays
@@ -323,7 +326,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
 
-    t_host2device = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_host2device = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
@@ -341,7 +344,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     kernelStickVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);              // call the CUDA kernel for voting
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
-    t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
 
     start = std::chrono::high_resolution_clock::now();
@@ -349,7 +352,7 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorFieldSize * sizeof(float), cudaMemcpyDeviceToHost));
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
-    t_device2host = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_device2host = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Free all of the GPU arrays
     start = std::chrono::high_resolution_clock::now();
@@ -358,6 +361,18 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     HANDLE_ERROR(cudaFree(gpuL));
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
-    t_devicefree = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    float t_devicefree = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    if (debug) {
+        std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
+        std::cout << "Voting: " << t_voting << " ms" << std::endl;
+
+
+        std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
+        std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
+        std::cout << "cudaMalloc: " << t_devicealloc << " ms" << std::endl;
+        std::cout << "cudaFree: " << t_devicefree << " ms" << std::endl;
+        std::cout << "cudaDeviceProps: " << t_deviceprops << " ms" << std::endl;
+    }
 }
 

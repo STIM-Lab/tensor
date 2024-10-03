@@ -23,6 +23,7 @@ find_package(TIRA REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
 #find_package(Boost CONFIG)
+find_package(PNG REQUIRED)
 
 
 #build the executable in the binary directory on MS Visual Studio
@@ -72,6 +73,7 @@ add_executable(tensorview2
 				tensorview2.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
 				cuda_calls.cu
+				tensorvote.cu
 )
 
 target_link_libraries(tensorview2
@@ -82,6 +84,7 @@ target_link_libraries(tensorview2
 				${CMAKE_DL_LIBS}
 				Boost::program_options
 				PRIVATE imgui::imgui
+				PNG::PNG
 )
 
 #create an executable
@@ -114,6 +117,7 @@ add_executable(image2tensor
 target_link_libraries(image2tensor
 				Boost::program_options
 				${X11_LIBRARIES}
+				PNG::PNG
 
 )
 

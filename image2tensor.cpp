@@ -94,7 +94,8 @@ int main(int argc, char** argv) {
 	boost::program_options::variables_map vm;
 
 	boost::program_options::positional_options_description p;
-	p.add("input", -1);
+	p.add("input", 1);
+	p.add("output", 1);
 	boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
 
 	boost::program_options::notify(vm);
