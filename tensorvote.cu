@@ -169,28 +169,34 @@ __host__ __device__  VoteContribution StickVote(float u, float v, float sigma1, 
     return S;
 }
 
-__host__ __device__  VoteContribution PlateVote(float u, float v, float sigma) {
+__host__ __device__  glm::mat2 PlateVote(float u, float v, float sigma1, float sigma2) {
 
     float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
+    float l2 = length * length;
+    float s12 = sigma1 * sigma1;
+    float s22 = sigma2 * sigma2;
+    float e1 = 0;
+    if (sigma1 > 0)
+        e1 = std::exp(-l2 / s12);
+    float e2 = 0;
+    if (sigma2 > 0)
+        e2 = std::exp(-l2 / s22);
 
-    VoteContribution R;
-    R.decay = PlateDecay(length, sigma);
+    float alpha = std::atan2(v, u);
+    float two_a = 2 * alpha;
+    float cos_2a = std::cos(two_a);
+    float sin_2a = std::sin(two_a);
+    glm::mat2 M;
+    M[0][0] = cos_2a + 2;
+    M[1][0] = sin_2a;
+    M[0][1] = sin_2a;
+    M[1][1] = 2 - cos_2a;
 
-    glm::mat2 TV;
-    TV[0][0] = 1.0f;                                // initialize the receiver vote to I
-    TV[1][1] = 1.0f;
-    TV[0][1] = TV[1][0] = 0.0f;
-    
-    if (length >= 0) {
-        float phi = atan2(v, u);
-        TV[0][0] = TV[0][0] - 0.25f * (cos(2.0f * phi) + 2);
-        TV[1][1] = TV[1][1] - 0.25f * (2 - cos(2.0f * phi));
-        TV[0][1] = TV[0][1] - 0.25f * (sin(2.0f * phi));
-        TV[1][0] = TV[0][1];
-    }
+    glm::mat2 I(1.0f);
 
-    R.votes = TV;
-    return R;
+    float c = length / (s12 + s22);
+
+    return c * (e1 * (I - 0.25f * M) + e2 * (0.25f * M));
 }
 
 
@@ -242,7 +248,7 @@ __global__ void kernelStickVote(float* VT, float* L, float* V, float sigma1, flo
     VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
 }
 
-__global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma, unsigned int power, int w, int s0, int s1) {
+__global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
     int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
     int x1 = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -260,22 +266,8 @@ __global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma, unsi
 
                 r1 = x1 + u;
                 if (r1 >= 0 && r1 < s1) {
-                    // calculate the contribution of (u,v) to (x,y)
-                    //float Vcart[2];
-                    //Vcart[0] = std::cos(V[(r0 * s1 + r1) * 2 + 1]);
-                    //Vcart[1] = std::sin(V[(r0 * s1 + r1) * 2 + 1]);
-                    //VoteContribution vote = StickVote(u, v, sigma, Vcart, power);
-                    //float l0 = L[(r0 * s1 + r1) * 2 + 0];
-                    //float l1 = L[(r0 * s1 + r1) * 2 + 1];
-                    //float scale = std::abs(l1) - std::abs(l0);
-                    //if(l1 < 0) scale = scale * (-1);
-                    //Votee = Votee + scale * vote.votes * vote.decay;
-
-                    //if (PLATE) {
-                        VoteContribution vote = PlateVote(u, v, sigma);
-                        float scale = L[(r0 * s1 + r1) * 2 + 0];
-                        Votee = Votee + scale * vote.votes * vote.decay;
-                    //}
+                    float l0 = L[(r0 * s1 + r1) * 2 + 0];
+                    Votee = Votee + l0 * PlateVote(u, v, sigma1, sigma2);
                 }
             }
         }
@@ -287,7 +279,10 @@ __global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma, unsi
     VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
 }
 
-void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2, unsigned int w, unsigned int power, unsigned int device, bool PLATE, bool debug) {
+void cudaVote2D(float* input_field, float* output_field, 
+    unsigned int s0, unsigned int s1, 
+    float sigma, float sigma2, 
+    unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug) {
     
     auto start = std::chrono::high_resolution_clock::now();
     cudaDeviceProp props;
@@ -341,7 +336,10 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     }
 
     start = std::chrono::high_resolution_clock::now();
-    kernelStickVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);              // call the CUDA kernel for voting
+    if(STICK)
+        kernelStickVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);              // call the CUDA kernel for voting
+    if (PLATE)
+        kernelPlateVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     float t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

@@ -32,7 +32,11 @@ void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
 float* cudaEigenvalues(float* tensors, unsigned int n);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
-void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2, unsigned int w, unsigned int power, unsigned int device, bool PLATE, bool debug);
+
+void cudaVote2D(float* input_field, float* output_field,
+    unsigned int s0, unsigned int s1,
+    float sigma, float sigma2,
+    unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 
 glm::vec2 Eigenvalues2D(glm::mat2 T);
 
@@ -77,8 +81,6 @@ float TV_SIGMA1 = 3;
 float TV_SIGMA2 = 0;
 int TV_P = 1;
 float SCALE = 0.3;
-//bool BLUR = false;
-//bool TV = false;
 float SCALE_FIELD = 1.0f;               // scale factor for the field (for zooming)
 
 int EIGENVALUE_SIGN = 0;                // limits eigenvector visualization to signed eigenvalues (-1 = negative eigenvalues, 0 = all, 1 = positive eigenvalues)
@@ -99,6 +101,8 @@ const char* FileName = "";
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity};
 enum ProcessingType {None, Gaussian, Vote};
+bool TV_STICK = true;
+bool TV_PLATE = true;
 int SCALARTYPE = ScalarType::EVec1;
 int PROCESSINGTYPE = ProcessingType::None;
 bool RENDER_GLYPHS = false;
@@ -248,12 +252,13 @@ void GaussianFilter(float sigma) {
 
 }
 
-void TensorVote(float sigma, unsigned int p, float sigma2) {
+void TensorVote(float sigma, unsigned int p, float sigma2, bool stick, bool plate) {
     Tn = tira::image<glm::mat2>(T0.X(), T0.Y());
 
     unsigned int w = 6 * std::max(sigma, sigma2) + 1;
     cudaVote2D((float*)T0.data(), (float*)Tn.data(), 
-        (unsigned int)T0.shape()[0], (unsigned int)T0.shape()[1], sigma, sigma2, w, p, in_device, false, false);
+        (unsigned int)T0.shape()[0], (unsigned int)T0.shape()[1], 
+        sigma, sigma2, w, p, in_device, stick, plate, false);
 
     UpdateEigens();
 }
@@ -598,6 +603,7 @@ void RenderUI() {
         if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::None)) {
             Tn = T0;
             UpdateEigens();
+            ScalarRefresh();
         }
         ImGui::SeparatorText("Gaussian Blur");
         if (ImGui::RadioButton("Blur", &PROCESSINGTYPE, (int)ProcessingType::Gaussian)) {
@@ -622,7 +628,7 @@ void RenderUI() {
         ImGui::SeparatorText("Tensor Voting");
         if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
             //if (PROCESSINGTYPE == ProcessingType::Vote) {
-                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2);
+                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
             //}
             //else {
             //    Tn = T0;
@@ -633,23 +639,32 @@ void RenderUI() {
         if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f)) {
             if (TV_SIGMA1 < 0) TV_SIGMA1 = 0.0;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
-                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2);
+                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
                 ScalarRefresh();
             }
         }
         if (ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f)) {
             if (TV_SIGMA2 < 0) TV_SIGMA2 = 0.0;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
-                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2);
+                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
                 ScalarRefresh();
             }
         }
         if (ImGui::InputInt("Power", &TV_P, 1, 5)) {
             if (TV_P < 1) TV_P = 1;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
-                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2);
+                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
                 ScalarRefresh();
             }
+        }
+        if (ImGui::Checkbox("Stick", &TV_STICK)) {
+            TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+            ScalarRefresh();
+        }
+        ImGui::SameLine();
+        if (ImGui::Checkbox("Plate", &TV_PLATE)) {
+            TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+            ScalarRefresh();
         }
 
         ImGui::TreePop();
