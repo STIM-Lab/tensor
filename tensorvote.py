@@ -154,7 +154,7 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     L = np.sqrt(RX**2 + RY**2)
     
     #c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
-    c = L / (sigma1**2 + sigma2**2)
+    c = 1 / (sigma1**2 + sigma2**2)
     
     e1 = 0
     if(sigma1 > 0):
@@ -175,7 +175,7 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     M[:, :, 1, 1] = (0.25 * (2 - COS_2ALPHA))
     
     # this line assumes that there is no contribution from the voter at the voter location
-    c[L==0] = 0
+    #c[L==0] = 0
     
     eta = 1.0 / (np.pi**(3.0/2.0)/ (4*np.sqrt(1.0/(sigma1**2))))
     
