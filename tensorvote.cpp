@@ -10,9 +10,11 @@ glm::vec2 Eigenvalues2D(glm::mat2 T);
 glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
 void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
 VoteContribution StickVote(float u, float v, float sigma, float sigma2, float* eigenvectors, unsigned int power);
-VoteContribution PlateVote(float u, float v, float sigma);
-void cudaVote2D(float* input_field, float* output_field, unsigned int sx, unsigned int sy, float sigma, float sigma2, unsigned int w, unsigned int power, unsigned int device, bool PLATE = true, bool time = false);
-
+VoteContribution PlateVote(float u, float v, float sigma, float sigma2);
+void cudaVote2D(float* input_field, float* output_field,
+    unsigned int s0, unsigned int s1,
+    float sigma, float sigma2,
+    unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 float* cudaEigenvalues(float* tensors, unsigned int n);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
 
@@ -29,6 +31,7 @@ int in_cuda;
 std::vector<float> in_votefield;
 bool debug = false;
 bool PLATE = true;
+bool STICK = true;
 
 // timing variables
 float t_voting;
@@ -106,7 +109,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
                             receiver = receiver + scale * vote.votes * vote.decay;
 
                             if (PLATE) {                        // apply the plate vote
-                                vote = PlateVote(u, v, sigma);
+                                vote = PlateVote(u, v, sigma, sigma2);
                                 scale = L[(r0 * s1 + r1) * 2 + 0];
                                 receiver = receiver + scale * vote.votes * vote.decay;
                             }
@@ -168,6 +171,7 @@ int main(int argc, char *argv[]) {
         ("votefield", boost::program_options::value<std::vector<float> >(&in_votefield)->multitoken(), "generate a test field based on a 2D orientation")
         ("power", boost::program_options::value<unsigned int>(&in_power)->default_value(1), "power used to refine the vote field")
         ("stick", "stick voting only")
+        ("plate", "plate voting only")
         ("debug", "output debug information")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
@@ -187,6 +191,7 @@ int main(int argc, char *argv[]) {
 
     if (vm.count("debug")) debug = true;                    // activate debug output
     if (vm.count("stick")) PLATE = false;                     // if only stick voting is requested, set the boolean flag
+    if(vm.count("plate")) STICK = false;
 
     // calculate the window size if one isn't provided
     if (!vm.count("window")) in_window = int(6 * std::max(in_sigma, in_sigma2) + 1);
@@ -209,7 +214,7 @@ int main(int argc, char *argv[]) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, PLATE, debug);
     }
     else {
-        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, in_cuda, PLATE, debug);
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, in_cuda, STICK, PLATE, debug);
     }
     auto end = std::chrono::high_resolution_clock::now();
     t_total = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();

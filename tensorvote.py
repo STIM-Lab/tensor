@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import math
 
 '''
 
@@ -27,7 +28,7 @@ def eigmag(T):
     
     return sortedValues, sortedVectors
     
-def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0):
+def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     
     q = np.zeros((2, 1))
     q[0] = qx
@@ -38,14 +39,14 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0):
     
     # calculate the normalized direction vector
     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
+       
+    # if L == 0, assume that D is zero (and 1-qTd = 1)
+    #D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
+    #D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
     
-    # assume that 1 - q.d = 0
-    #D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
-    #D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
-    
-    # assume that 1 - q.d = 1
-    D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
+    # if L == 0, assume that D is zero (and 1-qTd = 1)
+    D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
+    D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
     
     # calculate the rotated stick direction
     Dt = np.transpose(D, axes=(0, 1, 3, 2))
@@ -55,28 +56,25 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0):
     Rqt = np.transpose(Rq, (0, 1, 3, 2))
     
     # calculate the decay based on the desired properties
+    eta = 1.0 / ((np.pi * math.factorial(2 * power)) / (2**(2*power) * (math.factorial(power)**2)) * (sigma1**2 + sigma2**2))
     if sigma1 == 0:
-        g1 = 0
-        normscale1 = 0
+        d1 = 0
     else:
-        g1 = np.exp(- L**2 / sigma1**2)[..., np.newaxis, np.newaxis]
-        normscale1 = 2 / (np.pi * sigma1**2)
+        d1 = np.exp(- L**2 / sigma1**2)
         
     if sigma2 == 0:
-        g2 = 0
-        normscale2 = 0
+        d2 = 0
     else:
-        g2 = np.exp(- L**2 / sigma2**2)[..., np.newaxis, np.newaxis]
-        normscale2 = 2 / (np.pi * sigma2**2)
+        d2 = np.exp(- L**2 / sigma2**2)
     
-    qTd = np.matmul(np.transpose(q), D)
+    qTd = np.squeeze(np.matmul(np.transpose(q), D))
     cos_2_theta = qTd**2
     sin_2_theta = 1 - cos_2_theta    
     
-    decay = normscale1 * g1 * sin_2_theta + normscale2 * g2 * cos_2_theta
+    DECAY = (d1 * sin_2_theta + d2 * cos_2_theta)[..., np.newaxis, np.newaxis]
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
-    V = decay * np.matmul(Rq, Rqt)
+    V = eta * DECAY * np.matmul(Rq, Rqt)
     return V
 
 # calculate the vote result of the tensor field T
@@ -155,20 +153,38 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     
     L = np.sqrt(RX**2 + RY**2)
     
-    c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
+    #c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
+    c = L / (sigma1**2 + sigma2**2)
     
-    # this line assumes that there is no contribution from the voter at the voter location
-    c[L==0] = 0
+    e1 = 0
+    if(sigma1 > 0):
+        e1 = np.exp(- L**2 / sigma1**2)
+    e2 = 0
+    if(sigma2 > 0):
+        e2 = np.exp(- L**2 / sigma2**2)
     
-    T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
+    
+    M = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
     
     COS_2ALPHA = np.cos(TWO_ALPHA)
     SIN_2ALPHA = np.sin(TWO_ALPHA)
     
-    T[:, :, 0, 0] = c * (1 - 0.25 * (COS_2ALPHA + 2))
-    T[:, :, 0, 1] = c * (-0.25 * SIN_2ALPHA)
-    T[:, :, 1, 0] = c * (-0.25 * SIN_2ALPHA)
-    T[:, :, 1, 1] = c * (1 - 0.25 * (2 - COS_2ALPHA))
+    M[:, :, 0, 0] = (0.25 * (COS_2ALPHA + 2))
+    M[:, :, 0, 1] = (0.25 * SIN_2ALPHA)
+    M[:, :, 1, 0] = (0.25 * SIN_2ALPHA)
+    M[:, :, 1, 1] = (0.25 * (2 - COS_2ALPHA))
+    
+    # this line assumes that there is no contribution from the voter at the voter location
+    c[L==0] = 0
+    
+    eta = 1.0 / (np.pi**(3.0/2.0)/ (4*np.sqrt(1.0/(sigma1**2))))
+    
+    T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))    
+    
+    T[:, :, 0, 0] = c * (eta * e1 * (1 - M[:, :, 0, 0]) + e2 * M[:, :, 0, 0])
+    T[:, :, 0, 1] = c * (eta * e1 * (0 - M[:, :, 0, 1]) + e2 * M[:, :, 0, 1])
+    T[:, :, 1, 0] = c * (eta * e1 * (0 - M[:, :, 1, 0]) + e2 * M[:, :, 1, 0])
+    T[:, :, 1, 1] = c * (eta * e1 * (1 - M[:, :, 1, 1]) + e2 * M[:, :, 1, 1])
     
     return T
 
@@ -176,7 +192,7 @@ def platefield2_numerical(RX, RY, sigma1, sigma2=0, N=10):
     
     T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
     
-    dtheta = 2 * np.pi / N
+    dtheta = np.pi / N
     for n in range(N):
         x = np.cos(n * dtheta)
         y = np.sin(n * dtheta)
@@ -386,13 +402,15 @@ def visualize(T):
     l0_max = np.max(np.abs(L[..., 0]))
     plt.imshow(L[:, :, 0], vmin=-l0_max, vmax=l0_max, cmap="RdYlBu_r", origin="lower")
     plt.colorbar()
-    plt.title("Eigenvalue 0")
+    l0_sum = np.sum(L[..., 0])
+    plt.title("Eigenvalue 0, integral = " + str(l0_sum))
     
     plt.subplot(2, 3, 5)
     l1_max = np.max(np.abs(L[..., 1]))
     plt.imshow(L[:, :, 1], vmin=-l1_max, vmax=l1_max, cmap="RdYlBu_r", origin="lower")
     plt.colorbar()
-    plt.title("Eigenvalue 1")
+    l1_sum = np.sum(L[..., 1])
+    plt.title("Eigenvalue 1, integral = " + str(l1_sum))
     
     
     

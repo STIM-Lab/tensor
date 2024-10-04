@@ -100,11 +100,11 @@ float Viewport[2];
 const char* FileName = "";
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity};
-enum ProcessingType {None, Gaussian, Vote};
+enum ProcessingType {NoProcessing, Gaussian, Vote};
 bool TV_STICK = true;
 bool TV_PLATE = true;
 int SCALARTYPE = ScalarType::EVec1;
-int PROCESSINGTYPE = ProcessingType::None;
+int PROCESSINGTYPE = ProcessingType::NoProcessing;
 bool RENDER_GLYPHS = false;
 
 // Calculate the viewport width and height in field pixels given the size of the field and window
@@ -600,7 +600,7 @@ void RenderUI() {
     ss << "Min: " << MINVAL << "\t Max: " << MAXVAL;
     ImGui::Text("%s", ss.str().c_str());
     if (ImGui::TreeNode("Processing")) {
-        if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::None)) {
+        if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
             Tn = T0;
             UpdateEigens();
             ScalarRefresh();
