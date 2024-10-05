@@ -161,7 +161,7 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     L = np.sqrt(RX**2 + RY**2)
     
     #c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
-    c = 1 / (sigma1**2 + sigma2**2)
+    c = 1 / (np.pi * (sigma1**2 + sigma2**2))
     
     e1 = 0
     if(sigma1 > 0):

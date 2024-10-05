@@ -194,7 +194,7 @@ __host__ __device__  glm::mat2 PlateVote(float u, float v, float sigma1, float s
 
     glm::mat2 I(1.0f);
 
-    float c = length / (s12 + s22);
+    float c = 1.0f / (std::numbers::pi * (s12 + s22));
 
     return c * (e1 * (I - 0.25f * M) + e2 * (0.25f * M));
 }
