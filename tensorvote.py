@@ -27,6 +27,14 @@ def eigmag(T):
     #eigenVectors = np.take_along_axis(eigenVectors, idx, -1)
     
     return sortedValues, sortedVectors
+
+# calculates the normalization factor for a stick tensor field
+def eta(sigma1, sigma2, p):
+    num = np.pi * math.factorial(2*p)
+    den = 2**(2*p) * (math.factorial(p)**2)
+    s = sigma1**2 + sigma2**2
+    integral = (num / den) * s
+    return 1.0 / integral
     
 def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     
@@ -56,7 +64,6 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     Rqt = np.transpose(Rq, (0, 1, 3, 2))
     
     # calculate the decay based on the desired properties
-    eta = 1.0 / ((np.pi * math.factorial(2 * power)) / (2**(2*power) * (math.factorial(power)**2)) * (sigma1**2 + sigma2**2))
     if sigma1 == 0:
         d1 = 0
     else:
@@ -74,7 +81,7 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     DECAY = (d1 * sin_2_theta + d2 * cos_2_theta)[..., np.newaxis, np.newaxis]
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
-    V = eta * DECAY * np.matmul(Rq, Rqt)
+    V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
     return V
 
 # calculate the vote result of the tensor field T
@@ -173,18 +180,14 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     M[:, :, 0, 1] = (0.25 * SIN_2ALPHA)
     M[:, :, 1, 0] = (0.25 * SIN_2ALPHA)
     M[:, :, 1, 1] = (0.25 * (2 - COS_2ALPHA))
-    
-    # this line assumes that there is no contribution from the voter at the voter location
-    #c[L==0] = 0
-    
-    eta = 1.0 / (np.pi**(3.0/2.0)/ (4*np.sqrt(1.0/(sigma1**2))))
+
     
     T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))    
     
-    T[:, :, 0, 0] = c * (eta * e1 * (1 - M[:, :, 0, 0]) + e2 * M[:, :, 0, 0])
-    T[:, :, 0, 1] = c * (eta * e1 * (0 - M[:, :, 0, 1]) + e2 * M[:, :, 0, 1])
-    T[:, :, 1, 0] = c * (eta * e1 * (0 - M[:, :, 1, 0]) + e2 * M[:, :, 1, 0])
-    T[:, :, 1, 1] = c * (eta * e1 * (1 - M[:, :, 1, 1]) + e2 * M[:, :, 1, 1])
+    T[:, :, 0, 0] = c * (e1 * (1 - M[:, :, 0, 0]) + e2 * M[:, :, 0, 0])
+    T[:, :, 0, 1] = c * (e1 * (0 - M[:, :, 0, 1]) + e2 * M[:, :, 0, 1])
+    T[:, :, 1, 0] = c * (e1 * (0 - M[:, :, 1, 0]) + e2 * M[:, :, 1, 0])
+    T[:, :, 1, 1] = c * (e1 * (1 - M[:, :, 1, 1]) + e2 * M[:, :, 1, 1])
     
     return T
 
