@@ -38,6 +38,8 @@ void cudaVote2D(float* input_field, float* output_field,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 
+glm::vec2 Eigenvector2D(glm::mat2 T, float lambda);
+
 glm::vec2 Eigenvalues2D(glm::mat2 T);
 
 // command line arguments
@@ -73,6 +75,8 @@ tira::image<float> THETAn;          // eigenvectors of the current tensor field 
 tira::image<float> SCALAR;
 bool FIELD_LOADED = false;
 
+tira::image<unsigned char> CurrentColormap;
+
 float MINVAL, MAXVAL;
 float MAXNORM;                          // maximum matrix norm in the field (size of the largest tensor)
 int DIMENSION;
@@ -100,11 +104,21 @@ float Viewport[2];
 const char* FileName = "";
 
 enum ScalarType {NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity};
+int SCALARTYPE = ScalarType::EVec1;
+
 enum ProcessingType {NoProcessing, Gaussian, Vote};
+int PROCESSINGTYPE = ProcessingType::NoProcessing;
+
+enum AdjustColorType {NoAdjustment, Darken, Lighten};
+int ECCENTRICITYCOLORMODE = AdjustColorType::Lighten;
+int MAGNITUDECOLORMODE = AdjustColorType::Darken;
+float MAGNITUDECOLORTHRESHOLD = -1;
+float L1MaxMag = -1;
+
 bool TV_STICK = true;
 bool TV_PLATE = true;
-int SCALARTYPE = ScalarType::EVec1;
-int PROCESSINGTYPE = ProcessingType::NoProcessing;
+
+
 bool RENDER_GLYPHS = false;
 
 // Calculate the viewport width and height in field pixels given the size of the field and window
@@ -288,17 +302,25 @@ tira::image<unsigned char> ColormapEval(unsigned int i) {
     return C;
 }
 
-tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool mag = true) {    
+tira::image<unsigned char> ColormapEvec(unsigned int i) {    
 
+    // calculate a color representing the eigenvector angle
     tira::image<float> AngleColor = THETAn.channel(i).cmap(-std::numbers::pi, std::numbers::pi, ColorMap::RainbowCycle);
-    if (ecc) {
-        tira::image<float> White(AngleColor.X(), AngleColor.Y(), AngleColor.C());
-        White = 255;
+
+
+    // adjust the pixel color based on the eccentricity
+    if (ECCENTRICITYCOLORMODE) {
+        tira::image<float> EccentricityColor(AngleColor.X(), AngleColor.Y(), AngleColor.C());
+        if (ECCENTRICITYCOLORMODE == AdjustColorType::Lighten)
+            EccentricityColor = 255;
+        else
+            EccentricityColor = 0;
+
         tira::image<float> eccentricity = CalculateEccentricity();
-        AngleColor = AngleColor * eccentricity + (-eccentricity + 1) * White;
+        AngleColor = AngleColor * eccentricity + (-eccentricity + 1) * EccentricityColor;
     }
 
-    if (mag) {
+    if (MAGNITUDECOLORMODE) {
         tira::image<float> L1 = Ln.channel(1);                  // get the magnitude of the largest eigenvector
         if(EIGENVALUE_SIGN == -1)
             L1 = L1.clamp(-INFINITY, 0).abs();
@@ -306,12 +328,21 @@ tira::image<unsigned char> ColormapEvec(unsigned int i, bool ecc = true, bool ma
             L1 = L1.clamp(0, INFINITY);
         else
             L1 = L1.abs();
-        float L1max = L1.maxv();
-        tira::image<float> L1norm = L1 / L1max;
-        AngleColor = AngleColor * L1norm;
+        if(MAGNITUDECOLORTHRESHOLD < 0)
+            MAGNITUDECOLORTHRESHOLD = L1.maxv();
+        L1MaxMag = L1.maxv();
+        tira::image<float> L1norm = (L1 / MAGNITUDECOLORTHRESHOLD).clamp(0.0f, 1.0f);
+
+        tira::image<float> MagnitudeColor(AngleColor.X(), AngleColor.Y(), AngleColor.C());
+        if (MAGNITUDECOLORMODE == AdjustColorType::Lighten)
+            MagnitudeColor = 255;
+        else
+            MagnitudeColor = 0;
+
+        AngleColor = AngleColor * L1norm + (-L1norm + 1) * MagnitudeColor;
     }
-    tira::image<unsigned char> C = AngleColor;
-    return C;
+    CurrentColormap = AngleColor;
+    return CurrentColormap;
 }
 
 tira::image<unsigned char> ColormapEccentricity() {
@@ -321,8 +352,8 @@ tira::image<unsigned char> ColormapEccentricity() {
 
     MAXVAL = 1.0;
     MINVAL = 0.0;
-    tira::image<unsigned char> C = ecc.cmap(0, 1, ColorMap::Magma);
-    return C;
+    CurrentColormap = ecc.cmap(0, 1, ColorMap::Magma);
+    return CurrentColormap;
 }
 
 
@@ -342,9 +373,9 @@ void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
         }
     }
 
-    tira::image<unsigned char> C = ColormapTensor(u, v);
+    CurrentColormap = ColormapTensor(u, v);
 
-    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
+    CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
 }
 
 /// <summary>
@@ -359,8 +390,8 @@ void ScalarFrom_Eval(unsigned int i) {
     MAXVAL = SCALAR.maxv();
     MINVAL = SCALAR.minv();
     if (CMAP_MATERIAL) {
-        tira::image<unsigned char> C = ColormapEval(i);
-        CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
+        CurrentColormap = ColormapEval(i);
+        CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
     }
 }
 
@@ -371,25 +402,8 @@ void ScalarFrom_Eval(unsigned int i) {
 /// <param name="i"></param>
 void ScalarFrom_Eccentricity() {
 
-    /*SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);      // allocate a scalar image
-
-    float t, d;
-    for (int yi = 0; yi < Tn.shape()[0]; yi++) {                                     // for each tensor in the field
-        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            float l0 = Ln(xi, yi, 0);
-            float l1 = Ln(xi, yi, 1);
-            if (l0 == 0.0f)
-                SCALAR(xi, yi) = 0.0f;
-            else
-                SCALAR(xi, yi) = sqrt(1.0f - (l0 * l0) / (l1 * l1));
-        }
-    }
-
-    MAXVAL = 1.0f;
-    MINVAL = 0.0f;
-    */
-    tira::image<unsigned char> C = ColormapEccentricity();
-    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
+    CurrentColormap = ColormapEccentricity();
+    CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
 }
 
 /// <summary>
@@ -400,61 +414,12 @@ void ScalarFrom_Evec(unsigned int i) {
 
     SCALAR = THETAn.channel(i);
 
-    tira::image<unsigned char> C = ColormapEvec(i);
+    CurrentColormap = ColormapEvec(i);
 
-    CMAP_MATERIAL->SetTexture("mapped_image", C, GL_RGB8, GL_NEAREST);
+    CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
 }
 
-
-// small then large
-glm::vec2 Eigenvalues2D_old_old(glm::mat2 T) {
-    float d = T[0][0];
-    float e = T[0][1];
-    float f = e;
-    float g = T[1][1];
-
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
-    float min = a < b ? a : b;
-    float max = a > b ? a : b;
-    glm::vec2 out(min, max);
-    return out;
-}
-
-glm::vec2 Eigenvalues2D_old(glm::mat2 T) {
-    /*float a = T[0][0];
-    float b = T[0][1];
-    float c = b;
-    float d = T[1][1];
-
-    float trace = a + d;
-    float det = a * d - b * c;
-    //float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float e = trace / 2.0f;
-    float f = sqrt(trace * trace / 4.0 - det);
-    //float min = a < b ? a : b;
-    //float max = a > b ? a : b;
-    glm::vec2 out(e - f, e + f);
-    return out;*/
-    float d = T[0][0];
-    float e = T[1][0];
-    float f = T[0][1];
-    float g = T[1][1];
-
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
-
-    glm::vec2 result;
-    result.x = std::abs(a) < std::abs(b) ? a : b;
-    result.y = std::abs(a) > std::abs(b) ? a : b;
-    return result;
-}
-
-glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
+/*glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
     float a = T[0][0];
     float b = T[0][1];
     //float c = b;
@@ -471,7 +436,7 @@ glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
         if (a < d) return glm::vec2(0.0, 1.0);
         else return glm::vec2(1.0, 0.0);
     }
-}
+}*/
 
 void ScalarRefresh() {
 
@@ -557,6 +522,59 @@ void RenderUI() {
 
     // select scalar component
     if (ImGui::Button("Reset View")) SCALE_FIELD = 1.0f;
+
+    if (ImGui::Button("Save Image"))					// create a button for loading the shader
+        ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
+        //ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
+    if (ImGuiFileDialog::Instance()->Display("ChooseBmpFile")) {				    // if the user opened a file dialog
+        if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+            std::string extension = filename.substr(filename.find_last_of(".") + 1);
+            if (extension == "bmp") {
+                CurrentColormap.save(filename);
+            }
+        }
+        ImGuiFileDialog::Instance()->Close();									// close the file dialog box		
+    }
+
+    ImGui::SeparatorText("Eigenvector Display");
+    if (ImGui::RadioButton("evec 0 (theta)", &SCALARTYPE, (int)ScalarType::EVec0)) {
+        ScalarRefresh();
+    }
+    ImGui::SameLine();
+    if (ImGui::RadioButton("evec 1 (theta)", &SCALARTYPE, (int)ScalarType::EVec1)) {
+        ScalarRefresh();
+    }
+    ImGui::Columns(2);
+    ImGui::Text("Eccentricity");
+    if (ImGui::RadioButton("None##1", &ECCENTRICITYCOLORMODE, AdjustColorType::NoAdjustment))
+        ScalarRefresh();
+    if (ImGui::RadioButton("Lighten##1", &ECCENTRICITYCOLORMODE, AdjustColorType::Lighten))
+        ScalarRefresh();
+    if (ImGui::RadioButton("Darken##1", &ECCENTRICITYCOLORMODE, AdjustColorType::Darken))
+        ScalarRefresh();
+
+    ImGui::NextColumn();
+    ImGui::Text("Magnitude");
+    if (ImGui::RadioButton("None##2", &MAGNITUDECOLORMODE, AdjustColorType::NoAdjustment))
+        ScalarRefresh();
+    if (ImGui::RadioButton("Lighten##2", &MAGNITUDECOLORMODE, AdjustColorType::Lighten))
+        ScalarRefresh();
+    if (ImGui::RadioButton("Darken##2", &MAGNITUDECOLORMODE, AdjustColorType::Darken))
+        ScalarRefresh();
+    ImGui::SetNextItemWidth(160);
+    if (ImGui::InputFloat("Scale", &MAGNITUDECOLORTHRESHOLD, L1MaxMag * 0.01, L1MaxMag * 0.1)) {
+        if (MAGNITUDECOLORTHRESHOLD < 0) MAGNITUDECOLORTHRESHOLD = 0;
+        ScalarRefresh();
+    }
+    if (ImGui::Button("Reset")) {
+        MAGNITUDECOLORTHRESHOLD = L1MaxMag;
+        ScalarRefresh();
+    }
+
+    ImGui::Columns(1);
+
+    ImGui::SeparatorText("Scalar Display");
     ImGui::RadioButton("None", &SCALARTYPE, (int)ScalarType::NoScalar);
     if (ImGui::RadioButton("[0, 0] = dxdx", &SCALARTYPE, (int)ScalarType::Tensor00)) {
         ScalarRefresh();
@@ -575,13 +593,7 @@ void RenderUI() {
     if (ImGui::RadioButton("lambda 1", &SCALARTYPE, (int)ScalarType::EVal1)) {
         ScalarRefresh();
     }
-    if (ImGui::RadioButton("evec 0 (theta)", &SCALARTYPE, (int)ScalarType::EVec0)) {
-        ScalarRefresh();
-    }
-    ImGui::SameLine();
-    if (ImGui::RadioButton("evec 1 (theta)", &SCALARTYPE, (int)ScalarType::EVec1)) {
-        ScalarRefresh();
-    }
+    
     if (ImGui::RadioButton("eccentricity", &SCALARTYPE, (int)ScalarType::Eccentricity)) {
         ScalarFrom_Eccentricity();
     }
@@ -599,7 +611,12 @@ void RenderUI() {
     std::stringstream ss;
     ss << "Min: " << MINVAL << "\t Max: " << MAXVAL;
     ImGui::Text("%s", ss.str().c_str());
-    if (ImGui::TreeNode("Processing")) {
+
+    if (ImGui::TreeNodeEx("Processing", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::Button("Bake")) {
+            T0 = Tn;
+            PROCESSINGTYPE = ProcessingType::NoProcessing;
+        }
         if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
             Tn = T0;
             UpdateEigens();
@@ -713,10 +730,11 @@ void RenderUI() {
 
             // display the eigenvectors
             ImGui::Text("Eigenvectors:");
-            float evx[2] = { ev0[0], ev1[0] };
-            float evy[2] = { ev0[1], ev1[1] };
-            ImGui::InputFloat2("##evx", evx, "%1.5F");
-            ImGui::InputFloat2("##evy", evy, "%1.5F");
+            ImGui::Columns(2);
+            //float ev0[2] = { ev0[0], ev0[1] };
+            //float ev1[2] = { ev1[0], ev1[1] };
+            ImGui::InputFloat2("x0, y0", (float*)& ev0, "%1.5F");
+            ImGui::InputFloat2("x1, y1", (float*)& ev1, "%1.5F");
 
         }
     }
@@ -774,7 +792,8 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    SCALE_FIELD += SCALE_FIELD * (yoffset * 0.25);
+    if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+        SCALE_FIELD += SCALE_FIELD * (yoffset * 0.25);
 }
 
 

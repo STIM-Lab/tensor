@@ -50,20 +50,43 @@ __host__ __device__ glm::vec2 Eigenvalues2D(glm::mat2 T) {
 }
 
 // small then large
-__host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index) {
+__host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
+/*
+    //[ d    e ]
+    //[ e    g ]
     float d = T[0][0];
     float e = T[0][1];
-    //float f = e;
     float g = T[1][1];
 
     if (e != 0) {
-        return glm::normalize(glm::vec2(1.0, (lambdas[index] - d) / e));
+        return glm::normalize(glm::vec2(1.0, (lambda - d) / e));
     }
     else if (g == 0) {
-        return glm::vec2(1.0, 0.0);
+        if (index == 0) return glm::vec2(0.0, 1.0);
+        if (index == 1) return glm::vec2(1.0, 0.0);
     }
     else {
-        return glm::vec2(0.0, 1.0);
+        if (index == 0) return glm::vec2(0.0, 1.0);
+        if (index == 1) return glm::vec2(1.0, 0.0);
+    }
+    */
+    // [ a   b ]
+    // [ b   d ]
+    float a = T[0][0];
+    float b = T[0][1];
+    //float c = b;
+    float d = T[1][1];
+
+    if (b != 0) {
+        return glm::normalize(glm::vec2(lambda - d, b));
+    }
+    else if (lambda == 0) {
+        if (a < d) return glm::vec2(1.0, 0.0);
+        else return glm::vec2(0.0, 1.0);
+    }
+    else {
+        if (a < d) return glm::vec2(0.0, 1.0);
+        else return glm::vec2(1.0, 0.0);
     }
 }
 
@@ -82,7 +105,7 @@ __host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, flo
                 input_field[ti + 3]);
 
             glm::vec2 evals = Eigenvalues2D(T);                     // calculate the eigenvalues
-            glm::vec2 evec = Eigenvector2D(T, evals, 1);              // calculate the largest (1) eigenvector
+            glm::vec2 evec(Eigenvector2D(T, evals[1]));              // calculate the largest (1) eigenvector
 
             unsigned int vi = i * 2;                                // update the vector/value index (each is 2 elements)
             eigenvectors[vi + 0] = evec[0];                         // save the eigenvectors to the output array

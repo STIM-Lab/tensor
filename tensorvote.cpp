@@ -10,7 +10,7 @@ glm::vec2 Eigenvalues2D(glm::mat2 T);
 glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
 void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
 VoteContribution StickVote(float u, float v, float sigma, float sigma2, float* eigenvectors, unsigned int power);
-VoteContribution PlateVote(float u, float v, float sigma, float sigma2);
+glm::mat2 PlateVote(float u, float v, float sigma, float sigma2);
 void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
@@ -109,9 +109,10 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
                             receiver = receiver + scale * vote.votes * vote.decay;
 
                             if (PLATE) {                        // apply the plate vote
-                                vote = PlateVote(u, v, sigma, sigma2);
+                                
                                 scale = L[(r0 * s1 + r1) * 2 + 0];
-                                receiver = receiver + scale * vote.votes * vote.decay;
+                                //receiver = receiver + scale * vote.votes * vote.decay;
+                                receiver = receiver + PlateVote(u, v, sigma, sigma2);
                             }
 
                             if (debug) {
