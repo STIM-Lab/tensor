@@ -21,24 +21,24 @@ float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, 
     return dest;
 }
 
-float* cudaEigenvalues(float* tensors, unsigned int n) {
-    return tira::cuda::Eigenvalues2D<float>(tensors, n);
+float* cudaEigenvalues(float* tensors, unsigned int n, int device) {
+    return tira::cuda::Eigenvalues2D<float>(tensors, n, device);
 }
 
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n) {
-    return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device) {
+    return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n, device);
 }
 
-void cudaEigenvalue0(float* tensors, unsigned int n, float* evals) {
-    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n);
+void cudaEigenvalue0(float* tensors, unsigned int n, float* evals, int device) {
+    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n, device);
     for (size_t i = 0; i < n; i++) {
         evals[i] = both_evals[2 * i];
     }
     free(both_evals);
 }
 
-void cudaEigenvalue1(float* tensors, unsigned int n, float* evals) {
-    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n);
+void cudaEigenvalue1(float* tensors, unsigned int n, float* evals, int device) {
+    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n, device);
     for (size_t i = 0; i < n; i++) {
         evals[i] = both_evals[2 * i + 1];
     }

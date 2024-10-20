@@ -4,131 +4,77 @@ R"(
 # version 330 core
 
 layout(location = 0) in vec3 v;
+layout(location = 1) in vec3 n;
+layout(location = 2) in vec2 t;
 
 out vec4 vertex_color;
 
-uniform float tx;
-uniform float ty;
-uniform sampler2D tensorfield;
-uniform mat4 MVP;
-uniform float maxnorm;
-uniform float scale = 0.3;
-float epsilon = 0.1;
+uniform mat4 Mview;
+uniform mat4 Mobj;
+uniform float scale;
+uniform sampler2D lambda;
+uniform sampler2D evecs;
 
-/*
-	eccentricity = sqrt(a^2 - b^2) for ellipse use this for n
-	axis of rotation is z
-*/
+vec4 rainbow_cycle_cmap(float low, float high, float v){
+	float x = mix(0.0f, 6.0f, (v - low) / (high - low));
+	vec4 r = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+	vec4 g = vec4(0.0f, 1.0f, 0.0f, 1.0f);
+	vec4 b = vec4(0.0f, 0.0f, 1.0f, 1.0f);
 
-// returns r for a given theta and eigenvector
-mat4 rot(float theta){
-
-	return mat4(cos(theta), sin(theta), 0, 0,
-		        -sin(theta), cos(theta),  0, 0,
-		        0         , 0         ,  1, 0,
-		        0         , 0         ,  0, 1);
-
+	if(x <= 1.0f) return mix(r, g, x);
+	if(x <= 2.0f) return mix(g, b, x - 1.0f);
+	if(x <= 3.0f) return mix(b, r, x - 2.0f);
+	if(x <= 4.0f) return mix(r, g, x - 3.0f);
+	if(x <= 5.0f) return mix(g, b, x - 4.0f);
+	return mix(b, r, x - 5.0f);
 }
 
-// Calculate the i-th eigenvalue of a symmetric 2D tensor T
-// T is the tensor represented as a vec4 instead of a mat2, i is the flag to return the lambda you want
-float EigenvalueSym2D(vec4 T, int i) {
-    float a = T.x;
-    float b = T.y;
-    float c = b;
-    float d = T.w;
-
-    float trace = a + d;
-    float determinant = a*d - b*c;
-    //float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    //float a = (dpg + disc) / 2.0f;
-    //float b = (dpg - disc) / 2.0f;
-
-    //if (i == 0) return min(a, b);
-    //else return max(a, b);
-    if(i==0) return trace/2.0 - sqrt(trace*trace/4-determinant);
-    else return trace/2.0 + sqrt(trace*trace/4-determinant);
+float eccentricity(float l0, float l1){
+	float ratio = pow(l0, 2) / pow(l1, 2);
+	return sqrt(1.0f - ratio);	// otherwise calculate the elliptical eccentricity [0, 1]
 }
 
-// Calculate the eigenvector of a symmetric 2D tensor T given its eigenvalue ev
-vec2 EigenvectorSym2D(vec4 T, float lambda) {
-	float a = T.x;
-    float b = T.y;
-    //float c = b;
-    float d = T.w;
+float superquadric(float ecc, float theta, float l0, float l1){
+	float n = mix(2, 5, pow(ecc, 3));
+	float a = 1.0f;
+	float b = l0/l1;
+	
 
-    if (b != 0) {
-        return normalize(vec2(lambda - d, b));
-    }
-    else if (lambda == 0) {
-        if (a < d) return vec2(1.0, 0.0);
-        else return vec2(0.0, 1.0);
-    }
-    else {
-        if (a < d) return vec2(0.0, 1.0);
-        else return vec2(1.0, 0.0);
-    }
+	float cos_theta = cos(theta);
+	float sin_theta = sin(theta);
+	float cos_theta_n = pow(abs(cos_theta)/a, n);
+	float sin_theta_n = pow(abs(sin_theta)/b, n);
+	float r = 0.5 * scale * pow(cos_theta_n + sin_theta_n, -1.0f/n);
+	return r;
 }
 
 void main() {
 
+	// fetch the eigenvalues
+	ivec2 tensor_coord = ivec2(v.x, v.y);
+	vec4 l = texelFetch(lambda, tensor_coord, 0);
 
-	vec4 T = texture(tensorfield, vec2(tx, ty));			// get the tensor encoded in the texture
-	float lambda0 = EigenvalueSym2D(T, 0);					// get the smallest eigenvalue
-	float lambda1 = EigenvalueSym2D(T, 1);					// get the largest eigenvalue
+	//fetch the eigenvectors
+	vec4 ev = texelFetch(evecs, tensor_coord, 0);
 
-	vec2 e1 = EigenvectorSym2D(T, lambda1);					// get the largest eigenvector
+	// calculate the tensor eccentricity
+	float ecc = eccentricity(l.x, l.y);
 
-	float norm = maxnorm;									// scale the eigenvalues for display
-	if(maxnorm == 0) norm = lambda1;			// if maxnorm is 0, all glyphs are the same length
-	float l0, l1;
-	if(norm == 0){								// if the glyph length is zero, set both axis lengths to zero
-		l0 = 0;
-		l1 = 0;
-	}
-	else{										// otherwise set them to the normalized eigenvalues
-		l0 = lambda0 / norm;
-		l1 = lambda1 / norm;
-	}
-	if(l0 < epsilon) l0 = epsilon;				// if the smallest length is less than epsilon, set it to epsilon
+	// calculate the position on the superquadric
+	//vec2 sq = superquadric(ecc, t.y, l.x, l.y);
+	float sq = superquadric(ecc, t.y - ev.y, l.x, l.y);
 
-	float x, y;									// create coordinates to store the new (x,y) value of the vertex
-	if (v.x == 0.0f && v.y == 0.0f) {			// keep the center vertex at the center (prevent dividing by 0)
-		x = 0.0f;
-		y = 0.0f;
-	}
-	else {
+	// set the vertex position
+	vec3 p = v + vec3(sq * cos(t.y), sq * sin(t.y), 0.0);
 
-		float theta = atan(v.y, v.x);			// calculate the theta value for the vertex (in polar coords)
+	// transform
+	gl_Position = Mview * Mobj * vec4(p.x, p.y, p.z, 1.0);
 
-		float cos_theta = cos(theta);			// calculate the sine and cosine to for glyph shape
-		float sin_theta = sin(theta);
-
-												// eccentricity is 0 for an ellipse, 1 for a line
-		float ecc;
-		float ratio = pow(l0, 2)/ pow(l1, 2);
-		ecc = sqrt(1.0f - ratio);	// otherwise calculate the elliptical eccentricity [0, 1]
-
-		
-		// here we use superquadrics to calculate the glyph shape based on its eccentricity
-		///////////////////////////////////////////////////////////////////////////////////
-		float n = 1 - pow(ecc, 3);
-
-
-		float cos_theta_n = pow(abs(cos_theta), n) * sign(cos_theta);
-		float sin_theta_n = pow(abs(sin_theta), n) * sign(sin_theta);
-		x = cos_theta_n * l1;
-		//if(l1 < epsilon)
-		//	l1 = epsilon;
-		y = sin_theta_n * l0;
-		///////////////////////////////////////////////////////////////////////////////////
-		// now we have the new (x, y) coordinates for the vertex
-
-	}
-	
-	gl_Position = MVP * rot(atan(e1.y, e1.x)) * vec4(x * scale, y * scale, v.z, 1.0f);
-	vertex_color = vec4(abs(e1.x), abs(e1.y), 0.0f, 1.0f);
-
+	// get the cartesian coordinates of the largest eigenvector
+	vec2 ev1 = vec2(cos(ev.y), sin(ev.y));
+	vec4 cmap = rainbow_cycle_cmap(-3.14159, 3.14159, ev.y);
+	vec4 white = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+	vertex_color = mix(white, cmap, ecc);
 };
 
 # shader fragment

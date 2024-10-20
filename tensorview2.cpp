@@ -3,6 +3,9 @@
 
 #include <boost/program_options.hpp>
 
+#include <cuda_runtime.h>
+
+#include "tira/cuda/error.h"
 #include "tira/graphics_gl.h"
 #include "tira/graphics/glShader.h"
 #include "tira/graphics/shapes/circle.h"
@@ -30,8 +33,8 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 
 void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
-float* cudaEigenvalues(float* tensors, unsigned int n);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
+float* cudaEigenvalues(float* tensors, unsigned int n, int device);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
 
 void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
@@ -85,7 +88,7 @@ float TV_SIGMA1 = 3;
 float TV_SIGMA2 = 0;
 int TV_P = 1;
 float SCALE = 0.3;
-float SCALE_FIELD = 1.0f;               // scale factor for the field (for zooming)
+float CameraZoom = 1.0f;               // scale factor for the field (for zooming)
 
 int EIGENVALUE_SIGN = 0;                // limits eigenvector visualization to signed eigenvalues (-1 = negative eigenvalues, 0 = all, 1 = positive eigenvalues)
 
@@ -94,9 +97,15 @@ tira::glMaterial* CMAP_MATERIAL;
 
 tira::glGeometry GLYPH_GEOMETRY;
 tira::glMaterial* GLYPH_MATERIAL;
+//tira::glTexture* LAMBDA_TEXTURE;
+//tira::glTexture* EVEC_TEXTURE;
+
 int GLYPH_ROWS = 100;
 float GLYPH_SCALE = 0.3;
 bool SCALE_BY_NORM = false;
+
+glm::vec2 CameraPos;
+glm::vec2 prevMousePos;                 // stores the last polled mouse position
 
 float MousePos[2];
 float Viewport[2];
@@ -123,18 +132,18 @@ bool RENDER_GLYPHS = false;
 
 // Calculate the viewport width and height in field pixels given the size of the field and window
 void FitRectangleToWindow(float field_width_pixels, float field_height_pixels, 
-                          float window_width, float window_height, float scale,
+                          float window_width, float window_height,// float scale,
                           float& viewport_width, float& viewport_height) {
  
     float display_aspect = window_width / window_height;
     float image_aspect = field_width_pixels / field_height_pixels;
     if (image_aspect > display_aspect) {
-        viewport_width = field_width_pixels / scale;
-        viewport_height = field_width_pixels / display_aspect / scale;
+        viewport_width = field_width_pixels;// / scale;
+        viewport_height = field_width_pixels / display_aspect;// / scale;
     }
     else {
-        viewport_height = field_height_pixels / scale;
-        viewport_width = field_height_pixels * display_aspect / scale;
+        viewport_height = field_height_pixels;// / scale;
+        viewport_width = field_height_pixels * display_aspect;// / scale;
     }
 }
 
@@ -156,10 +165,11 @@ tira::image<float> CalculateEccentricity() {
 /// Update the field eigenvectors and eigenvalues
 /// </summary>
 void UpdateEigens() {
-    float* eigenvalues_raw = cudaEigenvalues((float*)Tn.data(), Tn.X() * Tn.Y());
+    float* eigenvalues_raw = cudaEigenvalues((float*)Tn.data(), Tn.X() * Tn.Y(), in_device);
     Ln = tira::image<float>(eigenvalues_raw, Tn.X(), Tn.Y(), 2);
-    float* eigenvectors_raw = cudaEigenvectorsPolar((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y());
+    float* eigenvectors_raw = cudaEigenvectorsPolar((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y(), in_device);
     THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
+
     free(eigenvalues_raw);
     free(eigenvectors_raw);
 }
@@ -262,8 +272,6 @@ void GaussianFilter(float sigma) {
         Tn = Tn.convolve2(Ky);
     }
 
-    UpdateEigens();                                     // update the field eigendecomposition
-
 }
 
 void TensorVote(float sigma, unsigned int p, float sigma2, bool stick, bool plate) {
@@ -274,7 +282,7 @@ void TensorVote(float sigma, unsigned int p, float sigma2, bool stick, bool plat
         (unsigned int)T0.shape()[0], (unsigned int)T0.shape()[1], 
         sigma, sigma2, w, p, in_device, stick, plate, false);
 
-    UpdateEigens();
+    
 }
 
 tira::image<unsigned char> ColormapTensor(unsigned int row, unsigned int col) {
@@ -486,6 +494,23 @@ void RenderFieldSpecs() {
     ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
 
+void RegenerateGlyphs() {
+    tira::geometry<float> circle = tira::circle<float>(100).scale({ 0.0f, 0.0f });
+    tira::geometry<float> glyphrow;
+    for (unsigned int xi = 0; xi < Tn.width(); xi++) {
+        glyphrow = glyphrow.merge(circle.translate({ (float)xi }));
+    }
+    tira::geometry<float> glyphs;
+    for (unsigned int yi = 0; yi < Tn.height(); yi++) {
+        glyphs = glyphs.merge(glyphrow.translate({ 0.0f, (float)yi }));
+    }
+
+    GLYPH_GEOMETRY = tira::glGeometry(glyphs);
+    GLYPH_MATERIAL->SetUniform1f("scale", 0.8f);
+    GLYPH_MATERIAL->SetTexture("lambda", Ln, GL_RG32F, GL_NEAREST);
+    GLYPH_MATERIAL->SetTexture("evecs", THETAn, GL_RG32F, GL_NEAREST);
+}
+
 /// This function renders the user interface every frame
 void RenderUI() {
     // Start the Dear ImGui frame
@@ -521,7 +546,7 @@ void RenderUI() {
     RenderFieldSpecs();
 
     // select scalar component
-    if (ImGui::Button("Reset View")) SCALE_FIELD = 1.0f;
+    if (ImGui::Button("Reset View")) CameraZoom = 1.0f;
 
     if (ImGui::Button("Save Image"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
@@ -620,16 +645,20 @@ void RenderUI() {
         if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
             Tn = T0;
             UpdateEigens();
+            RegenerateGlyphs();
             ScalarRefresh();
         }
         ImGui::SeparatorText("Gaussian Blur");
         if (ImGui::RadioButton("Blur", &PROCESSINGTYPE, (int)ProcessingType::Gaussian)) {
             if (PROCESSINGTYPE == ProcessingType::Gaussian) {
                 GaussianFilter(SIGMA);
+                UpdateEigens();
+                RegenerateGlyphs();
             }
             else {
                 Tn = T0;
                 UpdateEigens();
+                RegenerateGlyphs();
             }
             ScalarRefresh();
         }
@@ -638,25 +667,25 @@ void RenderUI() {
             if (SIGMA <= 0) SIGMA = 0.01;
             if (PROCESSINGTYPE == ProcessingType::Gaussian) {
                 GaussianFilter(SIGMA);
+                UpdateEigens();
+                RegenerateGlyphs();
                 ScalarRefresh();
             }
         }
 
         ImGui::SeparatorText("Tensor Voting");
         if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
-            //if (PROCESSINGTYPE == ProcessingType::Vote) {
-                TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
-            //}
-            //else {
-            //    Tn = T0;
-            //    UpdateEigens();
-            //}
+            TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+            UpdateEigens();
+            RegenerateGlyphs();
             ScalarRefresh();
         }
         if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f)) {
             if (TV_SIGMA1 < 0) TV_SIGMA1 = 0.0;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
                 TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+                UpdateEigens();
+                RegenerateGlyphs();
                 ScalarRefresh();
             }
         }
@@ -664,6 +693,8 @@ void RenderUI() {
             if (TV_SIGMA2 < 0) TV_SIGMA2 = 0.0;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
                 TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+                UpdateEigens();
+                RegenerateGlyphs();
                 ScalarRefresh();
             }
         }
@@ -671,16 +702,22 @@ void RenderUI() {
             if (TV_P < 1) TV_P = 1;
             if (PROCESSINGTYPE == ProcessingType::Vote) {
                 TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+                UpdateEigens();
+                RegenerateGlyphs();
                 ScalarRefresh();
             }
         }
         if (ImGui::Checkbox("Stick", &TV_STICK)) {
             TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+            UpdateEigens();
+            RegenerateGlyphs();
             ScalarRefresh();
         }
         ImGui::SameLine();
         if (ImGui::Checkbox("Plate", &TV_PLATE)) {
             TensorVote(TV_SIGMA1, TV_P, TV_SIGMA2, TV_STICK, TV_PLATE);
+            UpdateEigens();
+            RegenerateGlyphs();
             ScalarRefresh();
         }
 
@@ -782,19 +819,43 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        prevMousePos[0] = xpos;
+        prevMousePos[1] = ypos;
+    }
+}
+
 void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     int display_w, display_h;
     glfwGetFramebufferSize(window, &display_w, &display_h);
-    float x_adjustment = (Viewport[0] - (float)Tn.width()) / 2.0f;
-    float y_adjustment = (Viewport[1] - (float)Tn.height()) / 2.0f;
-    MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
-    MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS &&
+        glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        //int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
+        double xdist = (prevMousePos[0] - xposIn) / display_w * Viewport[0] * CameraZoom;
+        double ydist = (prevMousePos[1] - yposIn) / display_h * Viewport[1] * CameraZoom;
+        CameraPos[0] += xdist;
+        CameraPos[1] += ydist;
+        prevMousePos[0] = xposIn;
+        prevMousePos[1] = yposIn;
+    }
+    else {
+        
+        float x_adjustment = (Viewport[0] - (float)Tn.width()) / 2.0f;
+        float y_adjustment = (Viewport[1] - (float)Tn.height()) / 2.0f;
+        MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
+        MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
+    }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        SCALE_FIELD += SCALE_FIELD * (yoffset * 0.25);
+        CameraZoom -= CameraZoom * (yoffset * 0.25);
 }
+
 
 
 
@@ -823,6 +884,15 @@ int main(int argc, char** argv) {
     if (vm.count("help")) {
         std::cout << desc << std::endl;
         return 1;
+    }
+
+    // make sure there the specified CUDA device is available (otherwise switch to CPU)
+    int ndevices;
+    cudaError_t error = cudaGetDeviceCount(&ndevices);
+    if (error != cudaSuccess) ndevices = 0;
+    if (ndevices <= in_device) {
+        std::cout << "WARNING: Specified CUDA device " << in_device << " is unavailable (" << ndevices << " compatible devices found), defaulting to CPU" << std::endl;
+        in_device = -1;
     }
 
     // Load the tensor field if it is provided as a command-line argument
@@ -869,6 +939,7 @@ int main(int argc, char** argv) {
         glfwSetCursorPosCallback(window, mouse_callback);
     }
     glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
 
     InitUI(window, glsl_version);
     if (glewInit() != GLEW_OK)
@@ -876,12 +947,16 @@ int main(int argc, char** argv) {
 
     CMAP_GEOMETRY = tira::glGeometry::GenerateRectangle<float>();
     CMAP_MATERIAL = new tira::glMaterial(colormap_shader_string);
+    GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
     
     if (FIELD_LOADED) {
         ScalarRefresh();
-        GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
-        GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
+        RegenerateGlyphs();
+        CameraPos = glm::vec3(Tn.width() / 2.0f, Tn.height() / 2.0f, 0.0f);
     }
+
+    
+    
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -901,63 +976,47 @@ int main(int argc, char** argv) {
         // if a tensor field is loaded
         if (FIELD_LOADED) {
 
-            
-            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
-            float view_extent[2] = { Viewport[0] / (2.0f), Viewport[1] / (2.0f) };
-            glm::mat4 Mview = glm::ortho(-view_extent[0], view_extent[0], view_extent[1], -view_extent[1]);   // create a view matrix
+            // Calculate the viewport width and height based on the dimensions of the tensor field and the screen (so that the field isn't distorted)
+            //FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
+            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
 
+            //float view_extent[2] = { Viewport[0] / (2.0f), Viewport[1] / (2.0f) };
+            glm::vec2 viewport(Viewport[0], Viewport[1]);
+            glm::vec2 view_extent = viewport * CameraZoom / 2.0f;
+            glm::mat4 Mview = glm::ortho(-view_extent[0] + CameraPos[0], 
+                view_extent[0] + CameraPos[0], 
+                view_extent[1] + CameraPos[1], 
+                -view_extent[1] + CameraPos[1]);   // create a view matrix
+            glm::vec3 center((float)Tn.width() / 2.0f, (float)Tn.height() / 2.0f, 0.0f);
+            
+            
             // if the user is visualizing a scalar component of the tensor field as a color map
             if (SCALARTYPE != ScalarType::NoScalar) {
 
                 glm::vec3 scale((float)Tn.width(), (float)Tn.height(), 1.0f);
                 glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), scale);                                                      // compose the scale matrix from the width and height of the tensor field
-                glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
-                glm::mat4 M = Mview * Mtrans * Mscale;                                                                      // create the transformation matrix
+                glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), center);
+                //glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
+                
+                glm::mat4 Mobj = Mtrans * Mscale;                                                                      // create the transformation matrix
                 CMAP_MATERIAL->Begin();                                                                                     // begin using the scalar colormap material
                 //CMAP_MATERIAL->SetUniform1f("maxval", MAXVAL);                                                              // pass the max and min values so that the color map can be scaled
                 //CMAP_MATERIAL->SetUniform1f("minval", MINVAL);
-                CMAP_MATERIAL->SetUniformMat4f("Mview", M);                                                                 // pass the transformation matrix as a uniform
+                CMAP_MATERIAL->SetUniformMat4f("Mview", Mview);                                                                 // pass the transformation matrix as a uniform
+                CMAP_MATERIAL->SetUniformMat4f("Mobj", Mobj);
                 CMAP_GEOMETRY.Draw();                                                                                       // draw the rectangle
                 CMAP_MATERIAL->End();                                                                                       // stop using the material
             }
             // if the user is rendering glyphs
             if (RENDER_GLYPHS) {
-                tira::image<float> Ti((float*)Tn.data(), Tn.X(), Tn.Y(), 4);                                                // create an image to store the tensor field data (2D tensor has 4 channels)
-                GLYPH_MATERIAL->SetTexture<float>("tensorfield", Ti, GL_RGBA32F, GL_NEAREST);                               // set the texture to the tensor field image (use GL_RGBA for a 4-channel float)
-                GLYPH_MATERIAL->Begin();                                                                                    // bind the material
-                int glyph_cols = GLYPH_ROWS * (float)Ti.width() / (float)Ti.height();                                       // calculate the number of glyph columns based on glyph rows (so the glyphs are isotropic)
-                float scale = (float)Ti.height() / (float)GLYPH_ROWS;                                                       // calculate the scale factor for the glyphs (so that they don't overlap)
-                float tex_sample_size_x = 1.0f / (float)GLYPH_ROWS;
-                float half_tex_sample_size_x = tex_sample_size_x / 2.0f;
-                float tex_sample_size_y = 1.0f / (float)glyph_cols;
-                float half_tex_sample_size_y = tex_sample_size_y / 2.0f;
-                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(scale, scale, 1.0f));                              // create a scale matrix based on the calculated scale value
-
-                float glyph_start_x = -(float)Ti.width() / 2.0f + scale / 2.0f;                                             // start from -x and -y
-                float glyph_start_y = -(float)Ti.height() / 2.0f + scale / 2.0f;
-                for (int yi = 0; yi < GLYPH_ROWS; yi++) {                                                                   // for each row
-                    for (int xi = 0; xi < glyph_cols; xi++) {                                                               // for each column
-                        // create a translation matrix moving the glyph to its appropriate position
-                        glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f),
-                            glm::vec3(glyph_start_x + xi * scale,
-                                glyph_start_y + yi * scale,
-                                1.0f));
-                        glm::mat4 M = Mview * Mtrans * Mscale;                                                              // assemble the transformation matrix
-
-                        GLYPH_MATERIAL->SetUniformMat4f("MVP", M);                                                          // pass the transformation matrix to the material
-                        float tx = (float)xi / (float)glyph_cols + half_tex_sample_size_x;
-                        float ty = (float)yi / (float)GLYPH_ROWS + half_tex_sample_size_y;
-                        //std::cout << "tx = " << tx << "     " << "ty = " << ty << std::endl;
-                        GLYPH_MATERIAL->SetUniform1f("tx", tx);                                    // pass the glyph coordinate to the material
-                        GLYPH_MATERIAL->SetUniform1f("ty", ty);
-                        if (SCALE_BY_NORM)
-                            GLYPH_MATERIAL->SetUniform1f("maxnorm", MAXNORM);                                               // set a flag to determine of the glyphs are normalized (largest glyph takes up a single zone)
-                        else
-                            GLYPH_MATERIAL->SetUniform1f("maxnorm", 0.0f);
-                        GLYPH_MATERIAL->SetUniform1f("scale", SCALE);                                                       // pass the glyph scale factor (input by the user)
-                        GLYPH_GEOMETRY.Draw();                                                                              // draw the glyph
-                    }
-                }
+                
+                glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.0f));
+                glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(1.0, 1.0f, 1.0f));
+                glm::mat4 Mobj = Mtrans * Mscale;
+                GLYPH_MATERIAL->Begin();
+                GLYPH_MATERIAL->SetUniformMat4f("Mview", Mview);
+                GLYPH_MATERIAL->SetUniformMat4f("Mobj", Mobj);
+                GLYPH_GEOMETRY.Draw();
                 GLYPH_MATERIAL->End();
             }
         }

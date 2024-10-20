@@ -351,7 +351,7 @@ def eccentricity_decay(T, rate):
     
 
 # visualize a tensor field T (NxMx2x2)
-def visualize(T):
+def visualize(T, glyphs=False, glyphscalar="l1"):
     
     L, V = eigmag(T)
     THETA0 = vec2theta(V[..., :, 0])                 # convert the eigenvector to polar coordinates
@@ -414,6 +414,18 @@ def visualize(T):
     plt.colorbar()
     l1_sum = np.sum(L[..., 1])
     plt.title("Eigenvalue 1, integral = " + str(l1_sum))
+    
+    plt.subplot(2, 3, 6)
+    l1_max = np.max(np.abs(L[..., 1]))
+    
+    if glyphs:
+        plt.quiver(V[:,:,0, 1], V[:, :, 1, 1], headwidth=0, headaxislength=0, headlength=0, pivot="mid", color=(0.0, 0.0, 0.0, 0.5))
+
+        if glyphscalar == "l1":
+            plt.imshow(L[:, :, 1], vmin=-l1_max, vmax=l1_max, cmap="RdYlBu_r", origin="lower")
+            plt.colorbar()
+        l1_sum = np.sum(L[..., 1])
+        plt.title("Eigenvalue 1, integral = " + str(l1_sum))
     
     
     

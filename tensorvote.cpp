@@ -15,7 +15,7 @@ void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
-float* cudaEigenvalues(float* tensors, unsigned int n);
+float* cudaEigenvalues(float* tensors, unsigned int n, int device);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
 
 #include <tira/field.h>

@@ -10,10 +10,11 @@ layout(location = 2) in vec2 t;
 //out vec4 vertex_color;
 out vec2 vertex_texcoord;
 uniform mat4 Mview;
+uniform mat4 Mobj;
 
 void main() {
 
-	gl_Position = Mview * vec4(v.x, v.y, v.z, 1.0f);
+	gl_Position = Mview * Mobj * vec4(v.x, v.y, v.z, 1.0f);
 	vertex_texcoord = t;
 };
 

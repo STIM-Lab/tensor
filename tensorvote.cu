@@ -2,6 +2,8 @@
 #include <glm/glm.hpp>
 #define GLM_FORCE_CUDA
 
+#define PI 3.14159265358979323846
+
 #include "tensorvote.cuh"
 
 #include <iostream>
@@ -19,8 +21,8 @@ extern float t_devicealloc;
 extern float t_devicefree;
 extern float t_deviceprops;
 
-float* cudaEigenvalues(float* tensors, unsigned int n);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
+float* cudaEigenvalues(float* tensors, unsigned int n, int device);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
 
 
 static void HandleError(cudaError_t err, const char* file, int line)
@@ -132,8 +134,7 @@ __host__ __device__ float decay(float t2, float length, float sigma, unsigned in
 }
 
 __host__ __device__ float PlateDecay(float length, float sigma) {
-    float c = 3.1415926535897932384626433832795028841971693993751058209749445923078164062
-        * exp(-(length * length) / (sigma * sigma)) / 2.0f;
+    float c = PI * exp(-(length * length) / (sigma * sigma)) / 2.0f;
 
     return c;
 }
@@ -146,8 +147,7 @@ __host__ __device__ double factorial(unsigned int n) {
 }
 
 __host__ __device__ double sticknorm(double sigma1, double sigma2, unsigned int p) {
-    double pi = 3.1415926535897932384626433832795028841971693993751058209749445923078164062;
-    double num = pi * factorial(2 * p);
+    double num = PI * factorial(2 * p);
     double ex = std::pow(2, 2 * p);
     double facp = factorial(p);
     double trig_int = num / (ex * facp * facp);
@@ -217,7 +217,7 @@ __host__ __device__  glm::mat2 PlateVote(float u, float v, float sigma1, float s
 
     glm::mat2 I(1.0f);
 
-    float c = 1.0f / (std::numbers::pi * (s12 + s22));
+    float c = 1.0f / (PI * (s12 + s22));
 
     return c * (e1 * (I - 0.25f * M) + e2 * (0.25f * M));
 }
@@ -316,8 +316,8 @@ void cudaVote2D(float* input_field, float* output_field,
     int tensorFieldSize = 4 * s0 * s1;
 
     start = std::chrono::high_resolution_clock::now();
-    float* L = cudaEigenvalues(input_field, s0 * s1);
-    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1);
+    float* L = cudaEigenvalues(input_field, s0 * s1, device);
+    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1, device);
     end = std::chrono::high_resolution_clock::now();
     float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
