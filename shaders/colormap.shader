@@ -7,7 +7,6 @@ layout(location = 0) in vec3 v;
 layout(location = 1) in vec3 n;
 layout(location = 2) in vec2 t;
 
-//out vec4 vertex_color;
 out vec2 vertex_texcoord;
 uniform mat4 Mview;
 uniform mat4 Mobj;

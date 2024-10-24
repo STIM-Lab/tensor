@@ -12,6 +12,7 @@ out vec4 vertex_color;
 uniform mat4 Mview;
 uniform mat4 Mobj;
 uniform float scale;
+uniform float norm;
 uniform sampler2D lambda;
 uniform sampler2D evecs;
 
@@ -61,8 +62,11 @@ void main() {
 	float ecc = eccentricity(l.x, l.y);
 
 	// calculate the position on the superquadric
-	//vec2 sq = superquadric(ecc, t.y, l.x, l.y);
 	float sq = superquadric(ecc, t.y - ev.y, l.x, l.y);
+
+	if(norm != 0){
+	    sq = sq * l.y / norm;
+	}
 
 	// set the vertex position
 	vec3 p = v + vec3(sq * cos(t.y), sq * sin(t.y), 0.0);
@@ -87,6 +91,7 @@ in vec4 vertex_color;
 
 void main() {
 	color = vertex_color;
+	//color = vec4(1.0f, 1.0f, 1.0f, 1.0f);
 };
 
 )"

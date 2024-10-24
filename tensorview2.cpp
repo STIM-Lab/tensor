@@ -5,11 +5,9 @@
 
 #include <cuda_runtime.h>
 
-#include "tira/cuda/error.h"
 #include "tira/graphics_gl.h"
 #include "tira/graphics/glShader.h"
 #include "tira/graphics/shapes/circle.h"
-//#include "tira/image/tensorfield.h"
 #include "tira/image/colormap.h"
 #include "tira/image.h"
 
@@ -21,18 +19,14 @@
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <stdio.h>
 #include <complex>
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
-void cudaEigenvalue0(float* tensors, unsigned int n, float* evals);
-void cudaEigenvalue1(float* tensors, unsigned int n, float* evals);
 float* cudaEigenvalues(float* tensors, unsigned int n, int device);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
 
@@ -67,6 +61,10 @@ const std::string glyph_shader_string =
 #include "shaders/glyph2d.shader"
 ;
 
+const std::string test_shader_string =
+#include "shaders/test.shader"
+;
+
 // TENSOR FIELD DATA
 tira::image<glm::mat2> T0;              // initial tensor field passed to the visualization program
 tira::image<glm::mat2> Tn;              // current tensor field being rendered (after processing)
@@ -97,12 +95,12 @@ tira::glMaterial* CMAP_MATERIAL;
 
 tira::glGeometry GLYPH_GEOMETRY;
 tira::glMaterial* GLYPH_MATERIAL;
-//tira::glTexture* LAMBDA_TEXTURE;
-//tira::glTexture* EVEC_TEXTURE;
+
+tira::glMaterial* testmaterial;
 
 int GLYPH_ROWS = 100;
-float GLYPH_SCALE = 0.3;
-bool SCALE_BY_NORM = false;
+float GLYPH_SCALE = 0.8;
+bool GLYPH_NORMALIZE = false;
 
 glm::vec2 CameraPos;
 glm::vec2 prevMousePos;                 // stores the last polled mouse position
@@ -154,8 +152,11 @@ tira::image<float> CalculateEccentricity() {
         for (size_t xi = 0; xi < ecc.X(); xi++) {
             if (Ln(xi, yi, 1) == 0)
                 ecc(xi, yi) = 0;
-            else
-                ecc(xi, yi) = std::sqrt(1 - std::pow(Ln(xi, yi, 0), 2) / std::pow(Ln(xi, yi, 1), 2));
+            else {
+                const float l02 = std::pow(Ln(xi, yi, 0), 2.0f);
+                const float l12 = std::pow(Ln(xi, yi, 1), 2.0f);
+                ecc(xi, yi) = std::sqrt(1.0f - l02 / l12);
+            }
         }
     }
     return ecc;
@@ -174,7 +175,7 @@ void UpdateEigens() {
     free(eigenvectors_raw);
 }
 
-void LoadTensorField(std::string filename) {
+void LoadTensorField(const std::string& filename) {
     T0.load_npy<float>(filename);
     Tn = T0;
     UpdateEigens();
@@ -189,7 +190,7 @@ void LoadTensorField(std::string filename) {
 /// <param name="u"></param>
 /// <param name="v"></param>
 /// <returns></returns>
-inline float Timg(unsigned int x, unsigned int y, unsigned int u, unsigned int v) {
+inline float Timg(const unsigned int x, const unsigned int y, const unsigned int u, const unsigned int v) {
     return Tn(x, y)[u][v];
 }
 
@@ -427,24 +428,6 @@ void ScalarFrom_Evec(unsigned int i) {
     CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
 }
 
-/*glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
-    float a = T[0][0];
-    float b = T[0][1];
-    //float c = b;
-    float d = T[1][1];
-
-    if (b != 0) {
-        return glm::normalize(glm::vec2(lambda - d, b));
-    }
-    else if (lambda == 0) {
-        if (a < d) return glm::vec2(1.0, 0.0);
-        else return glm::vec2(0.0, 1.0);
-    }
-    else {
-        if (a < d) return glm::vec2(0.0, 1.0);
-        else return glm::vec2(1.0, 0.0);
-    }
-}*/
 
 void ScalarRefresh() {
 
@@ -495,7 +478,7 @@ void RenderFieldSpecs() {
 }
 
 void RegenerateGlyphs() {
-    tira::geometry<float> circle = tira::circle<float>(100).scale({ 0.0f, 0.0f });
+    tira::geometry<float> circle = tira::circle<float>(200).scale({ 0.0f, 0.0f });
     tira::geometry<float> glyphrow;
     for (unsigned int xi = 0; xi < Tn.width(); xi++) {
         glyphrow = glyphrow.merge(circle.translate({ (float)xi }));
@@ -506,7 +489,6 @@ void RegenerateGlyphs() {
     }
 
     GLYPH_GEOMETRY = tira::glGeometry(glyphs);
-    GLYPH_MATERIAL->SetUniform1f("scale", 0.8f);
     GLYPH_MATERIAL->SetTexture("lambda", Ln, GL_RG32F, GL_NEAREST);
     GLYPH_MATERIAL->SetTexture("evecs", THETAn, GL_RG32F, GL_NEAREST);
 }
@@ -550,7 +532,6 @@ void RenderUI() {
 
     if (ImGui::Button("Save Image"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
-        //ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
     if (ImGuiFileDialog::Instance()->Display("ChooseBmpFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
@@ -725,10 +706,8 @@ void RenderUI() {
     }
 
     ImGui::Checkbox("Glyphs", &RENDER_GLYPHS);
-    ImGui::SameLine();
-    ImGui::InputInt("##Rows", &GLYPH_ROWS, 1, 10);
-    ImGui::InputFloat("Scale", &SCALE, 0.01, 0.1);
-    ImGui::Checkbox("Scale by Norm", &SCALE_BY_NORM);
+    ImGui::InputFloat("Scale", &GLYPH_SCALE, 0.1f, 1.0f);
+    ImGui::Checkbox("Scale by Norm", &GLYPH_NORMALIZE);
 
     int FieldIndex[2] = { (int)MousePos[0], (int)MousePos[1] };
 
@@ -768,8 +747,6 @@ void RenderUI() {
             // display the eigenvectors
             ImGui::Text("Eigenvectors:");
             ImGui::Columns(2);
-            //float ev0[2] = { ev0[0], ev0[1] };
-            //float ev1[2] = { ev1[0], ev1[1] };
             ImGui::InputFloat2("x0, y0", (float*)& ev0, "%1.5F");
             ImGui::InputFloat2("x1, y1", (float*)& ev1, "%1.5F");
 
@@ -955,8 +932,9 @@ int main(int argc, char** argv) {
         CameraPos = glm::vec3(Tn.width() / 2.0f, Tn.height() / 2.0f, 0.0f);
     }
 
-    
-    
+    testmaterial = new tira::glMaterial(test_shader_string);
+    testmaterial->Begin();
+    tira::glGeometry testgeometry = tira::glGeometry::GenerateRectangle<float>();
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -977,10 +955,8 @@ int main(int argc, char** argv) {
         if (FIELD_LOADED) {
 
             // Calculate the viewport width and height based on the dimensions of the tensor field and the screen (so that the field isn't distorted)
-            //FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, SCALE_FIELD, Viewport[0], Viewport[1]);
             FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
 
-            //float view_extent[2] = { Viewport[0] / (2.0f), Viewport[1] / (2.0f) };
             glm::vec2 viewport(Viewport[0], Viewport[1]);
             glm::vec2 view_extent = viewport * CameraZoom / 2.0f;
             glm::mat4 Mview = glm::ortho(-view_extent[0] + CameraPos[0], 
@@ -1000,8 +976,6 @@ int main(int argc, char** argv) {
                 
                 glm::mat4 Mobj = Mtrans * Mscale;                                                                      // create the transformation matrix
                 CMAP_MATERIAL->Begin();                                                                                     // begin using the scalar colormap material
-                //CMAP_MATERIAL->SetUniform1f("maxval", MAXVAL);                                                              // pass the max and min values so that the color map can be scaled
-                //CMAP_MATERIAL->SetUniform1f("minval", MINVAL);
                 CMAP_MATERIAL->SetUniformMat4f("Mview", Mview);                                                                 // pass the transformation matrix as a uniform
                 CMAP_MATERIAL->SetUniformMat4f("Mobj", Mobj);
                 CMAP_GEOMETRY.Draw();                                                                                       // draw the rectangle
@@ -1009,17 +983,26 @@ int main(int argc, char** argv) {
             }
             // if the user is rendering glyphs
             if (RENDER_GLYPHS) {
-                
+
                 glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), glm::vec3(0.5f, 0.5f, 0.0f));
                 glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(1.0, 1.0f, 1.0f));
                 glm::mat4 Mobj = Mtrans * Mscale;
+
+
                 GLYPH_MATERIAL->Begin();
+                GLYPH_MATERIAL->SetUniform1f("scale", GLYPH_SCALE);
+                if(GLYPH_NORMALIZE)
+                    GLYPH_MATERIAL->SetUniform1f("norm", L1MaxMag);
+                else
+                    GLYPH_MATERIAL->SetUniform1f("norm", 0.0f);
                 GLYPH_MATERIAL->SetUniformMat4f("Mview", Mview);
                 GLYPH_MATERIAL->SetUniformMat4f("Mobj", Mobj);
                 GLYPH_GEOMETRY.Draw();
                 GLYPH_MATERIAL->End();
             }
+
         }
+
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 
