@@ -101,6 +101,7 @@ tira::glMaterial* testmaterial;
 int GLYPH_ROWS = 100;
 float GLYPH_SCALE = 0.8;
 bool GLYPH_NORMALIZE = false;
+int GLYPH_TESSELATION = 10;
 
 glm::vec2 CameraPos;
 glm::vec2 prevMousePos;                 // stores the last polled mouse position
@@ -478,17 +479,12 @@ void RenderFieldSpecs() {
 }
 
 void RegenerateGlyphs() {
-    tira::geometry<float> circle = tira::circle<float>(200).scale({ 0.0f, 0.0f });
-    tira::geometry<float> glyphrow;
-    for (unsigned int xi = 0; xi < Tn.width(); xi++) {
-        glyphrow = glyphrow.merge(circle.translate({ (float)xi }));
-    }
-    tira::geometry<float> glyphs;
-    for (unsigned int yi = 0; yi < Tn.height(); yi++) {
-        glyphs = glyphs.merge(glyphrow.translate({ 0.0f, (float)yi }));
-    }
+    tira::geometry<float> circle = tira::circle<float>(GLYPH_TESSELATION).scale({ 0.0f, 0.0f });
 
-    GLYPH_GEOMETRY = tira::glGeometry(glyphs);
+    tira::geometry<float> glyphrow = circle.tile({1.0f, 0.0f, 0.0f}, Tn.width());
+    tira::geometry<float> glyphgrid = glyphrow.tile({0.0f, 1.0f, 0.0f}, Tn.height());
+
+    GLYPH_GEOMETRY = tira::glGeometry(glyphgrid);
     GLYPH_MATERIAL->SetTexture("lambda", Ln, GL_RG32F, GL_NEAREST);
     GLYPH_MATERIAL->SetTexture("evecs", THETAn, GL_RG32F, GL_NEAREST);
 }
@@ -707,6 +703,9 @@ void RenderUI() {
 
     ImGui::Checkbox("Glyphs", &RENDER_GLYPHS);
     ImGui::InputFloat("Scale", &GLYPH_SCALE, 0.1f, 1.0f);
+    if(ImGui::InputInt("Tesselate", &GLYPH_TESSELATION, 1, 10)) {
+        RegenerateGlyphs();
+    }
     ImGui::Checkbox("Scale by Norm", &GLYPH_NORMALIZE);
 
     int FieldIndex[2] = { (int)MousePos[0], (int)MousePos[1] };

@@ -73,6 +73,7 @@ void main() {
 
 	// transform
 	gl_Position = Mview * Mobj * vec4(p.x, p.y, p.z, 1.0);
+	//gl_Position = Mview * Mobj * vec4(v.x, v.y, v.z, 1.0);
 
 	// get the cartesian coordinates of the largest eigenvector
 	vec2 ev1 = vec2(cos(ev.y), sin(ev.y));
