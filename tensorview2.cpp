@@ -101,7 +101,7 @@ tira::glMaterial* testmaterial;
 int GLYPH_ROWS = 100;
 float GLYPH_SCALE = 0.8;
 bool GLYPH_NORMALIZE = false;
-int GLYPH_TESSELATION = 10;
+int GLYPH_TESSELATION = 20;
 
 glm::vec2 CameraPos;
 glm::vec2 prevMousePos;                 // stores the last polled mouse position
@@ -479,6 +479,8 @@ void RenderFieldSpecs() {
 }
 
 void RegenerateGlyphs() {
+    if (!RENDER_GLYPHS) return;                     // don't update if they aren't being displayed
+
     tira::geometry<float> circle = tira::circle<float>(GLYPH_TESSELATION).scale({ 0.0f, 0.0f });
 
     tira::geometry<float> glyphrow = circle.tile({1.0f, 0.0f, 0.0f}, Tn.width());
@@ -701,8 +703,10 @@ void RenderUI() {
         ImGui::TreePop();
     }
 
-    ImGui::Checkbox("Glyphs", &RENDER_GLYPHS);
-    ImGui::InputFloat("Scale", &GLYPH_SCALE, 0.1f, 1.0f);
+    if (ImGui::Checkbox("Glyphs", &RENDER_GLYPHS)) {
+        RegenerateGlyphs();
+    }
+    ImGui::InputFloat("Glyph Scale", &GLYPH_SCALE, 0.1f, 1.0f);
     if(ImGui::InputInt("Tesselate", &GLYPH_TESSELATION, 1, 10)) {
         RegenerateGlyphs();
     }
