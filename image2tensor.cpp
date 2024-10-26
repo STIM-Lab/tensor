@@ -18,13 +18,14 @@ float in_noise;
 float in_sigma;
 float in_blur;
 bool in_crop = false;
+int in_device;						// cuda device
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
-float* cudaEigenvalues(float* tensors, unsigned int n);
+float* cudaEigenvalues(float* tensors, unsigned int n, int device);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.
@@ -91,7 +92,9 @@ int main(int argc, char** argv) {
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(2), "order used to calculate the derivative")
 		("blur", boost::program_options::value<float>(&in_blur)->default_value(0.0f), "sigma value for blurring the input image")
 		("sigma", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for the tensor field blur")
+		("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "cuda device number (-1 for CPU)")
 		//("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
+		
 		("crop", "crop the edges of the field to fit the finite difference window")
 		("help", "produce help message")
 		;
@@ -199,7 +202,7 @@ int main(int argc, char** argv) {
 			bool keep_positives = true;
 			if(vm.count("negatives")) keep_positives = false;
 
-			float* evals = cudaEigenvalues((float*)T.data(), T.X() * T.Y());
+			float* evals = cudaEigenvalues((float*)T.data(), T.X() * T.Y(), in_device);
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				for (size_t xi = 0; xi < T.X(); xi++) {
 					size_t i = yi * T.X() + xi;

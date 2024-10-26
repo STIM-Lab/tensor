@@ -16,7 +16,7 @@ void cudaVote2D(float* input_field, float* output_field,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 float* cudaEigenvalues(float* tensors, unsigned int n, int device);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n);
+float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
 
 #include <tira/field.h>
 #include <tira/image.h>
@@ -27,7 +27,7 @@ float in_sigma;
 float in_sigma2;
 unsigned int in_power;
 unsigned int in_window;
-int in_cuda;
+int in_device;
 std::vector<float> in_votefield;
 bool debug = false;
 bool PLATE = true;
@@ -62,8 +62,8 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
-    float* L = cudaEigenvalues(input_field, s0 * s1);
-    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1);
+    float* L = cudaEigenvalues(input_field, s0 * s1, in_device);
+    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1, in_device);
 
     auto start = std::chrono::high_resolution_clock::now();
     //cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field
@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
         ("sigma", boost::program_options::value<float>(&in_sigma)->default_value(3.0f), "standard deviation for the stick decay function")
         ("sigma2", boost::program_options::value<float>(&in_sigma2)->default_value(0.0f), "standard deviation for the orthogonal stick decay function")
         ("window", boost::program_options::value<unsigned int>(&in_window), "window size (6 * sigma + 1 as default)")
-        ("cuda", boost::program_options::value<int>(&in_cuda)->default_value(0), "cuda device index (-1 for CPU)")
+        ("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "cuda device index (-1 for CPU)")
         ("votefield", boost::program_options::value<std::vector<float> >(&in_votefield)->multitoken(), "generate a test field based on a 2D orientation")
         ("power", boost::program_options::value<unsigned int>(&in_power)->default_value(1), "power used to refine the vote field")
         ("stick", "stick voting only")
@@ -211,11 +211,11 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
 
     // CPU IMPLEMENTATION
-    if (in_cuda < 0) {
+    if (in_device < 0) {
         cpuVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, PLATE, debug);
     }
     else {
-        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, in_cuda, STICK, PLATE, debug);
+        cudaVote2D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], in_sigma, in_sigma2, in_window, in_power, in_device, STICK, PLATE, debug);
     }
     auto end = std::chrono::high_resolution_clock::now();
     t_total = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
         std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
         std::cout << "Voting: " << t_voting << " ms" << std::endl;
 
-        if (in_cuda >= 0) {
+        if (in_device >= 0) {
             std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
             std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
             std::cout << "cudaMalloc: " << t_devicealloc << " ms" << std::endl;
