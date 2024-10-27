@@ -1,6 +1,6 @@
 #include <glm/glm.hpp>
 #include <tira/cuda/cudaGaussianFilter2D.cuh>
-#include <tira/cuda/cudaEigen2D.cuh>
+#include <tira/cuda/cudaEigen.cuh>
 
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
@@ -21,8 +21,12 @@ float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, 
     return dest;
 }
 
-float* cudaEigenvalues(float* tensors, unsigned int n, int device) {
+float* cudaEigenvalues2(float* tensors, unsigned int n, int device) {
     return tira::cuda::Eigenvalues2D<float>(tensors, n, device);
+}
+
+float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
+    return tira::cuda::Eigenvalues3D<float>(tensors, n, device);
 }
 
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device) {

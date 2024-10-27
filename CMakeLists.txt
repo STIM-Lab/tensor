@@ -90,9 +90,7 @@ target_link_libraries(tensorview2
 #create an executable
 add_executable(tensorview3
 				tensorview3.cpp
-				volumetric.h
-				gui.cpp
-				gui.h
+				cuda_calls.cu
 				ImGuiFileBrowser/ImGuiFileBrowser.cpp
 				ImGuiFileBrowser/ImGuiFileBrowser.h
 				ImGuiFileBrowser/dirent.h

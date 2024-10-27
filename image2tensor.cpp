@@ -25,7 +25,7 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 
-float* cudaEigenvalues(float* tensors, unsigned int n, int device);
+float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
 			bool keep_positives = true;
 			if(vm.count("negatives")) keep_positives = false;
 
-			float* evals = cudaEigenvalues((float*)T.data(), T.X() * T.Y(), in_device);
+			float* evals = cudaEigenvalues2((float*)T.data(), T.X() * T.Y(), in_device);
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				for (size_t xi = 0; xi < T.X(); xi++) {
 					size_t i = yi * T.X() + xi;

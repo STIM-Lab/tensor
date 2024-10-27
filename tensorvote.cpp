@@ -15,7 +15,7 @@ void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
-float* cudaEigenvalues(float* tensors, unsigned int n, int device);
+float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
 
 #include <tira/field.h>
@@ -62,7 +62,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
 
     int hw = (int)(w / 2);                                      // calculate the half window size
 
-    float* L = cudaEigenvalues(input_field, s0 * s1, in_device);
+    float* L = cudaEigenvalues2(input_field, s0 * s1, in_device);
     float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1, in_device);
 
     auto start = std::chrono::high_resolution_clock::now();
