@@ -19,7 +19,6 @@
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <complex>
@@ -167,9 +166,9 @@ tira::image<float> CalculateEccentricity() {
 /// Update the field eigenvectors and eigenvalues
 /// </summary>
 void UpdateEigens() {
-    float* eigenvalues_raw = cudaEigenvalues2((float*)Tn.data(), Tn.X() * Tn.Y(), in_device);
+    float* eigenvalues_raw = cudaEigenvalues2(reinterpret_cast<float *>(Tn.data()), Tn.X() * Tn.Y(), in_device);
     Ln = tira::image<float>(eigenvalues_raw, Tn.X(), Tn.Y(), 2);
-    float* eigenvectors_raw = cudaEigenvectorsPolar((float*)Tn.data(), eigenvalues_raw, Tn.X() * Tn.Y(), in_device);
+    float* eigenvectors_raw = cudaEigenvectorsPolar(reinterpret_cast<float *>(Tn.data()), eigenvalues_raw, Tn.X() * Tn.Y(), in_device);
     THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
 
     free(eigenvalues_raw);
@@ -192,53 +191,49 @@ void LoadTensorField(const std::string& filename) {
 /// <param name="v"></param>
 /// <returns></returns>
 inline float Timg(const unsigned int x, const unsigned int y, const unsigned int u, const unsigned int v) {
-    return Tn(x, y)[u][v];
+    return Tn(x, y)[static_cast<int>(u)][static_cast<int>(v)];
 }
 
-inline float Trace2D(unsigned int x, unsigned int y) {
-    float trace = Timg(x, y, 0, 0) + Timg(x, y, 1, 1);
-    return trace;
+inline float Trace2D(const unsigned int x, const unsigned int y) {
+    return Timg(x, y, 0, 0) + Timg(x, y, 1, 1);
 }
 
-inline float Determinant2D(unsigned int x, unsigned int y) {
-    float det = Timg(x, y, 0, 0) * Timg(x, y, 1, 1) - pow(Timg(x, y, 0, 1), 2.0);
-    return det;
+inline float Determinant2D(const unsigned int x, const unsigned int y) {
+    return Timg(x, y, 0, 0) * Timg(x, y, 1, 1) - pow(Timg(x, y, 0, 1), 2.0f);
 }
 
-inline float Eigenvalue2D(unsigned int x, unsigned int y, unsigned int i) {
-    float d = Timg(x, y, 0, 0);
-    float e = Timg(x, y, 0, 1);
-    float f = e;
-    float g = Timg(x, y, 1, 1);
+inline float Eigenvalue2D(const unsigned int x, const unsigned int y, const unsigned int i) {
+    const float d = Timg(x, y, 0, 0);
+    const float e = Timg(x, y, 0, 1);
+    const float f = e;
+    const float g = Timg(x, y, 1, 1);
 
-    float dpg = d + g;
-    float disc = sqrt((4 * e * f) + pow(d - g, 2));
-    float a = (dpg + disc) / 2.0f;
-    float b = (dpg - disc) / 2.0f;
+    const float dpg = d + g;
+    const float disc = sqrt((4.0f * e * f) + pow(d - g, 2.0f));
+    const float a = (dpg + disc) / 2.0f;
+    const float b = (dpg - disc) / 2.0f;
     if (i == 0) return std::max(a, b);
     else return std::min(a, b);
 }
 
 inline glm::vec2 Eigenvector2D(unsigned int x, unsigned int y, unsigned int i) {
+    const float lambda = Eigenvalue2D(x, y, i);
 
-    float lambda = Eigenvalue2D(x, y, i);
-
-    float d = Timg(x, y, 0, 0);                 // dx * dx
-    float e = Timg(x, y, 0, 1);                 // dx * dy
-    float f = e;
-    float g = Timg(x, y, 1, 1);                 // dy * dy
+    const float d = Timg(x, y, 0, 0);                 // dx * dx
+    const float e = Timg(x, y, 0, 1);                 // dx * dy
+    const float g = Timg(x, y, 1, 1);                 // dy * dy
    
     if(e != 0)
         return glm::normalize(glm::vec2(1.0f, (lambda - d) / e));
     else if (g == 0)
-        return glm::vec2(1.0f, 0.0f);
+        return {1.0f, 1.0f};
     else
-        return glm::vec2(0.0f, 1.0f);
+        return {0.0f, 1.0f};
 }
 
-inline float normaldist(float x, float sigma) {
-    float scale = 1.0f / (sigma * sqrt(2 * 3.14159));
-    float ex = -(x * x) / (2 * sigma * sigma);
+inline float normaldist(const float x, const float sigma) {
+    const float scale = 1.0f / (sigma * sqrt(2 * 3.14159f));
+    const float ex = -(x * x) / (2 * sigma * sigma);
     return scale * exp(ex);
 }
 
@@ -246,7 +241,7 @@ inline float normaldist(float x, float sigma) {
 /// Blurs the tensor field and re-calculates the current scalar image
 /// </summary>
 /// <param name="sigma"></param>
-void GaussianFilter(float sigma) {
+void GaussianFilter(const float sigma) {
     // if a CUDA device is enabled, use a blur kernel
     if(in_device >=0) {
         unsigned int blur_width;
@@ -258,41 +253,39 @@ void GaussianFilter(float sigma) {
     }
     // otherwise use the CPU
     else {
-        unsigned int size = ceil(sigma * 6);
-        float dx = 1.0f;
-        float start = -(float)(size - 1) / 2.0f;
+        const unsigned int size = ceil(sigma * 6);
+        const float start = -static_cast<float>(size - 1) / 2.0f;
         std::vector<size_t> sx = { 1, size, 1 };
         std::vector<size_t> sy = { size, 1, 1 };
         tira::image<float> Kx(size, 1);
         tira::image<float> Ky(1, size);
         for (size_t i = 0; i < size; i++) {
-            float v = normaldist(start + dx * i, sigma);
+            constexpr float dx = 1.0f;
+            const float v = normaldist(start + dx * static_cast<float>(i), sigma);
             Kx(i, 0, 0) = v;
             Ky(0, i, 0) = v;
         }
         Tn = T0.convolve2(Kx);
         Tn = Tn.convolve2(Ky);
     }
-
 }
 
-void TensorVote(float sigma, unsigned int p, float sigma2, bool stick, bool plate) {
+void TensorVote(const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate) {
     Tn = tira::image<glm::mat2>(T0.X(), T0.Y());
 
-    unsigned int w = 6 * std::max(sigma, sigma2) + 1;
-    cudaVote2D((float*)T0.data(), (float*)Tn.data(), 
-        (unsigned int)T0.shape()[0], (unsigned int)T0.shape()[1], 
+    const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
+    cudaVote2D(reinterpret_cast<float *>(T0.data()), reinterpret_cast<float *>(Tn.data()),
+        static_cast<unsigned int>(T0.shape()[0]), static_cast<unsigned int>(T0.shape()[1]),
         sigma, sigma2, w, p, in_device, stick, plate, false);
 
     
 }
 
-tira::image<unsigned char> ColormapTensor(unsigned int row, unsigned int col) {
+tira::image<unsigned char> ColormapTensor(const unsigned int row, const unsigned int col) {
     SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);
-    float val;
-    for (int yi = 0; yi < Tn.shape()[0]; yi++) {
-        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            val = Timg(xi, yi, row, col);
+    for (unsigned int yi = 0; yi < Tn.shape()[0]; yi++) {
+        for (unsigned int xi = 0; xi < Tn.shape()[1]; xi++) {
+            const float val = Timg(xi, yi, row, col);
             SCALAR(xi, yi, 0) = val;
         }
     }
@@ -303,7 +296,7 @@ tira::image<unsigned char> ColormapTensor(unsigned int row, unsigned int col) {
     return C;
 }
 
-tira::image<unsigned char> ColormapEval(unsigned int i) {
+tira::image<unsigned char> ColormapEval(const unsigned int i) {
     tira::image<float> L = Ln.channel(i);
     MAXVAL = Ln.maxv();
     MINVAL = Ln.minv();
@@ -312,7 +305,7 @@ tira::image<unsigned char> ColormapEval(unsigned int i) {
     return C;
 }
 
-tira::image<unsigned char> ColormapEvec(unsigned int i) {    
+tira::image<unsigned char> ColormapEvec(const unsigned int i) {
 
     // calculate a color representing the eigenvector angle
     tira::image<float> AngleColor = THETAn.channel(i).cmap(-std::numbers::pi, std::numbers::pi, ColorMap::RainbowCycle);
@@ -372,13 +365,12 @@ tira::image<unsigned char> ColormapEccentricity() {
 /// </summary>
 /// <param name="u"></param>
 /// <param name="v"></param>
-void ScalarFrom_TensorElement2D(unsigned int u, unsigned int v) {
+void ScalarFrom_TensorElement2D(const unsigned int u, const unsigned int v) {
 
     SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);
-    float val;
-    for (int yi = 0; yi < Tn.shape()[0]; yi++) {
-        for (int xi = 0; xi < Tn.shape()[1]; xi++) {
-            val = Timg(xi, yi, u, v);
+    for (unsigned int yi = 0; yi < Tn.shape()[0]; yi++) {
+        for (unsigned int xi = 0; xi < Tn.shape()[1]; xi++) {
+            const float val = Timg(xi, yi, u, v);
             SCALAR(xi, yi, 0) = val;
         }
     }
@@ -409,7 +401,6 @@ void ScalarFrom_Eval(unsigned int i) {
 /// <summary>
 /// Create a scalar image from the specified eigenvalue
 /// </summary>
-/// <param name="i"></param>
 void ScalarFrom_Eccentricity() {
 
     CurrentColormap = ColormapEccentricity();
@@ -420,7 +411,7 @@ void ScalarFrom_Eccentricity() {
 /// Create a scalar image from the specified eigenvector and component
 /// </summary>
 /// <param name="i"></param>
-void ScalarFrom_Evec(unsigned int i) {
+void ScalarFrom_Evec(const unsigned int i) {
 
     SCALAR = THETAn.channel(i);
 
@@ -461,6 +452,8 @@ void ScalarRefresh() {
     case ScalarType::Eccentricity:
         ScalarFrom_Eccentricity();
         break;
+    default:
+        throw std::runtime_error("Invalid scalar type");
     }
 }
 
@@ -483,10 +476,10 @@ void RegenerateGlyphs() {
 
     tira::geometry<float> circle = tira::circle<float>(GLYPH_TESSELATION).scale({ 0.0f, 0.0f });
 
-    tira::geometry<float> glyphrow = circle.tile({1.0f, 0.0f, 0.0f}, Tn.width());
-    tira::geometry<float> glyphgrid = glyphrow.tile({0.0f, 1.0f, 0.0f}, Tn.height());
+    const tira::geometry<float> glyph_row = circle.tile({1.0f, 0.0f, 0.0f}, Tn.width());
+    const tira::geometry<float> glyph_grid = glyph_row.tile({0.0f, 1.0f, 0.0f}, Tn.height());
 
-    GLYPH_GEOMETRY = tira::glGeometry(glyphgrid);
+    GLYPH_GEOMETRY = tira::glGeometry(glyph_grid);
     GLYPH_MATERIAL->SetTexture("lambda", Ln, GL_RG32F, GL_NEAREST);
     GLYPH_MATERIAL->SetTexture("evecs", THETAn, GL_RG32F, GL_NEAREST);
 }
@@ -499,22 +492,21 @@ void RenderUI() {
     ImGui::NewFrame();
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
-    ImGui::Text("File: %s", FileName == NULL ? "N/A" : FileName);
+    ImGui::Text("File: %s", FileName == nullptr ? "N/A" : FileName);
 
     if (ImGui::Button("Load File"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
     if (ImGuiFileDialog::Instance()->Display("ChooseNpyFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
-            std::string extension = filename.substr(filename.find_last_of(".") + 1);
-            if (extension == "npy") {
+            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
                 LoadTensorField(filename);
                 SCALARTYPE = ScalarType::EVal0;
                 ScalarRefresh();
                 FIELD_LOADED = true;
                 RENDER_GLYPHS = true;
 
-                if (GLYPH_MATERIAL == NULL) {
+                if (GLYPH_MATERIAL == nullptr) {
                     GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
                     GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
                 }
@@ -533,8 +525,7 @@ void RenderUI() {
     if (ImGuiFileDialog::Instance()->Display("ChooseBmpFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
-            std::string extension = filename.substr(filename.find_last_of(".") + 1);
-            if (extension == "bmp") {
+            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "bmp") {
                 CurrentColormap.save(filename);
             }
         }
@@ -567,7 +558,7 @@ void RenderUI() {
     if (ImGui::RadioButton("Darken##2", &MAGNITUDECOLORMODE, AdjustColorType::Darken))
         ScalarRefresh();
     ImGui::SetNextItemWidth(160);
-    if (ImGui::InputFloat("Scale", &MAGNITUDECOLORTHRESHOLD, L1MaxMag * 0.01, L1MaxMag * 0.1)) {
+    if (ImGui::InputFloat("Scale", &MAGNITUDECOLORTHRESHOLD, L1MaxMag * 0.01f, L1MaxMag * 0.1f)) {
         if (MAGNITUDECOLORTHRESHOLD < 0) MAGNITUDECOLORTHRESHOLD = 0;
         ScalarRefresh();
     }
@@ -712,14 +703,15 @@ void RenderUI() {
     }
     ImGui::Checkbox("Scale by Norm", &GLYPH_NORMALIZE);
 
-    int FieldIndex[2] = { (int)MousePos[0], (int)MousePos[1] };
+    int FieldIndex[2] = { static_cast<int>(MousePos[0]), static_cast<int>(MousePos[1]) };
 
     if (FIELD_LOADED) {
-        if ((FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width()) && (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height()))
+        if ((FieldIndex[0] < 0 || FieldIndex[0] >= static_cast<int>(Tn.width()))
+            && (FieldIndex[1] < 0 || FieldIndex[1] >= static_cast<int>(Tn.height())))
             ImGui::Text("Field Index: ---, ---");
-        else if (FieldIndex[1] < 0 || FieldIndex[1] >= Tn.height())
+        else if (FieldIndex[1] < 0 || FieldIndex[1] >= static_cast<int>(Tn.height()))
             ImGui::Text("Field Index: %d, ---", FieldIndex[0]);
-        else if (FieldIndex[0] < 0 || FieldIndex[0] >= Tn.width())
+        else if (FieldIndex[0] < 0 || FieldIndex[0] >= static_cast<int>(Tn.width()))
             ImGui::Text("Field Index: ---, %d", FieldIndex[1]);
         else {
             ImGui::Text("Field Index: %d, %d", FieldIndex[0], FieldIndex[1]);
@@ -750,8 +742,8 @@ void RenderUI() {
             // display the eigenvectors
             ImGui::Text("Eigenvectors:");
             ImGui::Columns(2);
-            ImGui::InputFloat2("x0, y0", (float*)& ev0, "%1.5F");
-            ImGui::InputFloat2("x1, y1", (float*)& ev1, "%1.5F");
+            ImGui::InputFloat2("x0, y0", reinterpret_cast<float *>(&ev0), "%1.5F");
+            ImGui::InputFloat2("x1, y1", reinterpret_cast<float *>(&ev1), "%1.5F");
 
         }
     }
@@ -799,13 +791,13 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
-{
+void mouse_button_callback(GLFWwindow* window, const int button, const int action, const int mods) {
+    (void)mods;                                                         // mods is required for the callback but unused
     if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
         double xpos, ypos;
         glfwGetCursorPos(window, &xpos, &ypos);
-        prevMousePos[0] = xpos;
-        prevMousePos[1] = ypos;
+        prevMousePos[0] = static_cast<float>(xpos);
+        prevMousePos[1] = static_cast<float>(ypos);
     }
 }
 
@@ -815,25 +807,25 @@ void mouse_callback(GLFWwindow* window, double xposIn, double yposIn) {
     if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS &&
         glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
         //int state = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT);
-        double xdist = (prevMousePos[0] - xposIn) / display_w * Viewport[0] * CameraZoom;
-        double ydist = (prevMousePos[1] - yposIn) / display_h * Viewport[1] * CameraZoom;
-        CameraPos[0] += xdist;
-        CameraPos[1] += ydist;
-        prevMousePos[0] = xposIn;
-        prevMousePos[1] = yposIn;
+        const double xdist = (prevMousePos[0] - xposIn) / display_w * Viewport[0] * CameraZoom;
+        const double ydist = (prevMousePos[1] - yposIn) / display_h * Viewport[1] * CameraZoom;
+        CameraPos[0] += static_cast<float>(xdist);
+        CameraPos[1] += static_cast<float>(ydist);
+        prevMousePos[0] = static_cast<float>(xposIn);
+        prevMousePos[1] = static_cast<float>(yposIn);
     }
     else {
-        
-        float x_adjustment = (Viewport[0] - (float)Tn.width()) / 2.0f;
-        float y_adjustment = (Viewport[1] - (float)Tn.height()) / 2.0f;
-        MousePos[0] = (float)xposIn / (float)display_w * Viewport[0] - x_adjustment;
-        MousePos[1] = (float)yposIn / (float)display_h * Viewport[1] - y_adjustment;
+        const float x_adjustment = (Viewport[0] - static_cast<float>(Tn.width())) / 2.0f;
+        const float y_adjustment = (Viewport[1] - static_cast<float>(Tn.height())) / 2.0f;
+        MousePos[0] = static_cast<float>(xposIn) / static_cast<float>(display_w) * Viewport[0] - x_adjustment;
+        MousePos[1] = static_cast<float>(yposIn) / static_cast<float>(display_h) * Viewport[1] - y_adjustment;
     }
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+void scroll_callback(GLFWwindow* window, const double xoffset, const double yoffset) {
+    (void)xoffset;                                                  // xoffset is required for the callback but unused
     if(glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
-        CameraZoom -= CameraZoom * (yoffset * 0.25);
+        CameraZoom -= CameraZoom * (static_cast<float>(yoffset) * 0.25f);
 }
 
 
@@ -861,7 +853,7 @@ int main(int argc, char** argv) {
     boost::program_options::notify(vm);
 
     // if the user passes the help parameter, output command line details
-    if (vm.count("help")) {
+    if (vm.contains("help")) {
         std::cout << desc << std::endl;
         return 1;
     }
@@ -876,24 +868,24 @@ int main(int argc, char** argv) {
     }
 
     // Load the tensor field if it is provided as a command-line argument
-    if (vm.count("input")) {
+    if (vm.contains("input")) {
         LoadTensorField(in_inputname);
         FileName = in_inputname.c_str();
-        GLYPH_ROWS = Tn.shape()[0];
+        GLYPH_ROWS = static_cast<int>(Tn.shape()[0]);
     }
     else {
     }
 
     if(FIELD_LOADED) {
-        if (vm.count("blur")) {
+        if (vm.contains("blur")) {
             GaussianFilter(in_blur_strength);
         }
-        if (vm.count("l0")) ColormapEval(0).save(in_l0_outputname);
-        if (vm.count("l1")) ColormapEval(1).save(in_l1_outputname);
-        if (vm.count("v0")) ColormapEvec(0).save(in_v0_outputname);
-        if (vm.count("v1")) ColormapEvec(1).save(in_v1_outputname);
+        if (vm.contains("l0")) ColormapEval(0).save(in_l0_outputname);
+        if (vm.contains("l1")) ColormapEval(1).save(in_l1_outputname);
+        if (vm.contains("v0")) ColormapEvec(0).save(in_v0_outputname);
+        if (vm.contains("v1")) ColormapEvec(1).save(in_v1_outputname);
 
-        if (vm.count("nogui")) {
+        if (vm.contains("nogui")) {
             return 0;
         }
     }
@@ -910,8 +902,8 @@ int main(int argc, char** argv) {
 
 
     // Create window with graphics context
-    window = glfwCreateWindow(1600, 1200, "ImGui GLFW+OpenGL3 Hello World Program", NULL, NULL);
-    if (window == NULL)
+    window = glfwCreateWindow(1600, 1200, "ImGui GLFW+OpenGL3 Hello World Program", nullptr, nullptr);
+    if (window == nullptr)
         return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
@@ -932,7 +924,7 @@ int main(int argc, char** argv) {
     if (FIELD_LOADED) {
         ScalarRefresh();
         RegenerateGlyphs();
-        CameraPos = glm::vec3(Tn.width() / 2.0f, Tn.height() / 2.0f, 0.0f);
+        CameraPos = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
     }
 
     testmaterial = new tira::glMaterial(test_shader_string);
@@ -958,7 +950,11 @@ int main(int argc, char** argv) {
         if (FIELD_LOADED) {
 
             // Calculate the viewport width and height based on the dimensions of the tensor field and the screen (so that the field isn't distorted)
-            FitRectangleToWindow(Tn.width(), Tn.height(), display_w, display_h, Viewport[0], Viewport[1]);
+            FitRectangleToWindow(static_cast<float>(Tn.width()),
+                static_cast<float>(Tn.height()),
+                static_cast<float>(display_w),
+                static_cast<float>(display_h),
+                Viewport[0], Viewport[1]);
 
             glm::vec2 viewport(Viewport[0], Viewport[1]);
             glm::vec2 view_extent = viewport * CameraZoom / 2.0f;
@@ -966,13 +962,13 @@ int main(int argc, char** argv) {
                 view_extent[0] + CameraPos[0], 
                 view_extent[1] + CameraPos[1], 
                 -view_extent[1] + CameraPos[1]);   // create a view matrix
-            glm::vec3 center((float)Tn.width() / 2.0f, (float)Tn.height() / 2.0f, 0.0f);
+            glm::vec3 center(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
             
             
             // if the user is visualizing a scalar component of the tensor field as a color map
             if (SCALARTYPE != ScalarType::NoScalar) {
 
-                glm::vec3 scale((float)Tn.width(), (float)Tn.height(), 1.0f);
+                glm::vec3 scale(static_cast<float>(Tn.width()), static_cast<float>(Tn.height()), 1.0f);
                 glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), scale);                                                      // compose the scale matrix from the width and height of the tensor field
                 glm::mat4 Mtrans = glm::translate(glm::mat4(1.0f), center);
                 //glm::mat4 Mtrans = glm::mat4(1.0f);                                                                         // there is no translation (the 2D field is centered at the origin)
