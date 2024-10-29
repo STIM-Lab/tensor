@@ -31,10 +31,10 @@ double xprev, yprev;
 size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
-tira::volume<glm::mat3> T0;							// 3D tensor field (3x3 voxels)
-tira::volume<glm::mat3> Tn;							// processed tensor field
-tira::volume<float> Ln;							// eigenvalues of the processed tensor field (smallest to largest magnitude)
-tira::volume<float> Vn;							// eigenvectors of the processed tensor field in polar coordinates (medium and large eigenvectors)
+tira::volume<glm::mat3> T0;								// 3D tensor field (3x3 voxels)
+tira::volume<glm::mat3> Tn(0, 0, 0);					// processed tensor field
+tira::volume<float> Ln;									// eigenvalues of the processed tensor field (smallest to largest magnitude)
+tira::volume<float> Vn;									// eigenvectors of the processed tensor field in polar coordinates (medium and large eigenvectors)
 //int gui_VolumeSize[] = { 0, 0, 0 };
 //float gui_PixelSize[] = { 1.0f, 1.0f, 1.0f };
 
@@ -49,8 +49,8 @@ int step = 4;
 tira::camera Camera;
 
 tira::glMaterial* SCALAR_MATERIAL;
-tira::glMaterial* GLYPH_MATERIAL;
-tira::glMaterial* VOLUME_MATERIAL;
+//tira::glMaterial* GLYPH_MATERIAL;
+//tira::glMaterial* VOLUME_MATERIAL;
 
 enum ScalarType { NoScalar, TensorElement, EVal, EVec, Anisotropy };
 int SCALAR_TYPE = ScalarType::EVal;
@@ -96,6 +96,7 @@ bool perspective = false;
 bool OPEN_TENSOR = false;
 bool RENDER_GLYPHS = false;
 bool TENSOR_LOADED = false;
+bool SET_CAMERA = false;
 std::string TensorFileName;
 
 bool OPEN_VOLUME = false;
@@ -439,8 +440,6 @@ void ColormapScalar() {
 	}
 }
 
-
-
 void UpdateEigens() {
 	float* eigenvalues_raw = cudaEigenvalues3((float*)Tn.data(), Tn.size(), -1);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
@@ -506,181 +505,212 @@ void RenderUI() {
 		style.WindowRounding = 7.f;
 
 
-		////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
-		ImGui::SeparatorText("Load");
-		if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
+		if (ImGui::BeginTabBar("MyTabBar"))
 		{
-			ImGui::OpenPopup("Open File");
-			tensor_data = true;
-		}
 
-		ImGui::SameLine();
-		if (ImGui::Button("Render", ImVec2(60, 25)) && TENSOR_LOADED) {
-			RENDER_GLYPHS = true;
-		}
-
-		////////////////////////////////////////////////  Load volume  ////////////////////////////////////////////////////
-		if (ImGui::Button("Load Volume"))					                                // create a button for loading the shader
-		{
-			ImGui::OpenPopup("Open File");
-			volume_data = true;
-		}
-		ImGui::SameLine();
-		// Render the plane with texture-mapped image
-		ImGui::Checkbox("Image Plane", &RENDER_IMAGE);
-		ImGui::Spacing();
-		// Adjust the image transparency
-		ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
-
-
-		if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
-			OpenFileDialog();
-		ImGui::Spacing(); ImGui::Spacing();
-		///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-
-		// Select the number of tensors along X axis
-		/*ImGui::SeparatorText("Pixel/Tensor");
-		int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
-		ImGui::Text("Number of pixels per tensor:");
-		int test;
-		if (TENSOR_LOADED)
-			ImGui::SliderInt("  ", &step, 1, smallest_axis / 10);
-		else {
-			ImGui::SameLine();
-			ImGui::Text("0");
-		}
-		ImGui::Spacing(); ImGui::Spacing();
-
-		// Display the volume size (text only)
-		ImGui::SeparatorText("Size");
-		ImGui::DragInt3("Volume Size", gui_VolumeSize, 1, 0, 1500, "%d", ImGuiSliderFlags_NoInput);
-
-		// Display and input the pixel size
-		ImGui::DragFloat3("Pixel Size", gui_PixelSize, 0.001f, 0.f, 5.f, "%.3f");
-		ImGui::Spacing();
-		if (ImGui::SmallButton(" Reset ")) {
-			gui_PixelSize[0] = 1.f;
-			gui_PixelSize[1] = 1.f;
-			gui_PixelSize[2] = 1.f;
-		}
-		ImGui::Spacing(); ImGui::Spacing();
-		*/
-
-		// Select which plane to render (view)
-		/*ImGui::SeparatorText("Plane");
-		if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("yi ", &scroll_axis, 1)) axis_change = true;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("zi ", &scroll_axis, 2)) axis_change = true;
-		ImGui::Spacing();*/
-
-		ImGui::SeparatorText("Scalar Visualization");
-		ImGui::Checkbox("X", &RENDER_PLANE[0]);
-		ImGui::SameLine();
-		if (ImGui::InputInt("##Xpos", &PLANE_POSITION[0])) {
-			if (PLANE_POSITION[0] < 0) PLANE_POSITION[0] = 0;
-			if (PLANE_POSITION[0] >= Tn.X()) PLANE_POSITION[0] = Tn.X() - 1;
-		}
-		ImGui::Checkbox("Y", &RENDER_PLANE[1]);
-		ImGui::SameLine();
-		if (ImGui::InputInt("##Ypos", &PLANE_POSITION[1])) {
-			if (PLANE_POSITION[1] < 0) PLANE_POSITION[1] = 0;
-			if (PLANE_POSITION[1] >= Tn.Y()) PLANE_POSITION[1] = Tn.Y() - 1;
-		}
-
-		ImGui::Checkbox("Z", &RENDER_PLANE[2]);
-		ImGui::SameLine();
-		if (ImGui::InputInt("##Zpos", &PLANE_POSITION[2])) {
-			if (PLANE_POSITION[2] < 0) PLANE_POSITION[2] = 0;
-			if (PLANE_POSITION[2] >= Tn.Z()) PLANE_POSITION[2] = Tn.Z() - 1;
-		}
-
-		if (ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal)) {
-			ColormapEval(SCALAR_EVAL);
-		}
-		if (ImGui::InputInt("Eigenvalue", &SCALAR_EVAL)) {
-			if (SCALAR_EVAL < 0) SCALAR_EVAL = 0;
-			if (SCALAR_EVAL > 2) SCALAR_EVAL = 2;
-			if (SCALAR_TYPE == ScalarType::EVal) ColormapEval(SCALAR_EVAL);
-		}
-		if (ImGui::RadioButton("Anisotropy", &SCALAR_TYPE, ScalarType::Anisotropy)) {
-			ColormapScalar();
-		}
-		const char* items[] = { "Fractional", "Linear", "Plate", "Spherical" };
-
-		// Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
-		const char* combo_preview_value = items[SCALAR_ANISOTROPY];
-
-		if (ImGui::BeginCombo("##AnisotropyType", combo_preview_value))
-		{
-			for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+			// First tab
+			if (ImGui::BeginTabItem("Tensor Field"))
 			{
-				const bool is_selected = (SCALAR_ANISOTROPY == n);
-				if (ImGui::Selectable(items[n], is_selected)) {
-					SCALAR_ANISOTROPY = n;
-					ColormapScalar();
+				////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
+				ImGui::SeparatorText("Load");
+				if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
+				{
+					ImGui::OpenPopup("Open File");
+					tensor_data = true;
 				}
 
-				// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-				if (is_selected)
-					ImGui::SetItemDefaultFocus();
+				ImGui::SameLine();
+				if (ImGui::Button("Render", ImVec2(60, 25)) && TENSOR_LOADED) {
+					RENDER_GLYPHS = true;
+				}
+
+				////////////////////////////////////////////////  Load volume  ////////////////////////////////////////////////////
+				if (ImGui::Button("Load Volume"))					                                // create a button for loading the shader
+				{
+					ImGui::OpenPopup("Open File");
+					volume_data = true;
+				}
+				ImGui::SameLine();
+				// Render the plane with texture-mapped image
+				ImGui::Checkbox("Image Plane", &RENDER_IMAGE);
+				ImGui::Spacing();
+				// Adjust the image transparency
+				ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
+
+
+				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
+					OpenFileDialog();
+				ImGui::Spacing(); ImGui::Spacing();
+				///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+				// Select the number of tensors along X axis
+				/*ImGui::SeparatorText("Pixel/Tensor");
+				int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
+				ImGui::Text("Number of pixels per tensor:");
+				int test;
+				if (TENSOR_LOADED)
+					ImGui::SliderInt("  ", &step, 1, smallest_axis / 10);
+				else {
+					ImGui::SameLine();
+					ImGui::Text("0");
+				}
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Display the volume size (text only)
+				ImGui::SeparatorText("Size");
+				ImGui::DragInt3("Volume Size", gui_VolumeSize, 1, 0, 1500, "%d", ImGuiSliderFlags_NoInput);
+
+				// Display and input the pixel size
+				ImGui::DragFloat3("Pixel Size", gui_PixelSize, 0.001f, 0.f, 5.f, "%.3f");
+				ImGui::Spacing();
+				if (ImGui::SmallButton(" Reset ")) {
+					gui_PixelSize[0] = 1.f;
+					gui_PixelSize[1] = 1.f;
+					gui_PixelSize[2] = 1.f;
+				}
+				ImGui::Spacing(); ImGui::Spacing();
+				*/
+
+				// Select which plane to render (view)
+				/*ImGui::SeparatorText("Plane");
+				if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
+				ImGui::SameLine();
+				if (ImGui::RadioButton("yi ", &scroll_axis, 1)) axis_change = true;
+				ImGui::SameLine();
+				if (ImGui::RadioButton("zi ", &scroll_axis, 2)) axis_change = true;
+				ImGui::Spacing();*/
+
+				ImGui::SeparatorText("Scalar Visualization");
+				ImGui::Checkbox("X", &RENDER_PLANE[0]);
+				ImGui::SetItemTooltip("Render plane X of the volume.");
+				ImGui::SameLine();
+				ImGui::SliderInt("X Position", &PLANE_POSITION[0], 0, Tn.X() - 1);
+				/*if (ImGui::InputInt("##Xpos", &PLANE_POSITION[0])) {
+					if (PLANE_POSITION[0] < 0) PLANE_POSITION[0] = 0;
+					if (PLANE_POSITION[0] >= Tn.X()) PLANE_POSITION[0] = Tn.X() - 1;
+				}*/
+				ImGui::Checkbox("Y", &RENDER_PLANE[1]);
+				ImGui::SetItemTooltip("Render plane Y of the volume.");
+				ImGui::SameLine();
+				ImGui::SliderInt("Y Position", &PLANE_POSITION[1], 0, Tn.Y() - 1);
+				/*if (ImGui::InputInt("##Ypos", &PLANE_POSITION[1])) {
+					if (PLANE_POSITION[1] < 0) PLANE_POSITION[1] = 0;
+					if (PLANE_POSITION[1] >= Tn.Y()) PLANE_POSITION[1] = Tn.Y() - 1;
+				}*/
+
+				ImGui::Checkbox("Z", &RENDER_PLANE[2]);
+				ImGui::SetItemTooltip("Render plane Z of the volume.");
+				ImGui::SameLine();
+				ImGui::SliderInt("Z Position", &PLANE_POSITION[2], 0, Tn.Z() - 1);
+				/*if (ImGui::InputInt("##Zpos", &PLANE_POSITION[2])) {
+					if (PLANE_POSITION[2] < 0) PLANE_POSITION[2] = 0;
+					if (PLANE_POSITION[2] >= Tn.Z()) PLANE_POSITION[2] = Tn.Z() - 1;
+				}*/
+
+				if (ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal)) {
+					ColormapEval(SCALAR_EVAL);
+				}
+				if (ImGui::InputInt("Eigenvalue", &SCALAR_EVAL)) {
+					if (SCALAR_EVAL < 0) SCALAR_EVAL = 0;
+					if (SCALAR_EVAL > 2) SCALAR_EVAL = 2;
+					if (SCALAR_TYPE == ScalarType::EVal) ColormapEval(SCALAR_EVAL);
+				}
+				if (ImGui::RadioButton("Anisotropy", &SCALAR_TYPE, ScalarType::Anisotropy)) {
+					ColormapScalar();
+				}
+				const char* items[] = { "Fractional", "Linear", "Plate", "Spherical" };
+
+				// Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
+				const char* combo_preview_value = items[SCALAR_ANISOTROPY];
+
+				if (ImGui::BeginCombo("##AnisotropyType", combo_preview_value))
+				{
+					for (int n = 0; n < IM_ARRAYSIZE(items); n++)
+					{
+						const bool is_selected = (SCALAR_ANISOTROPY == n);
+						if (ImGui::Selectable(items[n], is_selected)) {
+							SCALAR_ANISOTROPY = n;
+							ColormapScalar();
+						}
+
+						// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+						if (is_selected)
+							ImGui::SetItemDefaultFocus();
+					}
+
+					ImGui::EndCombo();
+				}
+
+				// Filter anisotropy using a threshold filter option
+				ImGui::SeparatorText("Anisotropy");
+				ImGui::Combo(" ", &anisotropy, "All\0Linear\0Planar\0Spherical\0\0");
+				ImGui::Spacing();
+				ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Use perspective view instead of ortho view
+				ImGui::SeparatorText("Projection");
+				if (ImGui::RadioButton("Ortho", !perspective))
+					perspective = false;
+				ImGui::SameLine();
+				if (ImGui::RadioButton("Perspective", perspective))
+					perspective = true;
+				ImGui::Spacing(); ImGui::Spacing();
+
+
+				// Show colormapped image based on shortest/longest eigenvector
+				ImGui::SeparatorText("IDK");
+				ImGui::Combo("\t", &cmap, "LongestVector\0ShortestVector\0\0");
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Adjust a threshold for eigenvalues corresponding to each tensor
+				ImGui::SeparatorText("Largest Eigenvalue Threshold");
+				static float begin = 0.f, end = 125.f, step = 0.005f;
+				ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
+				ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
+				ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Zooming in and out option
+				ImGui::SeparatorText("Zoom");
+				ImGui::InputFloat("##Zoom", &zoom, 0.1f, 2.0f);
+				zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
+				ImGui::SameLine();
+				if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Reset button
+				ImGui::SeparatorText("Reset");
+				float avail = ImGui::GetContentRegionAvail().x;
+				float off = (avail - 50) * 0.5f;
+				if (off > 0.0f)
+					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+				RESET = ImGui::Button("Reset", ImVec2(50, 50));
+
+				ImGui::EndTabItem();
 			}
-			
-			ImGui::EndCombo();
+
+			// Second tab
+			if (ImGui::BeginTabItem("Tensor Voting"))
+			{
+				ImGui::Text("This is the Tensor Voting tab!\n");
+				ImGui::EndTabItem();
+			}
+
+			// Third tab
+			if (ImGui::BeginTabItem("Other"))
+			{
+				ImGui::Text("Any more implementations? blah blah blah blah blah");
+				ImGui::EndTabItem();
+			}
+			ImGui::EndTabBar();
 		}
-		
-
-		// Filter anisotropy using a threshold filter option
-		ImGui::SeparatorText("Anisotropy");
-		ImGui::Combo(" ", &anisotropy, "All\0Linear\0Planar\0Spherical\0\0");
-		ImGui::Spacing();
-		ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
-		ImGui::Spacing(); ImGui::Spacing();
-
-		// Use perspective view instead of ortho view
-		ImGui::SeparatorText("Projection");
-		if (ImGui::RadioButton("Ortho", !perspective))
-			perspective = false;
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Perspective", perspective))
-			perspective = true;
-		ImGui::Spacing(); ImGui::Spacing();
-
-
-		// Show colormapped image based on shortest/longest eigenvector
-		ImGui::SeparatorText("IDK");
-		ImGui::Combo("\t", &cmap, "LongestVector\0ShortestVector\0\0");
-		ImGui::Spacing(); ImGui::Spacing();
-
-		// Adjust a threshold for eigenvalues corresponding to each tensor
-		ImGui::SeparatorText("Largest Eigenvalue Threshold");
-		static float begin = 0.f, end = 125.f, step = 0.005f;
-		ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
-		ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
-		ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
-		ImGui::Spacing(); ImGui::Spacing();
-
-		// Zooming in and out option
-		ImGui::SeparatorText("Zoom");
-		ImGui::InputFloat("##Zoom", &zoom, 0.1f, 2.0f);
-		zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
-		ImGui::SameLine();
-		if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
-		ImGui::Spacing(); ImGui::Spacing();
-
-		// Reset button
-		ImGui::SeparatorText("Reset");
-		float avail = ImGui::GetContentRegionAvail().x;
-		float off = (avail - 50) * 0.5f;
-		if (off > 0.0f)
-			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-		RESET = ImGui::Button("Reset", ImVec2(50, 50));
 
 		ImGui::GetFont()->Scale = old_size;
 		ImGui::PopFont();
 		ImGui::End();
+
 	}
 	//ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
 
@@ -727,15 +757,16 @@ int main(int argc, char** argv) {
 	tira::glGeometry rectangle = tira::glGeometry::GenerateRectangle<float>();				// create a rectangle for rendering volume
 
 	SCALAR_MATERIAL = new tira::glMaterial(scalar_shader_string);
-	GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
-	VOLUME_MATERIAL = new tira::glMaterial(volume_shader_string);
+	//GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
+	//VOLUME_MATERIAL = new tira::glMaterial(volume_shader_string);
 
 	// If the tensor field is loaded using command-line argument
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename);
 		OPEN_TENSOR = false;
-		std::cout << "Tensor loaded successfully\n" << std::endl;
-		std::cout << "Size of volume:\t" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << std::endl;
+		SET_CAMERA = true;
+		std::cout << "Tensor loaded successfully.\n" << std::endl;
+		std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
 	}
 
 	// If an image volume is specified, load it as a texture
@@ -756,10 +787,6 @@ int main(int argc, char** argv) {
 	float ambient = 0.3;
 
 	tira::glGeometry square = tira::glGeometry::GenerateRectangle<float>();
-	Camera.position({ 0.0f, 0.0f, -2 * Tn.smax()});
-	Camera.up({ 0.0f, 1.0f, 0.0f });
-	Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
-	Camera.fov(60);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();													// Poll and handle events (inputs, window resize, etc.)
@@ -776,15 +803,36 @@ int main(int argc, char** argv) {
 			Mproj = Camera.orthomatrix(aspect);
 		glm::mat4 Mview = Camera.viewmatrix();
 
-		
+		// If the load command for tensor field is called from ImGui file dialog
+		if (OPEN_TENSOR) {
+			LoadTensorField3(TensorFileName);								// Load the tensor field and set the texture-map
+			OPEN_TENSOR = false;
+			SET_CAMERA = true;
+			std::cout << "Tensor loaded successfully.\n" << std::endl;
+			std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
+			//std::cout << T.X() << ", " << T.Y() << ", " << T.Z() << std::endl;
+			//std::cout << T.dx() << ", " << T.dy() << ", " << T.dz() << std::endl;
+			//std::cout << T.sx() << ", " << T.sy() << ", " << T.sz() << std::endl;
+
+		}
+
+		if (TENSOR_LOADED && SET_CAMERA) {
+			Camera.position({ 0.0f, 0.0f, -2 * Tn.smax() });
+			Camera.up({ 0.0f, 1.0f, 0.0f });
+			Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
+			Camera.fov(60);
+			SET_CAMERA = false;
+		}
+
 		glClearColor(0, 0, 0, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
 		SCALAR_MATERIAL->Begin();
 		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
 
 		if (RENDER_PLANE[0]) {
 			glm::mat4 Mobj = glm::mat4(1.0f);
-			Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f));		
+			Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f));
 			Mobj = glm::scale(Mobj, glm::vec3(Tn.sx(), Tn.sy(), Tn.sz()));
 			Mobj = glm::rotate(Mobj, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -793,14 +841,14 @@ int main(int argc, char** argv) {
 			Mtex = glm::scale(Mtex, glm::vec3(1.0f, Tn.Y(), Tn.Z()));
 			Mtex = glm::rotate(Mtex, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 			glm::vec4 test = Mtex * glm::vec4(0.0, 0.0, 0.0, 1.0);
-			
+
 			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
 			square.Draw();
 		}
 		if (RENDER_PLANE[1]) {
 			glm::mat4 Mobj = glm::mat4(1.0f);
-			Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));		
+			Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
 			Mobj = glm::scale(Mobj, glm::vec3(Tn.sx(), Tn.sy(), Tn.sz()));
 			Mobj = glm::rotate(Mobj, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
@@ -808,7 +856,7 @@ int main(int argc, char** argv) {
 			Mtex = glm::translate(Mtex, glm::vec3(0.0f, (float)PLANE_POSITION[1], 0.0f));
 			Mtex = glm::scale(Mtex, glm::vec3(Tn.X(), 1.0f, Tn.Z()));
 			Mtex = glm::rotate(Mtex, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-			
+
 			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
 			square.Draw();
@@ -827,19 +875,10 @@ int main(int argc, char** argv) {
 			square.Draw();
 		}
 		SCALAR_MATERIAL->End();
+		
+
 
 		/*
-
-		// If the load command for tensor field is called from ImGui file dialog
-		if (OPEN_TENSOR) {
-			LoadTensorField3(TensorFileName);								// Load the tensor field and set the texture-map
-			OPEN_TENSOR = false;
-			std::cout << "Tensor loaded successfully\n" << std::endl;
-			std::cout << T.X() << ", " << T.Y() << ", " << T.Z() << std::endl;
-			std::cout << T.dx() << ", " << T.dy() << ", " << T.dz() << std::endl;
-			std::cout << T.sx() << ", " << T.sy() << ", " << T.sz() << std::endl;
-
-		}
 		// If the load command for volume is called from ImGui file dialog
 		if (OPEN_VOLUME) {
 			LoadVolume3(VolumeFileName);									// Load the volume and set the texture-map
