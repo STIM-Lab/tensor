@@ -62,11 +62,11 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     D[:, :, :, 2, 0] = np.divide(RZ, L, out=np.ones_like(RZ)*qz, where=L!=0)
     
     # calculate the rotated stick direction
-    Dt = np.transpose(D, axes=(0, 1, 3, 2))
-    I = np.eye(2)
+    Dt = np.transpose(D, axes=(0, 1, 2, 4, 3))
+    I = np.eye(3)
     R = I - 2 * np.matmul(D, Dt)
     Rq = np.matmul(R, q)
-    Rqt = np.transpose(Rq, (0, 1, 3, 2))
+    Rqt = np.transpose(Rq, (0, 1, 2, 4, 3))
     
     # calculate the decay based on the desired properties
     if sigma1 == 0:
@@ -84,9 +84,11 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     sin_2_theta = 1 - cos_2_theta    
     
     DECAY = (d1 * sin_2_theta + d2 * cos_2_theta)[..., np.newaxis, np.newaxis]
+    
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
-    V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
+    #V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
+    V = DECAY * np.matmul(Rq, Rqt)
     return V
 
 # calculate the vote result of the tensor field T
@@ -105,11 +107,12 @@ def stickvote3(T, sigma=3, sigma2=0):
     # calculate the optimal window size
     w = int(6 * sigmax + 1)
     x = np.linspace(-(w-1)/2, (w-1)/2, w)
-    X0, X1, X2 = np.meshgrid(x, x)
+    X0, X1, X2 = np.meshgrid(x, x, x)
     
     # create a padded vote field to store the vote results
     pad = int(3 * sigmax)
-    VF = np.pad(np.zeros(T.shape), ((pad, pad, pad), (pad, pad, pad), (0, 0, 0), (0, 0, 0)))
+    Z = np.zeros(T.shape)
+    VF = np.pad(Z, ((pad, pad), (pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
@@ -120,3 +123,39 @@ def stickvote3(T, sigma=3, sigma2=0):
                 VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1], x2:x2 + S.shape[2]] = VF[x0:x0 + S.shape[0], 
                                                                                     x1:x1 + S.shape[1], x2:x2 + S.shape[2]] + S
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
+
+# generate an impulse tensor field to test tensor voting
+def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma=5):
+    T = np.zeros((N, N, N, 3, 3))
+    
+    x = np.linspace(-N/2, N/2, N)
+    X, Y, Z = np.meshgrid(x, x, x)
+    V = stickfield3(1, 0, 0, X, Y, Z, sigma)
+    
+    # m = np.zeros((3, 3))
+    # m[0, 0] = x * x
+    # m[0, 1] = x * y
+    # m[0, 2] = x * z
+    # m[1, 0] = x * y
+    # m[1, 1] = y * y
+    # m[1, 2] = y * z
+    # m[2, 0] = x * z
+    # m[2, 1] = z * y
+    # m[2, 2] = z * z
+    
+    # l, v = np.linalg.eigh(m)
+    
+    # l[0] = l0
+    # l[1] = l1
+    # l[2] = l2
+    
+    # m = v @ np.diag(l) @ v.transpose()
+    
+    # T[int(N/2), int(N/2), int(N/2)] = m
+    
+    return V
+
+V = impulse3(101, 1, 0, 0, sigma=20)
+vals, vecs = np.linalg.eigh(V)
+plt.imshow(vals[:, :, 50, 2])
+np.save("stickfield.npy", V.astype(np.float32))
