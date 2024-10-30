@@ -50,6 +50,8 @@ configure_file(image2tensor.py
 				image2tensor.py COPYONLY)
 configure_file(tensorvote.py 
 				tensorvote.py COPYONLY)
+configure_file(tensorvote3d.py 
+				tensorvote3d.py COPYONLY)
 configure_file(gendata.py 
 				gendata.py COPYONLY)
 configure_file(physarum.bmp
