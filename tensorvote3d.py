@@ -80,10 +80,10 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
         d2 = np.exp(- L**2 / sigma2**2)
     
     qTd = np.squeeze(np.matmul(np.transpose(q), D))
-    cos_2_theta = qTd**2
-    sin_2_theta = 1 - cos_2_theta    
+    cos_2p_theta = (qTd**2)**power
+    sin_2p_theta = (1 - qTd**2)**power    
     
-    DECAY = (d1 * sin_2_theta + d2 * cos_2_theta)[..., np.newaxis, np.newaxis]
+    DECAY = (d1 * sin_2p_theta + d2 * cos_2p_theta)[..., np.newaxis, np.newaxis]
     
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
@@ -125,12 +125,14 @@ def stickvote3(T, sigma=3, sigma2=0):
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
 # generate an impulse tensor field to test tensor voting
-def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma=5):
-    T = np.zeros((N, N, N, 3, 3))
+def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
-    x = np.linspace(-N/2, N/2, N)
-    X, Y, Z = np.meshgrid(x, x, x)
-    V = stickfield3(1, 0, 0, X, Y, Z, sigma)
+    r = np.linspace(-N/2, N/2, N)
+    X, Y, Z = np.meshgrid(r, r, r)
+    
+    l = np.sqrt(x**2 + y**2 + z**2)
+    
+    V = stickfield3(x/l, y/l, z/l, X, Y, Z, sigma1, sigma2, power)
     
     # m = np.zeros((3, 3))
     # m[0, 0] = x * x
@@ -155,7 +157,7 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma=5):
     
     return V
 
-V = impulse3(101, 1, 0, 0, sigma=20)
+V = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
 vals, vecs = np.linalg.eigh(V)
 plt.imshow(vals[:, :, 50, 2])
 np.save("stickfield.npy", V.astype(np.float32))

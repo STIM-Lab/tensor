@@ -767,6 +767,9 @@ int main(int argc, char** argv) {
 		SET_CAMERA = true;
 		std::cout << "Tensor loaded successfully.\n" << std::endl;
 		std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
+		PLANE_POSITION[0] = static_cast<int>(Tn.X()/2);
+		PLANE_POSITION[1] = static_cast<int>(Tn.Y()/2);
+		PLANE_POSITION[2] = static_cast<int>(Tn.Z()/2);
 	}
 
 	// If an image volume is specified, load it as a texture
