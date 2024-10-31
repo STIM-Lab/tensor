@@ -29,6 +29,10 @@ float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
     return tira::cuda::Eigenvalues3D<float>(tensors, n, device);
 }
 
+float* cudaEigenvectors3(float* tensors, float* lambda, size_t n, int device) {
+    return tira::cuda::Eigenvectors3DPolar<float>(tensors, lambda, n, device);
+}
+
 float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device) {
     return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n, device);
 }

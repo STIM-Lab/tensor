@@ -18,6 +18,7 @@
 #define PI 3.14159265358979323846
 
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
+float* cudaEigenvectors3(float* tensors, float* lambda, size_t n, int device);
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
@@ -55,6 +56,7 @@ tira::glMaterial* SCALAR_MATERIAL;
 enum ScalarType { NoScalar, TensorElement, EVal, EVec, Anisotropy };
 int SCALAR_TYPE = ScalarType::EVal;
 int SCALAR_EVAL = 2;
+int SCALAR_EVEC = 2;
 int SCALAR_ANISOTROPY = 0;
 
 // scalar plane variables
@@ -330,6 +332,60 @@ tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
 	return triangular_elem;
 }
 
+void ColormapEvec(size_t vi) {
+	tira::volume<unsigned char> C(Tn.X(), Tn.Y(), Tn.Z(), 3);
+
+	for (size_t zi = 0; zi < Tn.Z(); zi++) {
+		float z = (float)zi / (float)Tn.Z();
+		for (size_t yi = 0; yi < Tn.Y(); yi++) {
+			float y = (float)yi / (float)Tn.Y();
+			for (size_t xi = 0; xi < Tn.X(); xi++) {
+				float theta, phi, x, y, z;
+				if (vi == 1) {
+					theta = Vn(xi, yi, zi, 0);
+					phi = Vn(xi, yi, zi, 1);
+
+					x = sin(theta) * cos(phi);
+					y = sin(theta) * sin(phi);
+					z = cos(theta);
+				}
+				else if (vi == 2) {
+					theta = Vn(xi, yi, zi, 2);
+					phi = Vn(xi, yi, zi, 3);
+
+					x = sin(theta) * cos(phi);
+					y = sin(theta) * sin(phi);
+					z = cos(theta);
+				}
+				else {
+					float theta1 = Vn(xi, yi, zi, 0);
+					float phi1 = Vn(xi, yi, zi, 1);
+
+					float x1 = sin(theta1) * cos(phi1);
+					float y1 = sin(theta1) * sin(phi1);
+					float z1 = cos(theta1);
+
+					float theta2 = Vn(xi, yi, zi, 0);
+					float phi2 = Vn(xi, yi, zi, 1);
+
+					float x2 = sin(theta2) * cos(phi2);
+					float y2 = sin(theta2) * sin(phi2);
+					float z2 = cos(theta2);
+
+					x = y1 * z2 - z1 * y2;
+					y = z1 * x2 - x1 * z2;
+					z = x1 * y2 - y1 * x2;
+				}
+
+				C(xi, yi, zi, 0) = abs(x) * 255;
+				C(xi, yi, zi, 1) = abs(y) * 255;
+				C(xi, yi, zi, 2) = abs(z) * 255;
+			}
+		}
+	}
+	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+}
+
 void ColormapEval(int eval) {
 	tira::volume<float> E = Ln.channel(eval);
 	tira::volume<unsigned char> C = E.cmap(ColorMap::Magma);
@@ -443,6 +499,9 @@ void ColormapScalar() {
 void UpdateEigens() {
 	float* eigenvalues_raw = cudaEigenvalues3((float*)Tn.data(), Tn.size(), -1);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
+
+	float* eigenvectors_raw = cudaEigenvectors3((float*)Tn.data(), (float*)Ln.data(), Tn.size(), -1);
+	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
 }
 
 // Load a tensor field from a NumPy file
@@ -640,6 +699,15 @@ void RenderUI() {
 					}
 
 					ImGui::EndCombo();
+				}
+
+				if (ImGui::RadioButton("Eigenvectors", &SCALAR_TYPE, ScalarType::EVec)) {
+					ColormapEvec(2);
+				}
+				if (ImGui::InputInt("Eigenvector", &SCALAR_EVEC)) {
+					if (SCALAR_EVEC < 0) SCALAR_EVEC = 0;
+					if (SCALAR_EVEC > 2) SCALAR_EVEC = 2;
+					if (SCALAR_TYPE == ScalarType::EVec) ColormapEvec(SCALAR_EVEC);
 				}
 
 				// Filter anisotropy using a threshold filter option
