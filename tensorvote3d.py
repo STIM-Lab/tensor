@@ -31,7 +31,7 @@ def eigmag(T):
 
 # calculates the normalization factor for a stick tensor field
 def eta(sigma1, sigma2, p):
-    num = np.pi * math.factorial(2*p)
+    num = 2 * np.pi * math.factorial(2*p)
     den = 2**(2*p) * (math.factorial(p)**2)
     s = sigma1**2 + sigma2**2
     integral = (num / den) * s
@@ -87,8 +87,8 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
-    #V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
-    V = DECAY * np.matmul(Rq, Rqt)
+    V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
+    #V = DECAY * np.matmul(Rq, Rqt)
     return V
 
 # calculate the vote result of the tensor field T

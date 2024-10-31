@@ -510,6 +510,11 @@ void LoadTensorField3(std::string npy_filename) {
 	T0.load_npy<float>(npy_filename);
 	Tn = T0;
 	
+	// Fix the plane position in the middle for better visualization
+	PLANE_POSITION[0] = static_cast<int>(Tn.X() / 2);
+	PLANE_POSITION[1] = static_cast<int>(Tn.Y() / 2);
+	PLANE_POSITION[2] = static_cast<int>(Tn.Z() / 2);
+
 	// Separate the diagonal and off-diagonal elements to be sent off to GPU as RGB volume texture-maps
 	//tira::volume<float> diagonal_elem = GetDiagValues(T);
 	//tira::volume<float> triangular_elem = GetOffDiagValues(T);
@@ -518,7 +523,7 @@ void LoadTensorField3(std::string npy_filename) {
 	//GLYPH_MATERIAL->SetTexture("Diagonal", diagonal_elem, GL_RGBA32F, GL_LINEAR);
 	//GLYPH_MATERIAL->SetTexture("Upper_trian", triangular_elem, GL_RGBA32F, GL_LINEAR);
 
-	// save everything for rendering
+	// Mark tensor as loaded for rendering
 	TENSOR_LOADED = true;
 
 	UpdateEigens();
@@ -835,9 +840,6 @@ int main(int argc, char** argv) {
 		SET_CAMERA = true;
 		std::cout << "Tensor loaded successfully.\n" << std::endl;
 		std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
-		PLANE_POSITION[0] = static_cast<int>(Tn.X()/2);
-		PLANE_POSITION[1] = static_cast<int>(Tn.Y()/2);
-		PLANE_POSITION[2] = static_cast<int>(Tn.Z()/2);
 	}
 
 	// If an image volume is specified, load it as a texture
