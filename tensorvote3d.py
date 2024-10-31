@@ -38,6 +38,37 @@ def eta(sigma1, sigma2, p):
     return 1.0 / integral
 
 
+def decay_integrate(sigma1, sigma2=0, power=1, N=100, L_max=10):
+    total = 0
+    
+    dtheta = 2 * np.pi / N
+    dphi = np.pi / N
+    dl = L_max / N
+    
+    for n in range(N):
+        theta = n * dtheta
+        for m in range(N):
+            phi = m * dphi
+            
+            x = np.cos(theta) * np.sin(phi)
+            y = np.sin(theta) * np.sin(phi)
+            z = np.cos(phi)
+            
+            for k in range(N):
+                L = k * dl
+                dV = L**2 * dl * dtheta * dphi * np.sin(phi)
+
+                d1 = np.exp(-L**2 / sigma1**2) if sigma1 != 0 else 0
+                d2 = np.exp(-L**2 / sigma2**2) if sigma2 != 0 else 0
+                
+                qTd = x**2 + y**2 + z**2                # not sure about this line???
+                cos_2p_theta = (qTd**2)**power
+                sin_2p_theta = (1 - qTd**2)**power
+                
+                total += dV * (d1 * sin_2p_theta + d2 * cos_2p_theta)
+    
+    return total
+    
 # calculates the 3D stick field
 def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
@@ -157,7 +188,14 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     return V
 
-V = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
-vals, vecs = np.linalg.eigh(V)
-plt.imshow(vals[:, :, 50, 2])
-np.save("stickfield.npy", V.astype(np.float32))
+#V = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
+#vals, vecs = np.linalg.eigh(V)
+N = 101
+r = np.linspace(-N/2, N/2, N)
+X, Y, Z = np.meshgrid(r, r, r)
+
+l = 1
+decay = decay_integrate(10, 5, 2)
+eta = eta(10, 5, 2)
+#plt.imshow(vals[:, :, 50, 2])
+#np.save("stickfield.npy", V.astype(np.float32))
