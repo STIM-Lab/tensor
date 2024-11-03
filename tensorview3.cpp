@@ -50,8 +50,10 @@ int step = 4;
 tira::camera Camera;
 
 tira::glMaterial* SCALAR_MATERIAL;
+tira::glMaterial* AXIS_MATERIAL;
 //tira::glMaterial* GLYPH_MATERIAL;
 //tira::glMaterial* VOLUME_MATERIAL;
+tira::glGeometry* axis;
 
 enum ScalarType { NoScalar, TensorElement, EVal, EVec, Anisotropy };
 int SCALAR_TYPE = ScalarType::EVal;
@@ -71,6 +73,9 @@ const std::string volume_shader_string =
 ;
 const std::string scalar_shader_string =
 #include "shaders/volumemap.shader"
+;
+const std::string AXIS_MATERIAL_string =
+#include "shaders/axis.shader"
 ;
 
 
@@ -244,11 +249,19 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 }
 
-void resetPlane(float frame) {
+void resetPlane() {
 	// Reset camera view to initial state
-	Camera.position(glm::vec3(0, 0, 0));
+	/*Camera.position(glm::vec3(0, 0, 0));
 	Camera.lookat(glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-	Camera.fov(60.f);
+	Camera.fov(60.f);*/
+	Camera.position({ 0.0f, 0.0f, -2 * Tn.smax() });
+	Camera.up({ 0.0f, 1.0f, 0.0f });
+	Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
+	Camera.fov(60);
+
+	PLANE_POSITION[0] = static_cast<int>(Tn.X() / 2);
+	PLANE_POSITION[1] = static_cast<int>(Tn.Y() / 2);
+	PLANE_POSITION[2] = static_cast<int>(Tn.Z() / 2);
 
 	move[1] = 0.0f;
 	move[0] = 0.0f;
@@ -525,6 +538,11 @@ void LoadTensorField3(std::string npy_filename) {
 
 	// Mark tensor as loaded for rendering
 	TENSOR_LOADED = true;
+	SET_CAMERA = true;
+
+	std::cout << "Tensor loaded successfully.\n" << std::endl;
+	std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
+	std::cout << "World size:\t(" << T0.sx() << " x " << T0.sy() << " x " << T0.sz() << ")" << std::endl;
 
 	UpdateEigens();
 	ColormapScalar();
@@ -540,6 +558,82 @@ void LoadTensorField3(std::string npy_filename) {
 	// save everything for rendering
 	VOLUME_LOADED = true;
 }*/
+
+void inline draw_axes(glm::mat4 Mview, int ax) {
+	glm::mat4 Mobj = glm::mat4(1.0f);
+	AXIS_MATERIAL->SetUniform1i("axis", ax);
+	glm::mat4 scale_x = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sx(), 1.5f, 1.5f));
+	glm::mat4 scale_y = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sy(), 1.5f));
+	glm::mat4 scale_z = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sz()));
+
+	glm::mat4 rotate_x = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));				// rotation matrix along X axis
+	glm::mat4 rotate_y = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));				// rotation matrix along Y axis
+	glm::mat4 rotate_z = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));				// rotation matrix along Z axis
+
+	if (ax == 0) {								// X axis
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], 0.0f, Tn.Z() / 2.0f));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y(), Tn.Z() / 2.0f));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z()));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, 0));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x);
+		axis->Draw();
+	}
+	else if (ax == 1) {								// Y axis
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(0.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() /2.0f, (float)PLANE_POSITION[1], 0.0f));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z()));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y);
+		axis->Draw();
+	}
+	else if (ax == 2) {								// Z axis
+		Mobj = glm::mat4(1.0f);  
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, 0.0f, (float)PLANE_POSITION[2]));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, Tn.Y(), (float)PLANE_POSITION[2]));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(0.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z);
+		axis->Draw();
+
+		Mobj = glm::mat4(1.0f);
+		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z);
+		axis->Draw();
+	}
+}
 
 
 /// <summary>
@@ -605,7 +699,8 @@ void RenderUI() {
 				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
 					OpenFileDialog();
 				ImGui::Spacing(); ImGui::Spacing();
-				///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 				// Select the number of tensors along X axis
@@ -645,7 +740,8 @@ void RenderUI() {
 				if (ImGui::RadioButton("zi ", &scroll_axis, 2)) axis_change = true;
 				ImGui::Spacing();*/
 
-				ImGui::SeparatorText("Scalar Visualization");
+				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
+				ImGui::SeparatorText("Planes");
 				ImGui::Checkbox("X", &RENDER_PLANE[0]);
 				ImGui::SetItemTooltip("Render plane X of the volume.");
 				ImGui::SameLine();
@@ -672,6 +768,8 @@ void RenderUI() {
 					if (PLANE_POSITION[2] >= Tn.Z()) PLANE_POSITION[2] = Tn.Z() - 1;
 				}*/
 
+				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
+				ImGui::SeparatorText("Scalar Visualization");
 				if (ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal)) {
 					ColormapEval(SCALAR_EVAL);
 				}
@@ -715,12 +813,6 @@ void RenderUI() {
 					if (SCALAR_TYPE == ScalarType::EVec) ColormapEvec(SCALAR_EVEC);
 				}
 
-				// Filter anisotropy using a threshold filter option
-				ImGui::SeparatorText("Anisotropy");
-				ImGui::Combo(" ", &anisotropy, "All\0Linear\0Planar\0Spherical\0\0");
-				ImGui::Spacing();
-				ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
-				ImGui::Spacing(); ImGui::Spacing();
 
 				// Use perspective view instead of ortho view
 				ImGui::SeparatorText("Projection");
@@ -731,19 +823,6 @@ void RenderUI() {
 					perspective = true;
 				ImGui::Spacing(); ImGui::Spacing();
 
-
-				// Show colormapped image based on shortest/longest eigenvector
-				ImGui::SeparatorText("IDK");
-				ImGui::Combo("\t", &cmap, "LongestVector\0ShortestVector\0\0");
-				ImGui::Spacing(); ImGui::Spacing();
-
-				// Adjust a threshold for eigenvalues corresponding to each tensor
-				ImGui::SeparatorText("Largest Eigenvalue Threshold");
-				static float begin = 0.f, end = 125.f, step = 0.005f;
-				ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
-				ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
-				ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
-				ImGui::Spacing(); ImGui::Spacing();
 
 				// Zooming in and out option
 				ImGui::SeparatorText("Zoom");
@@ -772,9 +851,30 @@ void RenderUI() {
 			}
 
 			// Third tab
-			if (ImGui::BeginTabItem("Other"))
+			if (ImGui::BeginTabItem("Previous"))
 			{
-				ImGui::Text("Any more implementations? blah blah blah blah blah");
+				ImGui::Text("Implementations from the previous version of tensorview3d");
+
+				// Filter anisotropy using a threshold filter option
+				ImGui::SeparatorText("Anisotropy");
+				ImGui::Combo(" ", &anisotropy, "All\0Linear\0Planar\0Spherical\0\0");
+				ImGui::Spacing();
+				ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Show colormapped image based on shortest/longest eigenvector
+				ImGui::SeparatorText("IDK");
+				ImGui::Combo("\t", &cmap, "LongestVector\0ShortestVector\0\0");
+				ImGui::Spacing(); ImGui::Spacing();
+
+				// Adjust a threshold for eigenvalues corresponding to each tensor
+				ImGui::SeparatorText("Largest Eigenvalue Threshold");
+				static float begin = 0.f, end = 125.f, step = 0.005f;
+				ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
+				ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
+				ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
+				ImGui::Spacing(); ImGui::Spacing();
+
 				ImGui::EndTabItem();
 			}
 			ImGui::EndTabBar();
@@ -826,10 +926,11 @@ int main(int argc, char** argv) {
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 
-	tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);			// create a glyph
-	tira::glGeometry rectangle = tira::glGeometry::GenerateRectangle<float>();				// create a rectangle for rendering volume
+	//tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);			// create a glyph
+	//tira::glGeometry rectangle = tira::glGeometry::GenerateRectangle<float>();					// create a rectangle for rendering volume
 
 	SCALAR_MATERIAL = new tira::glMaterial(scalar_shader_string);
+	AXIS_MATERIAL = new tira::glMaterial(AXIS_MATERIAL_string);
 	//GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
 	//VOLUME_MATERIAL = new tira::glMaterial(volume_shader_string);
 
@@ -837,7 +938,6 @@ int main(int argc, char** argv) {
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename);
 		OPEN_TENSOR = false;
-		SET_CAMERA = true;
 		std::cout << "Tensor loaded successfully.\n" << std::endl;
 		std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
 	}
@@ -860,6 +960,10 @@ int main(int argc, char** argv) {
 	float ambient = 0.3;
 
 	tira::glGeometry square = tira::glGeometry::GenerateRectangle<float>();
+	//tira::glGeometry axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
+
+	axis = new tira::glGeometry();
+	*axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();													// Poll and handle events (inputs, window resize, etc.)
@@ -880,13 +984,6 @@ int main(int argc, char** argv) {
 		if (OPEN_TENSOR) {
 			LoadTensorField3(TensorFileName);								// Load the tensor field and set the texture-map
 			OPEN_TENSOR = false;
-			SET_CAMERA = true;
-			std::cout << "Tensor loaded successfully.\n" << std::endl;
-			std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
-			//std::cout << T.X() << ", " << T.Y() << ", " << T.Z() << std::endl;
-			//std::cout << T.dx() << ", " << T.dy() << ", " << T.dz() << std::endl;
-			//std::cout << T.sx() << ", " << T.sy() << ", " << T.sz() << std::endl;
-
 		}
 
 		if (TENSOR_LOADED && SET_CAMERA) {
@@ -895,6 +992,10 @@ int main(int argc, char** argv) {
 			Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
 			Camera.fov(60);
 			SET_CAMERA = false;
+		}
+		else if (TENSOR_LOADED && RESET) {
+			// Reset the visualization to initial state if reset button is pushed
+			resetPlane();
 		}
 
 		glClearColor(0, 0, 0, 0);
@@ -948,7 +1049,12 @@ int main(int argc, char** argv) {
 			square.Draw();
 		}
 		SCALAR_MATERIAL->End();
-		
+
+		// Draw the axes
+		AXIS_MATERIAL->Bind();
+		draw_axes(Mproj * Mview, 0);
+		draw_axes(Mproj * Mview, 1);
+		draw_axes(Mproj * Mview, 2);
 
 
 		/*
@@ -968,9 +1074,6 @@ int main(int argc, char** argv) {
 			T.set_spacing((double)gui_PixelSize[0], (double)gui_PixelSize[1], (double)gui_PixelSize[2]);
 
 			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
-
-			// Reset the visualization to initial state if reset button is pushed
-			if (RESET) resetPlane(frame);
 
 			if (aspect > 1) {
 				if (!perspective)
