@@ -31,10 +31,15 @@ def eigmag(T):
 
 # calculates the normalization factor for a stick tensor field
 def eta(sigma1, sigma2, p):
-    num = 2 * np.pi * math.factorial(2*p)
-    den = 2**(2*p) * (math.factorial(p)**2)
-    s = sigma1**2 + sigma2**2
-    integral = (num / den) * s
+    num1 = 2
+    den1 = (2*p) + 1
+    term1 = sigma1**2 * (num1/den1)
+    
+    num2 = -2**(2*p + 1) * math.factorial(p) ** 2
+    den2 = math.factorial(2*p + 1)
+    term2 = sigma2**2 * (num2/den2)
+    
+    integral =  np.pi * (term1 + term2)
     return 1.0 / integral
 
 

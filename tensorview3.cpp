@@ -1051,10 +1051,12 @@ int main(int argc, char** argv) {
 		SCALAR_MATERIAL->End();
 
 		// Draw the axes
-		AXIS_MATERIAL->Bind();
-		draw_axes(Mproj * Mview, 0);
-		draw_axes(Mproj * Mview, 1);
-		draw_axes(Mproj * Mview, 2);
+		if (TENSOR_LOADED) {
+			AXIS_MATERIAL->Bind();
+			draw_axes(Mproj * Mview, 0);
+			draw_axes(Mproj * Mview, 1);
+			draw_axes(Mproj * Mview, 2);
+		}
 
 
 		/*
