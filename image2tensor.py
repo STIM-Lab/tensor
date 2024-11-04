@@ -1,10 +1,13 @@
-import numpy as np
-from skimage.io import imread
-from skimage.transform import downscale_local_mean
-import scipy as sp
-from skimage.color import rgb2gray
+import os
 import sys
+import cv2
+import numpy as np
+import scipy as sp
 import tensorvote as tv
+from skimage.io import imread
+from skimage.color import rgb2gray
+from skimage.transform import downscale_local_mean
+
 
 def structure2d(I, sigma=3, deriv=1, noise=0):
 
@@ -42,11 +45,58 @@ def structure2d(I, sigma=3, deriv=1, noise=0):
     #if the sigma value is 0, don't do any blurring or resampling
     if sigma > 0:
         window = np.ones((sigma, sigma, 1, 1))
-        T = sp.signal.convolve(T, window, mode="same") 
-    
-        
+        T = sp.signal.convolve(T, window, mode="same")   
 
     return T
+
+
+def structure3d(T, sigma, noise=0, SAVE=False):
+    """
+    This function takes a 3D grayscale volume and returns the structure tensor
+    for visualization in tensorview3D.
+
+    Parameters:
+    T (uint8): the input grayscale volume (ZxYxX)
+
+    Returns:
+    float32: the structure tensor (ZxYxXx3x3)
+    """
+    # create the structure tensor
+    dVdz, dVdy, dVdx = np.gradient(T, edge_order=2)
+    T = np.zeros((dVdx.shape[0], dVdx.shape[1], dVdx.shape[2], 3, 3))
+    T[:, :, :, 0, 0] = dVdx * dVdx
+    if noise > 0:
+        T[:, :, :, 0, 0] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 0, 0].shape))
+    T[:, :, :, 1, 1] = dVdy * dVdy
+    if noise > 0:
+        T[:, :, :, 1, 1] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 1, 1].shape))
+    T[:, :, :, 2, 2] = dVdz * dVdz
+    if noise > 0:
+        T[:, :, :, 2, 2] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 2, 2].shape))
+    T[:, :, :, 0, 1] = dVdx * dVdy
+    if noise > 0:
+        T[:, :, :, 0, 1] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 0, 1].shape))
+    T[:, :, :, 1, 0] = T[:, :, :, 0, 1]
+    T[:, :, :, 0, 2] = dVdx * dVdz
+    if noise > 0:
+        T[:, :, :, 0, 2] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 0, 2].shape))
+    T[:, :, :, 2, 0] = T[:, :, :, 0, 2]
+    T[:, :, :, 1, 2] = dVdy * dVdz
+    if noise > 0:
+        T[:, :, :, 1, 2] += np.abs(np.random.normal(0.0, noise, T[:, :, :, 1, 2].shape))
+    T[:, :, :, 2, 1] = T[:, :, :, 1, 2]
+
+    # if sigma is zero, no blurring
+    if sigma > 0:
+        kernel = np.ones((sigma, sigma, sigma, 1, 1))
+        T = sp.signal.convolve(T, kernel, mode="same") 
+        #T = sp.ndimage.gaussian_filter(T, [sigma, sigma, sigma, 0, 0])         # my version
+    
+    if SAVE:
+        np.save('tensorfield.npy', T.astype(np.float32))
+    else:
+        return T
+
 
 def structure2d_nz(I, w=3):
     
@@ -61,6 +111,16 @@ def structure2d_nz(I, w=3):
     T[nz, :, :] = 0
     
     return T
+
+
+def structure3d_nz(V, sigma=3):
+    
+    T = structure3d(V, sigma)
+    nz = V == 0
+    T[nz, :, :] = 0
+    return T
+
+
 
 # calculate the N-D structure tensor
 def structen(I, sigma):
@@ -148,6 +208,24 @@ def signsplit(T):
     return Tpos, Tneg
     
     
+def images2volume(folder_path, grayscale=True):
+    """
+    The function loads all the images in the folder path and stack
+    them into a 3D volume
+
+    Parameters:
+    folder_path (str): directory to the images
+
+    Returns:
+    uint8: the 3D volume
+    """
     
-    
+    images_list = [f for f in os.listdir(folder_path) if f.endswith('.bmp') or
+                   f.endswith('.jpg') or f.endswith('.tif') or f.endswith('.png')]
         
+    images = []
+    for name in images_list:
+        img = cv2.imread(os.path.join(folder_path, name), (cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR))
+        images.append(img)
+
+    return np.stack(images, axis=0)

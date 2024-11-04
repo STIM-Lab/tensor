@@ -1,7 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib
 import math
+import matplotlib
+import numpy as np
+import image2tensor as it
+import matplotlib.pyplot as plt
+
+
 
 '''
 
@@ -195,12 +198,16 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
 
 #V = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
 #vals, vecs = np.linalg.eigh(V)
-N = 101
-r = np.linspace(-N/2, N/2, N)
-X, Y, Z = np.meshgrid(r, r, r)
-
-l = 1
-decay = decay_integrate(10, 5, 2)
-eta = eta(10, 5, 2)
+# N = 101
+# r = np.linspace(-N/2, N/2, N)
+# X, Y, Z = np.meshgrid(r, r, r)
+#decay = decay_integrate(10, 5, 2)
+#eta = eta(10, 5, 2)
 #plt.imshow(vals[:, :, 50, 2])
 #np.save("stickfield.npy", V.astype(np.float32))
+
+path = '//kashyyyk.ee.e.uh.edu/scratch/smith'
+volume = it.images2volume(path)
+structure = it.structure3d(volume[:, 300:400, 400:500], 3)
+V = stickvote3(structure)
+# np.save('smith_vote.npy')
