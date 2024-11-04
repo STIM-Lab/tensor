@@ -562,9 +562,12 @@ void LoadTensorField3(std::string npy_filename) {
 void inline draw_axes(glm::mat4 Mview, int ax) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
 	AXIS_MATERIAL->SetUniform1i("axis", ax);
-	glm::mat4 scale_x = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sx(), 1.5f, 1.5f));
-	glm::mat4 scale_y = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sy(), 1.5f));
-	glm::mat4 scale_z = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sz()));
+	glm::mat4 scale_x1 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sy(), 1.5f, 1.5f));
+	glm::mat4 scale_x2 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sz(), 1.5f, 1.5f));
+	glm::mat4 scale_y1 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sz(), 1.5f));
+	glm::mat4 scale_y2 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sx(), 1.5f));
+	glm::mat4 scale_z1 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sx()));
+	glm::mat4 scale_z2 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sy()));
 
 	glm::mat4 rotate_x = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));				// rotation matrix along X axis
 	glm::mat4 rotate_y = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));				// rotation matrix along Y axis
@@ -573,64 +576,64 @@ void inline draw_axes(glm::mat4 Mview, int ax) {
 	if (ax == 0) {								// X axis
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], 0.0f, Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x2);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y(), Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x2);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z()));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x1);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, 0));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x1);
 		axis->Draw();
 	}
 	else if (ax == 1) {								// Y axis
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(0.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y1);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y1);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() /2.0f, (float)PLANE_POSITION[1], 0.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y2);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z()));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y2);
 		axis->Draw();
 	}
 	else if (ax == 2) {								// Z axis
 		Mobj = glm::mat4(1.0f);  
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, 0.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z1);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, Tn.Y(), (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z1);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(0.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z2);
 		axis->Draw();
 
 		Mobj = glm::mat4(1.0f);
 		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z);
+		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z2);
 		axis->Draw();
 	}
 }
@@ -938,8 +941,6 @@ int main(int argc, char** argv) {
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename);
 		OPEN_TENSOR = false;
-		std::cout << "Tensor loaded successfully.\n" << std::endl;
-		std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
 	}
 
 	// If an image volume is specified, load it as a texture
@@ -1053,9 +1054,9 @@ int main(int argc, char** argv) {
 		// Draw the axes
 		if (TENSOR_LOADED) {
 			AXIS_MATERIAL->Bind();
-			draw_axes(Mproj * Mview, 0);
-			draw_axes(Mproj * Mview, 1);
-			draw_axes(Mproj * Mview, 2);
+			if (RENDER_PLANE[0]) draw_axes(Mproj * Mview, 0);
+			if (RENDER_PLANE[1]) draw_axes(Mproj * Mview, 1);
+			if (RENDER_PLANE[2]) draw_axes(Mproj * Mview, 2);
 		}
 
 
