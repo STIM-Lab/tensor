@@ -58,6 +58,7 @@ configure_file(physarum.bmp
 				physarum.bmp COPYONLY)
 configure_file(demo_noisy.npy
 		demo_noisy.npy COPYONLY)
+file(COPY sbfsem DESTINATION .)
 
 # shell scripts
 configure_file(tensorvote.sh
