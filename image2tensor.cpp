@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);												// load the input image
-		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
+		tira::image<float> grey = I.channel(0);											// get the first channel if this is a color image
 		grey = grey / 255.0f;
 
 		if (in_blur > 0) {
@@ -188,7 +188,6 @@ int main(int argc, char** argv) {
 			}
 			std::cout << "done." << std::endl;
 		}
-		 
 
 		if (in_sigma > 0) {
 			unsigned int raw_width;
@@ -224,9 +223,46 @@ int main(int argc, char** argv) {
 		tira::field<float> Tout({ T.shape()[0], T.shape()[1], 2, 2 }, (float*)T.data());
 		Tout.save_npy(in_outputname);
 	}
+
 	else if (dim == 3) {
-		std::cout << "Doesn't support 3D images yet" << std::endl;
-		return 0;
+		std::cout << "Loading 3D images..." << std::endl;
+
+		tira::volume<float> V(in_inputname);									// load input volume
+		tira::volume<float> grey = V.channel(0);								// get the first channel if this is a color image
+
+		grey = grey.border(in_order, 0);
+		tira::volume<glm::mat3> T;
+		std::vector<size_t> field_shape;
+
+		// Evaluate the structure tensor at each pixel
+		tira::volume<float> Dx = grey.gradient_dx();			// calculate the derivative along the x axis
+		tira::volume<float> Dy = grey.gradient_dy();			// calculate the derivative along the y axis
+		tira::volume<float> Dz = grey.gradient_dz();			// calculate the derivative along the y axis
+
+		T = tira::volume<glm::mat3>(Dx.X(), Dx.Y(), Dx.Z());
+
+		std::cout << "Generating tensor field...";
+		// build the tensor field
+		for (size_t zi = 0; zi < T.Z(); zi++) {
+			for (size_t yi = 0; yi < T.Y(); yi++) {
+				for (size_t xi = 0; xi < T.X(); xi++) {
+					T(xi, yi, zi)[0][0] = std::pow(Dx(xi, yi, zi), 2);					// Dxx
+					T(xi, yi, zi)[1][1] = std::pow(Dy(xi, yi, zi), 2);					// Dyy
+					T(xi, yi, zi)[2][2] = std::pow(Dz(xi, yi, zi), 2);					// Dyy
+					T(xi, yi, zi)[0][1] = Dx(xi, yi, zi) * Dy(xi, yi, zi);				// Dxy
+					T(xi, yi, zi)[1][0] = T(xi, yi, zi)[0][1];							// Dyx
+					T(xi, yi, zi)[0][2] = Dx(xi, yi, zi) * Dz(xi, yi, zi);				// Dxz
+					T(xi, yi, zi)[2][0] = T(xi, yi, zi)[0][2];							// Dzx
+					T(xi, yi, zi)[1][2] = Dy(xi, yi, zi) * Dz(xi, yi, zi);				// Dyz
+					T(xi, yi, zi)[2][1] = T(xi, yi, zi)[1][2];							// Dzy
+				}
+			}
+		}
+		std::cout << " done." << std::endl;
+
+		// save the tensor field to an output file
+		tira::field<float> Tout({ T.shape()[0], T.shape()[1], T.shape()[2], 3, 3 }, (float*)T.data());
+		Tout.save_npy(in_outputname);
 
 	}
 
