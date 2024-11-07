@@ -17,6 +17,7 @@ unsigned int in_order;
 float in_noise;
 float in_sigma;
 float in_blur;
+float in_dx, in_dy, in_dz;
 bool in_crop = false;
 int in_device;						// cuda device
 
@@ -24,7 +25,10 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
+	unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0);
+float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
+	unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0);
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
@@ -93,6 +97,9 @@ int main(int argc, char** argv) {
 		("blur", boost::program_options::value<float>(&in_blur)->default_value(0.0f), "sigma value for blurring the input image")
 		("sigma", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for the tensor field blur")
 		("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "cuda device number (-1 for CPU)")
+		("dx", boost::program_options::value<float>(&in_dx)->default_value(1.0f), "size of X pixels")
+		("dy", boost::program_options::value<float>(&in_dy)->default_value(1.0f), "size of Y pixels")
+		("dz", boost::program_options::value<float>(&in_dz)->default_value(1.0f), "size of Z pixels")
 		//("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
 		
 		("crop", "crop the edges of the field to fit the finite difference window")
@@ -228,16 +235,26 @@ int main(int argc, char** argv) {
 		std::cout << "Loading 3D images..." << std::endl;
 
 		tira::volume<float> V(in_inputname);									// load input volume
-		tira::volume<float> grey = V.channel(0);								// get the first channel if this is a color image
+		tira::volume<float> grey = V.channel(0);								// get the first channel if this is a colored volume
 
-		grey = grey.border(in_order, 0);
+		if (in_blur > 0) {
+			unsigned int raw_width;
+			unsigned int raw_height;
+			unsigned int raw_depth;
+			float* raw_field = cudaGaussianBlur3D(grey.data(), grey.X(), grey.Y(), grey.Z(), in_blur, raw_width, raw_height, raw_depth);
+			grey = tira::volume<float>(raw_field, raw_width, raw_height, raw_depth);
+			free(raw_field);
+			//grey.cmap().save("grey.bmp");
+		}
+
+		//grey = grey.border(in_order, 0);
 		tira::volume<glm::mat3> T;
 		std::vector<size_t> field_shape;
 
 		// Evaluate the structure tensor at each pixel
-		tira::volume<float> Dx = grey.gradient_dx();			// calculate the derivative along the x axis
-		tira::volume<float> Dy = grey.gradient_dy();			// calculate the derivative along the y axis
-		tira::volume<float> Dz = grey.gradient_dz();			// calculate the derivative along the y axis
+		tira::volume<float> Dx = grey.gradient_dx() * (1 / in_dx);			// calculate the derivative along the x axis
+		tira::volume<float> Dy = grey.gradient_dy() * (1 / in_dy);			// calculate the derivative along the y axis
+		tira::volume<float> Dz = grey.gradient_dz() * (1 / in_dz);			// calculate the derivative along the z axis
 
 		T = tira::volume<glm::mat3>(Dx.X(), Dx.Y(), Dx.Z());
 
@@ -260,9 +277,19 @@ int main(int argc, char** argv) {
 		}
 		std::cout << " done." << std::endl;
 
+		if (in_sigma > 0) {
+			unsigned int raw_width;
+			unsigned int raw_height;
+			unsigned int raw_depth;
+			glm::mat3* raw_field = cudaGaussianBlur3D(T.data(), T.X(), T.Y(), T.Z(), in_sigma, raw_width, raw_height, raw_depth);
+			T = tira::volume<glm::mat3>(raw_field, raw_width, raw_height, raw_depth);
+			free(raw_field);
+		}
+
 		// save the tensor field to an output file
 		tira::field<float> Tout({ T.shape()[0], T.shape()[1], T.shape()[2], 3, 3 }, (float*)T.data());
 		Tout.save_npy(in_outputname);
+		std::cout << "Saved as " << in_outputname << std::endl;
 
 	}
 

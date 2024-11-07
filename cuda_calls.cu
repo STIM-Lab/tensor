@@ -1,5 +1,5 @@
 #include <glm/glm.hpp>
-#include <tira/cuda/cudaGaussianFilter2D.cuh>
+#include <tira/cuda/cudaGaussianFilter.cuh>
 #include <tira/cuda/cudaEigen.cuh>
 
 
@@ -17,6 +17,24 @@ float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, 
 
     cudaSetDevice(deviceID);
     float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);
+
+    return dest;
+}
+
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
+    unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0) {
+
+    cudaSetDevice(deviceID);
+    glm::mat3* dest = tira::cuda::GaussianFilter3D<glm::mat3>(source, width, height, depth, sigma, sigma, sigma, out_width, out_height, out_depth);
+
+    return dest;
+}
+
+float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
+    unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0) {
+
+    cudaSetDevice(deviceID);
+    float* dest = tira::cuda::GaussianFilter3D<float>(source, width, height, depth, sigma, sigma, sigma, out_width, out_height, out_depth);
 
     return dest;
 }
