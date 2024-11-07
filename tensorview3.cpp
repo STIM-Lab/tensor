@@ -206,10 +206,12 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
 	if (TENSOR_LOADED) {
-		scroll_value += yoffset;
+		/*scroll_value += yoffset;
 		if (scroll_value < 0) scroll_value = 0;
 		if (scroll_value >= Tn.Z()) scroll_value = Tn.Z() - 1;
-		std::cout << scroll_value << std::endl;
+		std::cout << scroll_value << std::endl;*/
+		zoom += 0.2 * yoffset;
+		zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
 	}
 }
 
@@ -251,9 +253,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 void resetPlane() {
 	// Reset camera view to initial state
-	/*Camera.position(glm::vec3(0, 0, 0));
-	Camera.lookat(glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-	Camera.fov(60.f);*/
 	Camera.position({ 0.0f, 0.0f, -2 * Tn.smax() });
 	Camera.up({ 0.0f, 1.0f, 0.0f });
 	Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
@@ -561,13 +560,14 @@ void LoadTensorField3(std::string npy_filename) {
 
 void inline draw_axes(glm::mat4 Mview, int ax) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
+	float radius = Tn.smax() / 200.0f;
 	AXIS_MATERIAL->SetUniform1i("axis", ax);
-	glm::mat4 scale_x1 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sy(), 1.5f, 1.5f));
-	glm::mat4 scale_x2 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sz(), 1.5f, 1.5f));
-	glm::mat4 scale_y1 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sz(), 1.5f));
-	glm::mat4 scale_y2 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, Tn.sx(), 1.5f));
-	glm::mat4 scale_z1 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sx()));
-	glm::mat4 scale_z2 = glm::scale(glm::mat4(1.0f), glm::vec3(1.5f, 1.5f, Tn.sy()));
+	glm::mat4 scale_x1 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sy(), radius, radius));
+	glm::mat4 scale_x2 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sz(), radius, radius));
+	glm::mat4 scale_y1 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, Tn.sz(), radius));
+	glm::mat4 scale_y2 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, Tn.sx(), radius));
+	glm::mat4 scale_z1 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, Tn.sx()));
+	glm::mat4 scale_z2 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, Tn.sy()));
 
 	glm::mat4 rotate_x = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));				// rotation matrix along X axis
 	glm::mat4 rotate_y = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));				// rotation matrix along Y axis
@@ -673,7 +673,9 @@ void RenderUI() {
 			if (ImGui::BeginTabItem("Tensor Field"))
 			{
 				////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				ImGui::SeparatorText("Load");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 				if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
 				{
 					ImGui::OpenPopup("Open File");
@@ -701,10 +703,9 @@ void RenderUI() {
 
 				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
 					OpenFileDialog();
-				ImGui::Spacing(); ImGui::Spacing();
 
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 				// Select the number of tensors along X axis
 				/*ImGui::SeparatorText("Pixel/Tensor");
@@ -732,10 +733,9 @@ void RenderUI() {
 					gui_PixelSize[2] = 1.f;
 				}
 				ImGui::Spacing(); ImGui::Spacing();
-				*/
 
 				// Select which plane to render (view)
-				/*ImGui::SeparatorText("Plane");
+				ImGui::SeparatorText("Plane");
 				if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
 				ImGui::SameLine();
 				if (ImGui::RadioButton("yi ", &scroll_axis, 1)) axis_change = true;
@@ -745,34 +745,28 @@ void RenderUI() {
 
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
 				ImGui::SeparatorText("Planes");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				ImGui::Checkbox("X", &RENDER_PLANE[0]);
 				ImGui::SetItemTooltip("Render plane X of the volume.");
 				ImGui::SameLine();
 				ImGui::SliderInt("X Position", &PLANE_POSITION[0], 0, Tn.X() - 1);
-				/*if (ImGui::InputInt("##Xpos", &PLANE_POSITION[0])) {
-					if (PLANE_POSITION[0] < 0) PLANE_POSITION[0] = 0;
-					if (PLANE_POSITION[0] >= Tn.X()) PLANE_POSITION[0] = Tn.X() - 1;
-				}*/
+
 				ImGui::Checkbox("Y", &RENDER_PLANE[1]);
 				ImGui::SetItemTooltip("Render plane Y of the volume.");
 				ImGui::SameLine();
 				ImGui::SliderInt("Y Position", &PLANE_POSITION[1], 0, Tn.Y() - 1);
-				/*if (ImGui::InputInt("##Ypos", &PLANE_POSITION[1])) {
-					if (PLANE_POSITION[1] < 0) PLANE_POSITION[1] = 0;
-					if (PLANE_POSITION[1] >= Tn.Y()) PLANE_POSITION[1] = Tn.Y() - 1;
-				}*/
 
 				ImGui::Checkbox("Z", &RENDER_PLANE[2]);
 				ImGui::SetItemTooltip("Render plane Z of the volume.");
 				ImGui::SameLine();
 				ImGui::SliderInt("Z Position", &PLANE_POSITION[2], 0, Tn.Z() - 1);
-				/*if (ImGui::InputInt("##Zpos", &PLANE_POSITION[2])) {
-					if (PLANE_POSITION[2] < 0) PLANE_POSITION[2] = 0;
-					if (PLANE_POSITION[2] >= Tn.Z()) PLANE_POSITION[2] = Tn.Z() - 1;
-				}*/
 
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
 				ImGui::SeparatorText("Scalar Visualization");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				if (ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal)) {
 					ColormapEval(SCALAR_EVAL);
 				}
@@ -816,9 +810,12 @@ void RenderUI() {
 					if (SCALAR_TYPE == ScalarType::EVec) ColormapEvec(SCALAR_EVEC);
 				}
 
-
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				//////////////////////////////////////////  Orthogonal / Perspective View  /////////////////////////////////////////
 				// Use perspective view instead of ortho view
 				ImGui::SeparatorText("Projection");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				if (ImGui::RadioButton("Ortho", !perspective))
 					perspective = false;
 				ImGui::SameLine();
@@ -826,17 +823,22 @@ void RenderUI() {
 					perspective = true;
 				ImGui::Spacing(); ImGui::Spacing();
 
-
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				//////////////////////////////////////////////////     Zoom      //////////////////////////////////////////////////
 				// Zooming in and out option
 				ImGui::SeparatorText("Zoom");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				ImGui::InputFloat("##Zoom", &zoom, 0.1f, 2.0f);
 				zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
 				ImGui::SameLine();
 				if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
 				ImGui::Spacing(); ImGui::Spacing();
 
-				// Reset button
+				ImGui::Dummy(ImVec2(0.0f, 5.0f));
+				///////////////////////////////////////////////////     Reset View      //////////////////////////////////////////////////
 				ImGui::SeparatorText("Reset");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 				float avail = ImGui::GetContentRegionAvail().x;
 				float off = (avail - 50) * 0.5f;
 				if (off > 0.0f)
@@ -978,7 +980,7 @@ int main(int argc, char** argv) {
 		if (perspective)
 			Mproj = Camera.perspectivematrix(aspect);
 		else
-			Mproj = Camera.orthomatrix(aspect);
+			Mproj = Camera.orthomatrix(aspect, zoom, move[0], move[1]);
 		glm::mat4 Mview = Camera.viewmatrix();
 
 		// If the load command for tensor field is called from ImGui file dialog
