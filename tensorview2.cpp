@@ -60,10 +60,6 @@ const std::string glyph_shader_string =
 #include "shaders/glyph2d.shader"
 ;
 
-const std::string test_shader_string =
-#include "shaders/test.shader"
-;
-
 // TENSOR FIELD DATA
 tira::image<glm::mat2> T0;              // initial tensor field passed to the visualization program
 tira::image<glm::mat2> Tn;              // current tensor field being rendered (after processing)
@@ -927,9 +923,6 @@ int main(int argc, char** argv) {
         CameraPos = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
     }
 
-    testmaterial = new tira::glMaterial(test_shader_string);
-    testmaterial->Begin();
-    tira::glGeometry testgeometry = tira::glGeometry::GenerateRectangle<float>();
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
