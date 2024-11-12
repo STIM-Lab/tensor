@@ -1007,6 +1007,12 @@ int main(int argc, char** argv) {
 		SCALAR_MATERIAL->Begin();
 		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
 
+		if (TENSOR_LOADED) {
+			// Enable alpha blending for transparency and set blending function
+			glEnable(GL_BLEND);
+			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+
 		if (RENDER_PLANE[0]) {
 			glm::mat4 Mobj = glm::mat4(1.0f);
 			Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f));
@@ -1021,6 +1027,7 @@ int main(int argc, char** argv) {
 
 			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
+			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 			square.Draw();
 		}
 		if (RENDER_PLANE[1]) {
@@ -1036,6 +1043,7 @@ int main(int argc, char** argv) {
 
 			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
+			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 			square.Draw();
 		}
 		if (RENDER_PLANE[2]) {
@@ -1049,18 +1057,21 @@ int main(int argc, char** argv) {
 
 			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
+			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 			square.Draw();
 		}
 		SCALAR_MATERIAL->End();
 
 		// Draw the axes
 		if (TENSOR_LOADED) {
+			glDisable(GL_BLEND);
 			AXIS_MATERIAL->Bind();
 			if (RENDER_PLANE[0]) draw_axes(Mproj * Mview, 0);
 			if (RENDER_PLANE[1]) draw_axes(Mproj * Mview, 1);
 			if (RENDER_PLANE[2]) draw_axes(Mproj * Mview, 2);
 		}
 
+		glClear(GL_DEPTH_BUFFER_BIT);
 
 		/*
 		// If the load command for volume is called from ImGui file dialog

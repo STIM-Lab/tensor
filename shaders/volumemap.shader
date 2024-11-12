@@ -24,13 +24,13 @@ void main() {
 layout(location = 0) out vec4 color;
 
 in vec4 texcoord;
-
+uniform float opacity;
 uniform sampler3D mapped_volume;
 
 void main() {
 	//color = vec4(texcoord.x, texcoord.y, texcoord.z, 1.0);
 	//color = texture(mapped_volume, vec3(texcoord.x, texcoord.y, texcoord.z));
-	color = texelFetch(mapped_volume, ivec3(texcoord.x, texcoord.y, texcoord.z), 0);
+	color = vec4(1.0f, 1.0f, 1.0f, opacity) * texelFetch(mapped_volume, ivec3(texcoord.x, texcoord.y, texcoord.z), 0);
 	//color = (texture(scalar, vertex_texcoord) - minval) / (maxval - minval);
 	//color = texture(mapped_volume, texcoord);
 
