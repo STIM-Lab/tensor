@@ -25,10 +25,12 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
-	unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0);
-float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
-	unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0);
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
+	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
+	unsigned int& out_depth, int deviceID = 0);
+float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, 
+	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
+	unsigned int& out_depth, int deviceID = 0);
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
@@ -241,10 +243,10 @@ int main(int argc, char** argv) {
 			unsigned int raw_width;
 			unsigned int raw_height;
 			unsigned int raw_depth;
-			float* raw_field = cudaGaussianBlur3D(grey.data(), grey.X(), grey.Y(), grey.Z(), in_blur, raw_width, raw_height, raw_depth);
+			float* raw_field = cudaGaussianBlur3D(grey.data(), grey.X(), grey.Y(), grey.Z(), in_blur/in_dx, 
+				in_blur/in_dy, in_blur/in_dz, raw_width, raw_height, raw_depth);
 			grey = tira::volume<float>(raw_field, raw_width, raw_height, raw_depth);
 			free(raw_field);
-			//grey.cmap().save("grey.bmp");
 		}
 
 		//grey = grey.border(in_order, 0);
@@ -281,7 +283,8 @@ int main(int argc, char** argv) {
 			unsigned int raw_width;
 			unsigned int raw_height;
 			unsigned int raw_depth;
-			glm::mat3* raw_field = cudaGaussianBlur3D(T.data(), T.X(), T.Y(), T.Z(), in_sigma, raw_width, raw_height, raw_depth);
+			glm::mat3* raw_field = cudaGaussianBlur3D(T.data(), T.X(), T.Y(), T.Z(), in_sigma / in_dx,
+				in_sigma / in_dy, in_sigma / in_dz, raw_width, raw_height, raw_depth);
 			T = tira::volume<glm::mat3>(raw_field, raw_width, raw_height, raw_depth);
 			free(raw_field);
 		}
@@ -290,7 +293,6 @@ int main(int argc, char** argv) {
 		tira::field<float> Tout({ T.shape()[0], T.shape()[1], T.shape()[2], 3, 3 }, (float*)T.data());
 		Tout.save_npy(in_outputname);
 		std::cout << "Saved as " << in_outputname << std::endl;
-
 	}
 
 	return 0;

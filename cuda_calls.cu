@@ -21,20 +21,23 @@ float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, 
     return dest;
 }
 
-glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
-    unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0) {
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, 
+    float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height,
+    unsigned int& out_depth, int deviceID = 0) {
 
     cudaSetDevice(deviceID);
-    glm::mat3* dest = tira::cuda::GaussianFilter3D<glm::mat3>(source, width, height, depth, sigma, sigma, sigma, out_width, out_height, out_depth);
+    glm::mat3* dest = tira::cuda::GaussianFilter3D<glm::mat3>(source, width, height, depth, sigma_w, sigma_h, sigma_d,
+        out_width, out_height, out_depth);
 
     return dest;
 }
 
-float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, float sigma,
-    unsigned int& out_width, unsigned int& out_height, unsigned int& out_depth, int deviceID = 0) {
+float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, float sigma_w,
+    float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
+    unsigned int& out_depth, int deviceID = 0) {
 
     cudaSetDevice(deviceID);
-    float* dest = tira::cuda::GaussianFilter3D<float>(source, width, height, depth, sigma, sigma, sigma, out_width, out_height, out_depth);
+    float* dest = tira::cuda::GaussianFilter3D<float>(source, width, height, depth, sigma_w, sigma_h, sigma_d, out_width, out_height, out_depth);
 
     return dest;
 }
