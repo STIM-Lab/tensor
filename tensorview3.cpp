@@ -54,6 +54,7 @@ tira::glMaterial* AXIS_MATERIAL;
 //tira::glMaterial* GLYPH_MATERIAL;
 //tira::glMaterial* VOLUME_MATERIAL;
 tira::glGeometry* axis;
+tira::glGeometry planes[2][2];
 
 enum ScalarType { NoScalar, TensorElement, EVal, EVec, Anisotropy };
 int SCALAR_TYPE = ScalarType::EVal;
@@ -895,6 +896,65 @@ void RenderUI() {
 	ImGui::Render();                                                            // Render all windows
 }
 
+void RenderPlane(int p) {
+	glm::mat4 Mobj = glm::mat4(1.0f);
+	glm::mat4 Mtex = glm::mat4(1.0f);
+
+	glm::vec3 pos;
+	glm::vec3 rot;
+	glm::vec3 scale = glm::vec3(Tn.sx(), Tn.sy(), Tn.sz());
+
+	glm::vec3 tpos;
+	glm::vec3 tscale;
+
+	if(p == 0) {
+		pos = glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f);
+		tpos = glm::vec3((float)PLANE_POSITION[0], 0.0f, 0.0f);
+
+		rot = glm::vec3(0.0f, 1.0f, 0.0f);
+
+		tscale = glm::vec3(1.0f, Tn.Y(), Tn.Z());
+	}
+	else if (p == 1) {
+		pos = glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f);
+		tpos = glm::vec3(0.0f, (float)PLANE_POSITION[1], 0.0f);
+
+		rot = glm::vec3(1.0f, 0.0f, 0.0f);
+
+		tscale = glm::vec3(Tn.X(), 1.0f, Tn.Z());
+	}
+	else {
+		pos = glm::vec3(Tn.X() / 2.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]);
+		tpos = glm::vec3(0.0f, 0.0f, (float)PLANE_POSITION[2]);
+
+		rot = glm::vec3(0.0f, 0.0f, 1.0f);
+
+		tscale = glm::vec3(Tn.X(), Tn.Y(), 1.0f);
+	}
+
+	Mobj = glm::translate(Mobj, pos);
+	Mobj = glm::scale(Mobj, scale);
+	Mobj = glm::rotate(Mobj, glm::radians(90.0f), rot);
+
+	Mtex = glm::translate(Mtex, tpos);
+	Mtex = glm::scale(Mtex, tscale);
+	Mtex = glm::rotate(Mtex, glm::radians(90.0f), rot);
+
+	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
+	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
+	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
+	planes[0][0].Draw();
+	//planes[0][1].Draw();
+	//planes[1][0].Draw();
+	//planes[1][1].Draw();
+}
+
+void RenderPlanes() {
+	if(RENDER_PLANE[0]) RenderPlane(0);
+	if(RENDER_PLANE[1]) RenderPlane(1);
+	if(RENDER_PLANE[2]) RenderPlane(2);
+}
+
 int main(int argc, char** argv) {
 
 	// Declare the supported options.
@@ -931,28 +991,16 @@ int main(int argc, char** argv) {
 	glEnable(GL_DEPTH_TEST);
 	glDisable(GL_CULL_FACE);
 
-	//tira::glGeometry glyph = tira::glGeometry::GenerateIcosphere<float>(3, false);			// create a glyph
-	//tira::glGeometry rectangle = tira::glGeometry::GenerateRectangle<float>();					// create a rectangle for rendering volume
 
 	SCALAR_MATERIAL = new tira::glMaterial(scalar_shader_string);
 	AXIS_MATERIAL = new tira::glMaterial(AXIS_MATERIAL_string);
-	//GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
-	//VOLUME_MATERIAL = new tira::glMaterial(volume_shader_string);
+
 
 	// If the tensor field is loaded using command-line argument
 	if (vm.count("input")) {
 		LoadTensorField3(in_filename);
 		OPEN_TENSOR = false;
 	}
-
-	// If an image volume is specified, load it as a texture
-	/*if (vm.count("volume")) {
-		LoadVolume3(in_image);
-		OPEN_VOLUME = false;
-		std::cout << "Volume loaded successfully\n" << std::endl;
-		//I.load_npy(in_image);
-		//VOLUME_MATERIAL.SetTexture("volumeTexture", I, GL_RGB, GL_NEAREST);
-	}*/
 
 	float gamma = in_gamma;
 	int component_color = in_cmap;
@@ -962,8 +1010,21 @@ int main(int argc, char** argv) {
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;
 
-	tira::glGeometry square = tira::glGeometry::GenerateRectangle<float>();
-	//tira::glGeometry axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
+	tira::geometry<float> r = tira::rectangle<float>();
+	r = r.scale({0.5f, 0.5f});
+	r = r.scale({0.5f, 0.5f}, 1);
+	r = r.translate({-0.25, -0.25});
+	tira::geometry<float> geoplanes[2][2];
+
+	geoplanes[0][0] = r.translate({0.0f, 0.0f}).translate({0.0f, 0.0f}, 1);
+	geoplanes[1][0] = r.translate({0.5f, 0.0f}).translate({0.5f, 0.0f}, 1);
+	geoplanes[0][1] = r.translate({0.0f, 0.5f}).translate({0.0f, 0.5f}, 1);
+	geoplanes[1][1] = r.translate({0.5f, 0.5f}).translate({0.5f, 0.5f}, 1);
+
+	planes[0][0] = tira::glGeometry(geoplanes[0][0]);
+	planes[0][1] = tira::glGeometry(geoplanes[0][1]);
+	planes[1][0] = tira::glGeometry(geoplanes[1][0]);
+	planes[1][1] = tira::glGeometry(geoplanes[1][1]);
 
 	axis = new tira::glGeometry();
 	*axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
@@ -1013,53 +1074,7 @@ int main(int argc, char** argv) {
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 
-		if (RENDER_PLANE[0]) {
-			glm::mat4 Mobj = glm::mat4(1.0f);
-			Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f));
-			Mobj = glm::scale(Mobj, glm::vec3(Tn.sx(), Tn.sy(), Tn.sz()));
-			Mobj = glm::rotate(Mobj, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-			glm::mat4 Mtex = glm::mat4(1.0f);
-			Mtex = glm::translate(Mtex, glm::vec3((float)PLANE_POSITION[0], 0.0f, 0.0f));
-			Mtex = glm::scale(Mtex, glm::vec3(1.0f, Tn.Y(), Tn.Z()));
-			Mtex = glm::rotate(Mtex, glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-			glm::vec4 test = Mtex * glm::vec4(0.0, 0.0, 0.0, 1.0);
-
-			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
-			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
-			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
-			square.Draw();
-		}
-		if (RENDER_PLANE[1]) {
-			glm::mat4 Mobj = glm::mat4(1.0f);
-			Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
-			Mobj = glm::scale(Mobj, glm::vec3(Tn.sx(), Tn.sy(), Tn.sz()));
-			Mobj = glm::rotate(Mobj, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-			glm::mat4 Mtex = glm::mat4(1.0f);
-			Mtex = glm::translate(Mtex, glm::vec3(0.0f, (float)PLANE_POSITION[1], 0.0f));
-			Mtex = glm::scale(Mtex, glm::vec3(Tn.X(), 1.0f, Tn.Z()));
-			Mtex = glm::rotate(Mtex, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
-			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
-			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
-			square.Draw();
-		}
-		if (RENDER_PLANE[2]) {
-			glm::mat4 Mobj = glm::mat4(1.0f);
-			Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
-			Mobj = glm::scale(Mobj, glm::vec3(Tn.sx(), Tn.sy(), Tn.sz()));
-
-			glm::mat4 Mtex = glm::mat4(1.0f);
-			Mtex = glm::translate(Mtex, glm::vec3(0.0f, 0.0f, (float)PLANE_POSITION[2]));
-			Mtex = glm::scale(Mtex, glm::vec3(Tn.X(), Tn.Y(), 1.0f));
-
-			SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
-			SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
-			SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
-			square.Draw();
-		}
+		RenderPlanes();
 		SCALAR_MATERIAL->End();
 
 		// Draw the axes
