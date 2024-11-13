@@ -561,82 +561,81 @@ void LoadTensorField3(std::string npy_filename) {
 
 void inline draw_axes(glm::mat4 Mview, int ax) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
-	float radius = Tn.smax() / 200.0f;
+	float radius = Tn.smax() / 150.0f;
 	AXIS_MATERIAL->SetUniform1i("axis", ax);
-	glm::mat4 scale_x1 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sy(), radius, radius));
-	glm::mat4 scale_x2 = glm::scale(glm::mat4(1.0f), glm::vec3(Tn.sz(), radius, radius));
-	glm::mat4 scale_y1 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, Tn.sz(), radius));
-	glm::mat4 scale_y2 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, Tn.sx(), radius));
-	glm::mat4 scale_z1 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, Tn.sx()));
-	glm::mat4 scale_z2 = glm::scale(glm::mat4(1.0f), glm::vec3(radius, radius, Tn.sy()));
+	float x_location = (float)PLANE_POSITION[0] / (float)(Tn.sx() - 1);
+	float y_location = (float)PLANE_POSITION[1] / (float)(Tn.sy() - 1);
+	float z_location = (float)PLANE_POSITION[2] / (float)(Tn.sz() - 1);
+	AXIS_MATERIAL->SetUniform3f("loc", x_location, y_location, z_location);
 
-	glm::mat4 rotate_x = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));				// rotation matrix along X axis
-	glm::mat4 rotate_y = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 1.0f, 0.0f));				// rotation matrix along Y axis
-	glm::mat4 rotate_z = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));				// rotation matrix along Z axis
+	glm::vec3 pos[4];
+	glm::vec3 scale[2];
+	glm::vec3 rot[2];
 
 	if (ax == 0) {								// X axis
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], 0.0f, Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x2);
-		axis->Draw();
+		pos[0] = glm::vec3((float)PLANE_POSITION[0], 0.0f, Tn.Z() / 2.0f);		
+		pos[1] = glm::vec3((float)PLANE_POSITION[0], Tn.Y(), Tn.Z() / 2.0f);
+		pos[2] = glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z());
+		pos[3] = glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, 0);
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y(), Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_x2);
-		axis->Draw();
+		rot[0] = glm::vec3(0.0f, 1.0f, 0.0f);
+		rot[1] = glm::vec3(0.0f, 0.0f, 1.0f);
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z()));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x1);
-		axis->Draw();
-
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, 0));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_x1);
-		axis->Draw();
+		scale[0] = glm::vec3(Tn.sz(), radius, radius);
+		scale[1] = glm::vec3(Tn.sy(), radius, radius);
 	}
 	else if (ax == 1) {								// Y axis
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(0.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y1);
-		axis->Draw();
+		pos[0] = glm::vec3(0.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f);
+		pos[1] = glm::vec3(Tn.X(), (float)PLANE_POSITION[1], Tn.Z() / 2.0f);
+		pos[2] = glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], 0.0f);
+		pos[3] = glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z());
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), (float)PLANE_POSITION[1], Tn.Z() / 2.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_y1);
-		axis->Draw();
+		rot[0] = glm::vec3(1.0f, 0.0f, 0.0f);
+		rot[1] = glm::vec3(0.0f, 0.0f, 1.0f);
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() /2.0f, (float)PLANE_POSITION[1], 0.0f));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y2);
-		axis->Draw();
-
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z()));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_z * scale_y2);
-		axis->Draw();
+		scale[0] = glm::vec3(radius, Tn.sz(), radius);
+		scale[1] = glm::vec3(radius, Tn.sx(), radius);		
 	}
 	else if (ax == 2) {								// Z axis
-		Mobj = glm::mat4(1.0f);  
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, 0.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z1);
-		axis->Draw();
+		pos[0] = glm::vec3(Tn.X() / 2.0f, 0.0f, (float)PLANE_POSITION[2]);		
+		pos[1] = glm::vec3(Tn.X() / 2.0f, Tn.Y(), (float)PLANE_POSITION[2]);
+		pos[2] = glm::vec3(0.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]);
+		pos[3] = glm::vec3(Tn.X(), Tn.Y() / 2.0f, (float)PLANE_POSITION[2]);
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X() / 2.0f, Tn.Y(), (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_y * scale_z1);
-		axis->Draw();
+		rot[0] = glm::vec3(0.0f, 1.0f, 0.0f);
+		rot[1] = glm::vec3(1.0f, 0.0f, 0.0f);
 
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(0.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z2);
-		axis->Draw();
-
-		Mobj = glm::mat4(1.0f);
-		Mobj = glm::translate(Mobj, glm::vec3(Tn.X(), Tn.Y() / 2.0f, (float)PLANE_POSITION[2]));
-		AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj * rotate_x * scale_z2);
-		axis->Draw();
+		scale[0] = glm::vec3(radius, radius, Tn.sx());
+		scale[1] = glm::vec3(radius, radius, Tn.sy());
 	}
+
+	const float rad = glm::radians(-90.0f);
+	Mobj = glm::translate(Mobj, pos[0]);
+	Mobj = glm::rotate(Mobj, rad, rot[0]);
+	Mobj = glm::scale(Mobj, scale[0]);
+	AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj);
+	axis->Draw();
+
+	Mobj = glm::mat4(1.0f);
+	Mobj = glm::translate(Mobj, pos[1]);
+	Mobj = glm::rotate(Mobj, rad, rot[0]);
+	Mobj = glm::scale(Mobj, scale[0]);
+	AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj);
+	axis->Draw();
+
+	Mobj = glm::mat4(1.0f);
+	Mobj = glm::translate(Mobj, pos[2]);
+	Mobj = glm::rotate(Mobj, rad, rot[1]);
+	Mobj = glm::scale(Mobj, scale[1]);
+	AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj);
+	axis->Draw();
+
+	Mobj = glm::mat4(1.0f);
+	Mobj = glm::translate(Mobj, pos[3]);
+	Mobj = glm::rotate(Mobj, rad, rot[1]);
+	Mobj = glm::scale(Mobj, scale[1]);
+	AXIS_MATERIAL->SetUniformMat4f("MVP", Mview * Mobj);
+	axis->Draw();
 }
 
 
@@ -907,7 +906,7 @@ void RenderPlane(int p) {
 	glm::vec3 tpos;
 	glm::vec3 tscale;
 
-	if(p == 0) {
+	if (p == 0) {
 		pos = glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f);
 		tpos = glm::vec3((float)PLANE_POSITION[0], 0.0f, 0.0f);
 
@@ -932,21 +931,23 @@ void RenderPlane(int p) {
 		tscale = glm::vec3(Tn.X(), Tn.Y(), 1.0f);
 	}
 
+	float radians = (p == 1) ? glm::radians(90.0f) : glm::radians(-90.0f);
+	if (p == 2) radians = glm::radians(0.0f);
 	Mobj = glm::translate(Mobj, pos);
 	Mobj = glm::scale(Mobj, scale);
-	Mobj = glm::rotate(Mobj, glm::radians(90.0f), rot);
+	Mobj = glm::rotate(Mobj, radians, rot);
 
 	Mtex = glm::translate(Mtex, tpos);
 	Mtex = glm::scale(Mtex, tscale);
-	Mtex = glm::rotate(Mtex, glm::radians(90.0f), rot);
+	Mtex = glm::rotate(Mtex, radians, rot);
 
 	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
 	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 	planes[0][0].Draw();
-	//planes[0][1].Draw();
-	//planes[1][0].Draw();
-	//planes[1][1].Draw();
+	planes[0][1].Draw();
+	planes[1][0].Draw();
+	planes[1][1].Draw();
 }
 
 void RenderPlanes() {
@@ -1014,17 +1015,11 @@ int main(int argc, char** argv) {
 	r = r.scale({0.5f, 0.5f});
 	r = r.scale({0.5f, 0.5f}, 1);
 	r = r.translate({-0.25, -0.25});
-	tira::geometry<float> geoplanes[2][2];
 
-	geoplanes[0][0] = r.translate({0.0f, 0.0f}).translate({0.0f, 0.0f}, 1);
-	geoplanes[1][0] = r.translate({0.5f, 0.0f}).translate({0.5f, 0.0f}, 1);
-	geoplanes[0][1] = r.translate({0.0f, 0.5f}).translate({0.0f, 0.5f}, 1);
-	geoplanes[1][1] = r.translate({0.5f, 0.5f}).translate({0.5f, 0.5f}, 1);
-
-	planes[0][0] = tira::glGeometry(geoplanes[0][0]);
-	planes[0][1] = tira::glGeometry(geoplanes[0][1]);
-	planes[1][0] = tira::glGeometry(geoplanes[1][0]);
-	planes[1][1] = tira::glGeometry(geoplanes[1][1]);
+	planes[0][0] = r.translate({ 0.0f, 0.0f }).translate({ 0.0f, 0.0f }, 1);
+	planes[0][1] = r.translate({ 0.5f, 0.0f }).translate({ 0.5f, 0.0f }, 1);
+	planes[1][0] = r.translate({ 0.0f, 0.5f }).translate({ 0.0f, 0.5f }, 1);
+	planes[1][1] = r.translate({ 0.5f, 0.5f }).translate({ 0.5f, 0.5f }, 1);
 
 	axis = new tira::glGeometry();
 	*axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
