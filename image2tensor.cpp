@@ -18,7 +18,7 @@ float in_noise;
 float in_sigma;
 float in_blur;
 float in_dx, in_dy, in_dz;
-bool in_crop = false;
+std::vector<unsigned int> in_crop_loc, in_crop_len;
 int in_device;						// cuda device
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
@@ -104,7 +104,8 @@ int main(int argc, char** argv) {
 		("dz", boost::program_options::value<float>(&in_dz)->default_value(1.0f), "size of Z pixels")
 		//("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
 		
-		("crop", "crop the edges of the field to fit the finite difference window")
+		("crop_loc", boost::program_options::value<std::vector<unsigned int>>()->multitoken(), "crop location (two values -> 2D (w, h), three values -> 3D (w, h, d)")
+		("crop_len", boost::program_options::value<std::vector<unsigned int>>()->multitoken(), "crop length (width, height, depth")
 		("help", "produce help message")
 		;
 	boost::program_options::variables_map vm;
@@ -113,7 +114,6 @@ int main(int argc, char** argv) {
 	p.add("input", 1);
 	p.add("output", 1);
 	boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-
 	boost::program_options::notify(vm);
 
 	if (vm.count("help")) {
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	if (vm.count("crop")) in_crop = true;
+	//if (vm.count("crop")) in_crop = true;
 
 	int dim = 3;															// number of dimensions
 	std::vector< tira::field<float> > D;									// vector stores the derivatives
@@ -133,6 +133,18 @@ int main(int argc, char** argv) {
 		tira::image<float> I(in_inputname);												// load the input image
 		tira::image<float> grey = I.channel(0);											// get the first channel if this is a color image
 		grey = grey / 255.0f;
+
+		std::vector<unsigned int> crop_loc, crop_len;
+		if (!vm["crop_loc"].empty() && (crop_loc = vm["crop_loc"].as<std::vector<unsigned int> >()).size() == 2) {
+			if (!vm["crop_len"].empty() && (crop_len = vm["crop_len"].as<std::vector<unsigned int> >()).size() == 2) {
+				grey = grey.crop(crop_loc[0], crop_loc[1], crop_len[0], crop_len[1]);
+			}
+			else {										// no crop length specified -> crop from location to the end of the image
+				grey = grey.crop(crop_loc[0], crop_loc[1], grey.X() - crop_loc[0], grey.Y() - crop_loc[1]);
+			}
+		}
+		else if (!vm["crop_loc"].empty())
+			std::cout << "Wrong number of inputs for crop location, input two." << std::endl;
 
 		if (in_blur > 0) {
 			unsigned int raw_width;
@@ -238,6 +250,18 @@ int main(int argc, char** argv) {
 
 		tira::volume<float> V(in_inputname);									// load input volume
 		tira::volume<float> grey = V.channel(0);								// get the first channel if this is a colored volume
+
+		std::vector<unsigned int> crop_loc, crop_len;
+		if (!vm["crop_loc"].empty() && (crop_loc = vm["crop_loc"].as<std::vector<unsigned int> >()).size() == 3) {
+			if (!vm["crop_len"].empty() && (crop_len = vm["crop_len"].as<std::vector<unsigned int> >()).size() == 3) {
+				grey = grey.crop(crop_loc[0], crop_loc[1], crop_loc[2], crop_len[0], crop_len[1], crop_len[2]);
+			}
+			else {										// no crop length specified -> crop from location to the end of the image
+				grey = grey.crop(crop_loc[0], crop_loc[1], crop_loc[2], grey.X() - crop_loc[0], grey.Y() - crop_loc[1], grey.Z() - crop_loc[2]);
+			}
+		}
+		else if (!vm["crop_loc"].empty())
+			std::cout << "Wrong number of inputs for crop location, input three." << std::endl;
 
 		if (in_blur > 0) {
 			unsigned int raw_width;
