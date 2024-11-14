@@ -1,22 +1,23 @@
 #include <numbers>
 #include <complex>
 #include <GL/glew.h>
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileBrowser/ImGuiFileBrowser.h"
-
 #include <GLFW/glfw3.h>
+#include <cuda_runtime.h>
 #include "tira/volume.h"
 #include "tira/graphics_gl.h"
-
 #include <glm/gtc/quaternion.hpp>
-
 #include <boost/program_options.hpp>
 
 #define PI 3.14159265358979323846
 
+
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
+	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height,
+	unsigned int& out_depth, int deviceID = 0);
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
 float* cudaEigenvectors3(float* tensors, float* lambda, size_t n, int device);
 
@@ -36,12 +37,11 @@ tira::volume<glm::mat3> T0;								// 3D tensor field (3x3 voxels)
 tira::volume<glm::mat3> Tn(0, 0, 0);					// processed tensor field
 tira::volume<float> Ln;									// eigenvalues of the processed tensor field (smallest to largest magnitude)
 tira::volume<float> Vn;									// eigenvectors of the processed tensor field in polar coordinates (medium and large eigenvectors)
-//int gui_VolumeSize[] = { 0, 0, 0 };
-//float gui_PixelSize[] = { 1.0f, 1.0f, 1.0f };
 
 // input variables for arguments
 std::string in_filename;
 std::string in_image;
+int in_device;
 float in_gamma;
 int in_cmap;
 int step = 4;
@@ -51,8 +51,7 @@ tira::camera Camera;
 
 tira::glMaterial* SCALAR_MATERIAL;
 tira::glMaterial* AXIS_MATERIAL;
-//tira::glMaterial* GLYPH_MATERIAL;
-//tira::glMaterial* VOLUME_MATERIAL;
+
 tira::glGeometry* axis;
 tira::glGeometry planes[2][2];
 
@@ -61,6 +60,8 @@ int SCALAR_TYPE = ScalarType::EVal;
 int SCALAR_EVAL = 2;
 int SCALAR_EVEC = 2;
 int SCALAR_ANISOTROPY = 0;
+enum ProcessingType { NoProcessing, Gaussian, Vote };
+int PROCESSINGTYPE = ProcessingType::NoProcessing;
 
 // scalar plane variables
 bool RENDER_PLANE[] = { true, true, true };
@@ -85,15 +86,11 @@ bool RESET = false;
 bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
 extern int step;                                        // the steps between each glyph along all axis
-//extern int gui_VolumeSize[];
-//extern float     gui_PixelSize[];
 
 // tensor fields
-
-
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
-// 2: planar tensors only       3: spherical tensors only
+														// 2: planar tensors only       3: spherical tensors only
 float filter = 0.1f;
 float zoom = 1.0f;
 int cmap = 1;
@@ -105,6 +102,8 @@ bool OPEN_TENSOR = false;
 bool RENDER_GLYPHS = false;
 bool TENSOR_LOADED = false;
 bool SET_CAMERA = false;
+bool BLUR = false;
+float SIGMA;
 std::string TensorFileName;
 
 bool OPEN_VOLUME = false;
@@ -116,18 +115,6 @@ bool tensor_data;
 bool volume_data;
 imgui_addons::ImGuiFileBrowser file_dialog;
 
-
-bool CenteredButton(const char* direc, ImGuiStyle& style) {
-	float size = ImGui::CalcTextSize(direc).x + style.FramePadding.x * 2.0f;
-	float avail = ImGui::GetContentRegionAvail().x;
-	float off = (avail - size) * 0.5f;
-	if (off > 0.0f)  ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-	style.FrameRounding = 10.f;
-	if (direc == "D")
-		return ImGui::ArrowButton("D", ImGuiDir_Down);
-	else
-		return ImGui::ArrowButton("U", ImGuiDir_Up);
-}
 
 void OpenFileDialog() {
 	std::cout << "Loading \"" << file_dialog.selected_fn << "\" ..." << std::endl;
@@ -179,7 +166,6 @@ void DestroyUI() {
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
 }
-
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -509,12 +495,76 @@ void ColormapScalar() {
 	}
 }
 
+inline float normaldist(const float x, const float sigma) {
+	const float scale = 1.0f / (sigma * sqrt(2 * 3.14159));
+	const float ex = -(x * x) / (2 * sigma * sigma);
+	return scale * exp(ex);
+}
+
+/// <summary>
+/// Blurs the tensor field and re-calculates the current scalar image
+/// </summary>
+/// <param name="sigma"></param>
+void GaussianFilter(const float sigma) {
+	// if a CUDA device is enabled, use a blur kernel
+	if (in_device >= 0) {
+		std::cout << "Gaussian on CUDA" << std::endl;
+		unsigned int blur_width;
+		unsigned int blur_height;
+		unsigned int blur_depth;
+		glm::mat3* blurred = cudaGaussianBlur3D(T0.data(), T0.X(), T0.Y(), T0.Z(), sigma, sigma, sigma,
+			blur_width, blur_height, blur_depth, in_device);
+
+		Tn = tira::volume<glm::mat3>(blurred, blur_width, blur_height, blur_depth);
+		free(blurred);
+	}
+	// otherwise use the CPU
+	else {
+		const unsigned int size = ceil(sigma * 6);
+		const float start = -static_cast<float>(size - 1) / 2.0f;
+		tira::volume<float> Kx(size, 1, 1);
+		tira::volume<float> Ky(1, size, 1);
+		tira::volume<float> Kz(1, 1, size);
+
+		// fill the kernels with the Gaussian values
+		for (size_t i = 0; i < size; i++) {
+			constexpr float dx = 1.0f;
+			const float v = normaldist(start + dx * static_cast<float>(i), sigma);
+			Kx(i, 0, 0) = v;
+			Ky(0, i, 0) = v;
+			Kz(0, 0, i) = v;
+		}
+		Tn = T0.convolve3D(Kx);
+		Tn = Tn.convolve3D(Ky);
+		Tn = Tn.convolve3D(Kz);
+	}
+}
+
 void UpdateEigens() {
-	float* eigenvalues_raw = cudaEigenvalues3((float*)Tn.data(), Tn.size(), -1);
+	float* eigenvalues_raw = cudaEigenvalues3(reinterpret_cast<float*>(Tn.data()), Tn.size(), in_device);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
 
-	float* eigenvectors_raw = cudaEigenvectors3((float*)Tn.data(), (float*)Ln.data(), Tn.size(), -1);
+	float* eigenvectors_raw = cudaEigenvectors3(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, Tn.size(), in_device);
 	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
+
+	free(eigenvalues_raw);
+	free(eigenvectors_raw);
+}
+
+void ScalarRefresh() {
+	switch (SCALAR_TYPE) {
+	case ScalarType::EVal:
+		ColormapEval(SCALAR_EVAL);
+		break;
+	case ScalarType::EVec:
+		ColormapEvec(SCALAR_EVEC);
+		break;
+	case ScalarType::Anisotropy:
+		ColormapScalar();
+		break;
+	default:
+		throw std::runtime_error("Invalid scalar type");
+	}
 }
 
 // Load a tensor field from a NumPy file
@@ -547,17 +597,6 @@ void LoadTensorField3(std::string npy_filename) {
 	UpdateEigens();
 	ColormapScalar();
 }
-
-// Load an image from a NumPy file
-/*void LoadVolume3(std::string npy_filename) {
-	// Load the image
-	V0.load_npy(npy_filename);
-
-	//VOLUME_MATERIAL->SetTexture("volumeTexture", V, GL_RGB8, GL_NEAREST);
-
-	// save everything for rendering
-	VOLUME_LOADED = true;
-}*/
 
 void inline draw_axes(glm::mat4 Mview, int ax) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
@@ -638,7 +677,6 @@ void inline draw_axes(glm::mat4 Mview, int ax) {
 	axis->Draw();
 }
 
-
 /// <summary>
 /// This function renders the user interface every frame
 /// </summary>
@@ -647,7 +685,6 @@ void RenderUI() {
 	ImGui_ImplOpenGL3_NewFrame();
 	ImGui_ImplGlfw_NewFrame();
 	ImGui::NewFrame();
-
 
 	{
 		// Use smaller font size
@@ -665,7 +702,6 @@ void RenderUI() {
 		style.GrabRounding = 3.f;
 		style.WindowRounding = 7.f;
 
-
 		if (ImGui::BeginTabBar("MyTabBar"))
 		{
 
@@ -682,67 +718,7 @@ void RenderUI() {
 					tensor_data = true;
 				}
 
-				ImGui::SameLine();
-				if (ImGui::Button("Render", ImVec2(60, 25)) && TENSOR_LOADED) {
-					RENDER_GLYPHS = true;
-				}
-
-				////////////////////////////////////////////////  Load volume  ////////////////////////////////////////////////////
-				if (ImGui::Button("Load Volume"))					                                // create a button for loading the shader
-				{
-					ImGui::OpenPopup("Open File");
-					volume_data = true;
-				}
-				ImGui::SameLine();
-				// Render the plane with texture-mapped image
-				ImGui::Checkbox("Image Plane", &RENDER_IMAGE);
-				ImGui::Spacing();
-				// Adjust the image transparency
-				ImGui::SliderFloat("Opacity", &opacity, 0.1f, 1.0f);
-
-
-				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
-					OpenFileDialog();
-
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-				// Select the number of tensors along X axis
-				/*ImGui::SeparatorText("Pixel/Tensor");
-				int smallest_axis = (gui_VolumeSize[0] < gui_VolumeSize[1]) ? gui_VolumeSize[0] : gui_VolumeSize[1];
-				ImGui::Text("Number of pixels per tensor:");
-				int test;
-				if (TENSOR_LOADED)
-					ImGui::SliderInt("  ", &step, 1, smallest_axis / 10);
-				else {
-					ImGui::SameLine();
-					ImGui::Text("0");
-				}
-				ImGui::Spacing(); ImGui::Spacing();
-
-				// Display the volume size (text only)
-				ImGui::SeparatorText("Size");
-				ImGui::DragInt3("Volume Size", gui_VolumeSize, 1, 0, 1500, "%d", ImGuiSliderFlags_NoInput);
-
-				// Display and input the pixel size
-				ImGui::DragFloat3("Pixel Size", gui_PixelSize, 0.001f, 0.f, 5.f, "%.3f");
-				ImGui::Spacing();
-				if (ImGui::SmallButton(" Reset ")) {
-					gui_PixelSize[0] = 1.f;
-					gui_PixelSize[1] = 1.f;
-					gui_PixelSize[2] = 1.f;
-				}
-				ImGui::Spacing(); ImGui::Spacing();
-
-				// Select which plane to render (view)
-				ImGui::SeparatorText("Plane");
-				if (ImGui::RadioButton("xi ", &scroll_axis, 0)) axis_change = true;
-				ImGui::SameLine();
-				if (ImGui::RadioButton("yi ", &scroll_axis, 1)) axis_change = true;
-				ImGui::SameLine();
-				if (ImGui::RadioButton("zi ", &scroll_axis, 2)) axis_change = true;
-				ImGui::Spacing();*/
-
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
 				ImGui::SeparatorText("Planes");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
@@ -836,7 +812,7 @@ void RenderUI() {
 				ImGui::Spacing(); ImGui::Spacing();
 
 				ImGui::Dummy(ImVec2(0.0f, 5.0f));
-				///////////////////////////////////////////////////     Reset View      //////////////////////////////////////////////////
+				///////////////////////////////////////////////////   Reset View   //////////////////////////////////////////////////
 				ImGui::SeparatorText("Reset");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 				float avail = ImGui::GetContentRegionAvail().x;
@@ -849,9 +825,39 @@ void RenderUI() {
 			}
 
 			// Second tab
-			if (ImGui::BeginTabItem("Tensor Voting"))
+			if (ImGui::BeginTabItem("Processing"))
 			{
-				ImGui::Text("This is the Tensor Voting tab!\n");
+				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
+					Tn = T0;
+					UpdateEigens();
+				}
+				///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
+				ImGui::SeparatorText("Load");
+				if (ImGui::RadioButton("Gaussian Blur", &PROCESSINGTYPE, (int)ProcessingType::Gaussian)) {
+					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
+						GaussianFilter(SIGMA);
+						UpdateEigens();
+						ScalarRefresh();
+					}
+					else {
+						Tn = T0;
+						UpdateEigens();
+						ScalarRefresh();
+					}
+				}
+				ImGui::SameLine();
+				if (ImGui::InputFloat("##Sigma", &SIGMA, 0.2f, 1.0f)) {
+					if (SIGMA <= 0) SIGMA = 0.01;
+					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
+						GaussianFilter(SIGMA);
+						UpdateEigens();
+						ScalarRefresh();
+					}
+				}
+				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
+					OpenFileDialog();
+
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				ImGui::EndTabItem();
 			}
 
@@ -965,8 +971,18 @@ int main(int argc, char** argv) {
 		("volume", boost::program_options::value<std::string>(&in_image), "optional image field corresponding to the tensors")
 		("gamma, g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
 		("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
+		("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
 		("help", "produce help message");
 	boost::program_options::variables_map vm;
+
+	// make sure there the specified CUDA device is available (otherwise switch to CPU)
+	int ndevices;
+	cudaError_t error = cudaGetDeviceCount(&ndevices);
+	if (error != cudaSuccess) ndevices = 0;
+	if (ndevices <= in_device) {
+		std::cout << "WARNING: Specified CUDA device " << in_device << " is unavailable (" << ndevices << " compatible devices found), defaulting to CPU" << std::endl;
+		in_device = -1;
+	}
 
 	boost::program_options::positional_options_description p;
 	p.add("input", -1);
@@ -1083,110 +1099,6 @@ int main(int argc, char** argv) {
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		/*
-		// If the load command for volume is called from ImGui file dialog
-		if (OPEN_VOLUME) {
-			LoadVolume3(VolumeFileName);									// Load the volume and set the texture-map
-			OPEN_VOLUME = false;
-			std::cout << "Volume loaded successfully\n" << std::endl;
-		}
-
-		float frame;
-		if (TENSOR_LOADED) {
-			gui_VolumeSize[0] = T.sx();
-			gui_VolumeSize[1] = T.sy();
-			gui_VolumeSize[2] = T.sz();
-
-			T.set_spacing((double)gui_PixelSize[0], (double)gui_PixelSize[1], (double)gui_PixelSize[2]);
-
-			frame = (scroll_axis == 2) ? std::max(T.X(), T.Y()) : ((scroll_axis == 1) ? std::max(T.X(), T.Z()) : std::max(T.Y(), T.Z()));
-
-			if (aspect > 1) {
-				if (!perspective)
-					Mprojection = glm::ortho(-aspect * frame / (2.0f * zoom) + move[1], aspect * frame / (2.0f * zoom) + move[1], -frame / (2.0f * zoom) + move[0], frame / (2.0f * zoom) + move[0], -2.0f * frame, 2.0f * frame);
-				else
-					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
-			}
-			else {
-				if (!perspective)
-					Mprojection = glm::ortho(-frame / 2.0f, frame / 2.0f, -frame / 2.0f / aspect, frame / 2.0f / aspect, -2.0f * frame, 2.0f * frame);
-				else
-					Mprojection = glm::perspective(60.0f * (float)std::numbers::pi / 180.0f, aspect, 0.1f, 4.0f * frame);
-			}
-
-			Mview = camera.matrix();						// generate a view matrix from the camera
-		}
-
-		glViewport(0, 0, display_w, display_h);									// specifies the area of the window where OpenGL can render
-		glClearColor(0, 0, 0, 0);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		glm::mat4 Mtran;
-
-		// --------- Render the volume slice (image) ----------------------
-		if (VOLUME_LOADED && RENDER_IMAGE) {
-			// Enable alpha blending for transparency and set blending function
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-			float z = scroll_value * T.dz() - T.sz() / 2.0f;
-			Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, z));
-
-			// Scale matrix
-			glm::mat4 Mscale = glm::scale(glm::mat4(1.0f), glm::vec3(T.sx(), T.sy(), 1.0f));
-
-			// Scroll_value should get mapped from range [0, V.Z() - 1] to range [0, 1]
-			float mappep_scroll_value = (float)scroll_value / (float)(V.Z() - 1);
-			VOLUME_MATERIAL->Begin();
-			VOLUME_MATERIAL->SetUniformMat4f("MVP", Mprojection * Mview * Mtran * Mscale);
-			VOLUME_MATERIAL->SetUniform1f("slider", mappep_scroll_value);
-			VOLUME_MATERIAL->SetUniform1f("opacity", opacity);
-			rectangle.Draw();
-			VOLUME_MATERIAL->End();
-
-			glDisable(GL_BLEND);
-		}
-
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		component_color = (cmap) ? 2 : 0;
-
-		GLYPH_MATERIAL->Begin();
-		GLYPH_MATERIAL->SetUniformMat4f("MV", Mprojection * Mview);
-		GLYPH_MATERIAL->SetUniform4f("light0", light0);
-		GLYPH_MATERIAL->SetUniform4f("light1", light1);
-		GLYPH_MATERIAL->SetUniform1f("ambient", ambient);
-		GLYPH_MATERIAL->SetUniform1i("ColorComponent", component_color);
-		GLYPH_MATERIAL->SetUniform1f("gamma", gamma);
-		GLYPH_MATERIAL->SetUniform1i("size", step);
-		GLYPH_MATERIAL->SetUniform1f("filter", filter);
-		GLYPH_MATERIAL->SetUniform1i("anisotropy", anisotropy);
-		GLYPH_MATERIAL->SetUniform1f("thresh", thresh);
-
-		// Rendering the tensor field for the selected axis
-		if (TENSOR_LOADED && RENDER_GLYPHS) {
-
-			for (size_t yi = 0; yi < T.Y(); yi += step) {
-				for (size_t xi = 0; xi < T.X(); xi += step) {
-
-					// calculate the position of the current glyph
-					float y = yi * T.dy() - T.sy() / 2.0f + (T.dy() * step) / 2.0f;
-					float x = xi * T.dx() - T.sx() / 2.0f + (T.dx() * step) / 2.0f;
-					float z = scroll_value * T.dz() - T.sz() / 2.0f;
-
-					// render the glyph at position (x, y, z)
-					Mtran = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
-					GLYPH_MATERIAL->SetUniformMat4f("Mtran", Mtran);
-					GLYPH_MATERIAL->SetUniform3ui("position", xi, yi, scroll_value);
-					glyph.Draw();
-
-				}
-			}
-		}
-
-		GLYPH_MATERIAL->End();
-
-		*/
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
 		glfwSwapBuffers(window);
 		glfwPollEvents();
