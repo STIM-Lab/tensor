@@ -507,6 +507,10 @@ inline float normaldist(const float x, const float sigma) {
 /// <param name="sigma"></param>
 void GaussianFilter(const float sigma) {
 	// if a CUDA device is enabled, use a blur kernel
+	if(sigma == 0) {
+		Tn = T0;
+		return;
+	}
 	if (in_device >= 0) {
 		std::cout << "Gaussian on CUDA" << std::endl;
 		unsigned int blur_width;
@@ -830,6 +834,7 @@ void RenderUI() {
 				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
 					Tn = T0;
 					UpdateEigens();
+					ScalarRefresh();
 				}
 				///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
 				ImGui::SeparatorText("Load");
@@ -847,7 +852,7 @@ void RenderUI() {
 				}
 				ImGui::SameLine();
 				if (ImGui::InputFloat("##Sigma", &SIGMA, 0.2f, 1.0f)) {
-					if (SIGMA <= 0) SIGMA = 0.01;
+					if (SIGMA < 0) SIGMA = 0;
 					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
 						GaussianFilter(SIGMA);
 						UpdateEigens();
