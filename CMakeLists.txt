@@ -56,8 +56,10 @@ configure_file(gendata.py
 				gendata.py COPYONLY)
 configure_file(physarum.bmp
 				physarum.bmp COPYONLY)
-configure_file(demo_noisy.npy
-		demo_noisy.npy COPYONLY)
+configure_file(demo2.png
+		demo2.png COPYONLY)
+configure_file(demo2noise.png
+		demo2noise.png COPYONLY)
 file(COPY sbfsem DESTINATION .)
 
 # shell scripts
