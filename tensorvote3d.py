@@ -126,15 +126,14 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
-    V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
-    #V = DECAY * np.matmul(Rq, Rqt)
+    #V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
+    V = DECAY * np.matmul(Rq, Rqt)
     return V
 
 # calculate the vote result of the tensor field T
 # k is the eigenvector used as the voting direction
 # sigma is the standard deviation of the vote field
 def stickvote3(T, sigma=3, sigma2=0):
-
     evals, evecs = eigmag(T)
     evals_mag = np.abs(evals)
     
@@ -155,12 +154,13 @@ def stickvote3(T, sigma=3, sigma2=0):
     
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
+        print('\nx0: ', end='')
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
                 scale = (evals_mag[x0, x1, x2, 2] - evals_mag[x0, x1, x2, 1]) * np.sign(evals[x0, x1, x2, 2])
                 S = scale * stickfield3(E[x0, x1, x2, 0], E[x0, x1, x2, 1], E[x0, x1, x2, 2], X0, X1, X2, sigma, sigma2)
-                VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1], x2:x2 + S.shape[2]] = VF[x0:x0 + S.shape[0], 
-                                                                                    x1:x1 + S.shape[1], x2:x2 + S.shape[2]] + S
+                VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1], x2:x2 + S.shape[2]] += S
+        print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
 # generate an impulse tensor field to test tensor voting
@@ -206,8 +206,9 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
 #plt.imshow(vals[:, :, 50, 2])
 #np.save("stickfield.npy", V.astype(np.float32))
 
-path = '//kashyyyk.ee.e.uh.edu/scratch/smith'
+#path = '//kashyyyk.ee.e.uh.edu/scratch/smith'
+path = 'sbfsem/'
 volume = it.images2volume(path)
-structure = it.structure3d(volume[:, 300:400, 400:500], 3)
+structure = it.structure3d(volume, sigma=3)
 V = stickvote3(structure)
-# np.save('smith_vote.npy')
+#np.save('../../build/tensor/tensor_vote.npy', V)

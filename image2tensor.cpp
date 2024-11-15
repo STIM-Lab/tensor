@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
 			if (!vm["crop_len"].empty() && (crop_len = vm["crop_len"].as<std::vector<unsigned int> >()).size() == 3) {
 				grey = grey.crop(crop_loc[0], crop_loc[1], crop_loc[2], crop_len[0], crop_len[1], crop_len[2]);
 			}
-			else {										// no crop length specified -> crop from location to the end of the image
+			else {										// no crop length specified -> crop from location to the end of the volume
 				grey = grey.crop(crop_loc[0], crop_loc[1], crop_loc[2], grey.X() - crop_loc[0], grey.Y() - crop_loc[1], grey.Z() - crop_loc[2]);
 			}
 		}

@@ -721,6 +721,8 @@ void RenderUI() {
 					ImGui::OpenPopup("Open File");
 					tensor_data = true;
 				}
+				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
+					OpenFileDialog();
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
@@ -829,15 +831,18 @@ void RenderUI() {
 			}
 
 			// Second tab
+			ImGui::SeparatorText("Processing");
 			if (ImGui::BeginTabItem("Processing"))
 			{
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
 					Tn = T0;
 					UpdateEigens();
 					ScalarRefresh();
 				}
+				ImGui::Dummy(ImVec2(0.0f, 5.0f));
 				///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
-				ImGui::SeparatorText("Load");
+				
 				if (ImGui::RadioButton("Gaussian Blur", &PROCESSINGTYPE, (int)ProcessingType::Gaussian)) {
 					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
 						GaussianFilter(SIGMA);
@@ -852,17 +857,37 @@ void RenderUI() {
 				}
 				ImGui::SameLine();
 				if (ImGui::InputFloat("##Sigma", &SIGMA, 0.2f, 1.0f)) {
-					if (SIGMA < 0) SIGMA = 0;
+					if (SIGMA < 0.0f) SIGMA = 0.0f;
 					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
 						GaussianFilter(SIGMA);
 						UpdateEigens();
 						ScalarRefresh();
 					}
 				}
-				if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
-					OpenFileDialog();
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
+				ImGui::SeparatorText("Memory Status");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+				float free_m, total_m, used_m;
+				size_t free_t, total_t;
+				char buf[64];
+				if (in_device >= 0) {
+					cudaMemGetInfo(&free_t, &total_t);
+					free_m = static_cast<float>(free_t) / (1048576.0f);
+					total_m = static_cast<float>(total_t) / (1048576.0f);
+					used_m = total_m - free_m;
+				}
+				else {								// CPU memory will be added later
+					used_m = 0.0f;
+					total_m = 0.0f;
+				}
+				sprintf(buf, "%.1f/%.1f MB", used_m, total_m);
+				float bar_size = ImGui::GetWindowWidth() - ImGui::CalcTextSize("Memory Usage").x - 
+					ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x;
+				ImGui::ProgressBar((used_m / total_m), ImVec2(bar_size, 0.0f), buf);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Memory Usage");
 				ImGui::EndTabItem();
 			}
 
