@@ -1,6 +1,10 @@
 #include <numbers>
 #include <complex>
+#include <chrono>
+#include <limits>
+
 #include <GL/glew.h>
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -25,7 +29,6 @@ GLFWwindow* window;                                     // pointer to the GLFW w
 const char* glsl_version = "#version 130";              // specify the version of GLSL
 //tira::camera camera;
 
-extern bool perspective;
 float move[2] = { 0.0f, 0.0f };							// UP and RIGHT, respectively
 bool ctrl = false;
 bool dragging = false;
@@ -93,6 +96,28 @@ bool window_focused = true;
 bool axis_change = true;                                // gets true when the axis plane is changes
 extern int step;                                        // the steps between each glyph along all axis
 
+/// Profiling Timers
+float inf = std::numeric_limits<float>::infinity();
+float t_eigenvalues = inf;
+float t_eigenvectors = inf;
+float t_loading = inf;
+float t_resetfield = inf;
+float t_cmap_evec = inf;
+float t_cmap_eval = inf;
+float t_cmap_fa = inf;
+float t_cmap_linear = inf;
+float t_cmap_plate = inf;
+float t_cmap_sphere = inf;
+float t_gaussian = inf;
+
+auto tic() {
+	return std::chrono::high_resolution_clock::now();
+}
+float duration(auto t0, auto t1) {
+	std::chrono::duration< float > fs = t1 - t0;
+	return fs.count();
+}
+
 // tensor fields
 int scroll_axis = 2;				                    // default axis is Z
 int anisotropy = 0;                                     // 0: all tensors               1: linear tensors only
@@ -102,7 +127,7 @@ float zoom = 1.0f;
 int cmap = 1;
 float opacity = 1.0f;
 float thresh = 0.0f;
-bool perspective = false;
+bool perspective = true;
 
 bool OPEN_TENSOR = false;
 bool RENDER_GLYPHS = false;
@@ -339,6 +364,7 @@ tira::volume<float> FA() {
 }
 
 void ColormapEvec(size_t vi) {
+	auto t0 = tic();
 	tira::volume<unsigned char> C(Tn.X(), Tn.Y(), Tn.Z(), 3);
 
 	for (size_t zi = 0; zi < Tn.Z(); zi++) {
@@ -397,10 +423,12 @@ void ColormapEvec(size_t vi) {
 	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 
-	
+	auto t1 = tic();
+	t_cmap_evec = duration(t0, t1);	
 }
 
 void ColormapEval(int eval) {
+	auto t0 = tic();
 	tira::volume<float> E = Ln.channel(eval);
 	tira::volume<unsigned char> C = E.cmap(ColorMap::Magma);
 
@@ -411,21 +439,26 @@ void ColormapEval(int eval) {
 
 	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+	auto t1 = tic();
+	t_cmap_eval = duration(t0, t1);
 }
 
 
 
 void ColormapFA() {
-	
+	auto t0 = tic();
 	tira::volume<float> A = FA();	
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = (tira::volume<unsigned char>)(A * 255);
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+	auto t1 = tic();
+	t_cmap_fa = duration(t0, t1);
 }
 
 void ColormapLinearA() {
+	auto t0 = tic();
 	tira::volume<float> A(Tn.X(), Tn.Y(), Tn.Z());
 
 	for (size_t zi = 0; zi < Tn.Z(); zi++) {
@@ -449,9 +482,12 @@ void ColormapLinearA() {
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+	auto t1 = tic();
+	t_cmap_linear = duration(t0, t1);
 }
 
 void ColormapPlateA() {
+	auto t0 = tic();
 	tira::volume<float> A(Tn.X(), Tn.Y(), Tn.Z());
 
 	for (size_t zi = 0; zi < Tn.Z(); zi++) {
@@ -475,9 +511,12 @@ void ColormapPlateA() {
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+	auto t1 = tic();
+	t_cmap_plate = duration(t0, t1);
 }
 
 void ColormapSphereA() {
+	auto t0 = tic();
 	tira::volume<float> A(Tn.X(), Tn.Y(), Tn.Z());
 
 	for (size_t zi = 0; zi < Tn.Z(); zi++) {
@@ -501,6 +540,8 @@ void ColormapSphereA() {
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+	auto t1 = tic();
+	t_cmap_sphere = duration(t0, t1);
 }
 
 void ColormapScalar() {
@@ -521,14 +562,22 @@ inline float normaldist(const float x, const float sigma) {
 	return scale * exp(ex);
 }
 
+void ResetField() {
+	auto t0 = tic();
+	Tn = T0;
+	auto t1 = tic();
+	t_resetfield = duration(t0, t1);
+}
+
 /// <summary>
 /// Blurs the tensor field and re-calculates the current scalar image
 /// </summary>
 /// <param name="sigma"></param>
 void GaussianFilter(const float sigma) {
+	auto t0 = tic();
 	// if a CUDA device is enabled, use a blur kernel
 	if(sigma == 0) {
-		Tn = T0;
+		ResetField();
 		return;
 	}
 	if (in_device >= 0) {
@@ -536,7 +585,8 @@ void GaussianFilter(const float sigma) {
 		unsigned int blur_width;
 		unsigned int blur_height;
 		unsigned int blur_depth;
-		glm::mat3* blurred = cudaGaussianBlur3D(T0.data(), T0.X(), T0.Y(), T0.Z(), sigma, sigma, sigma,
+		glm::mat3* blurred = cudaGaussianBlur3D(T0.data(), T0.X(), T0.Y(), T0.Z(), 
+			sigma / T0.dx(), sigma / T0.dy(), sigma / T0.dz(),
 			blur_width, blur_height, blur_depth, in_device);
 
 		Tn = tira::volume<glm::mat3>(blurred, blur_width, blur_height, blur_depth);
@@ -562,14 +612,21 @@ void GaussianFilter(const float sigma) {
 		Tn = Tn.convolve3D(Ky);
 		Tn = Tn.convolve3D(Kz);
 	}
+	auto t1 = tic();
+	t_gaussian = duration(t0, t1);
 }
 
 void UpdateEigens() {
+	auto t0 = tic();
 	float* eigenvalues_raw = cudaEigenvalues3(reinterpret_cast<float*>(Tn.data()), Tn.size(), in_device);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
+	auto t1 = tic();
+	t_eigenvalues = duration(t0, t1);
 
 	float* eigenvectors_raw = cudaEigenvectors3(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, Tn.size(), in_device);
 	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
+	auto t2 = tic();
+	t_eigenvectors = duration(t1, t2);
 
 	free(eigenvalues_raw);
 	free(eigenvectors_raw);
@@ -626,7 +683,7 @@ void LoadDefaultField() {
 		}
 	}
 
-	Tn = T0;
+	ResetField();
 
 	ResetPlanes();
 
@@ -647,9 +704,13 @@ void LoadDefaultField() {
 // Load a tensor field from a NumPy file
 void LoadTensorField(std::string npy_filename) {
 	// Load the tensor field
+	auto t0 = tic();
 	T0.load_npy<float>(npy_filename);
+	auto t1 = tic();
+	t_loading = duration(t0, t1);
+
 	T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
-	Tn = T0;
+	ResetField();
 	
 	ResetPlanes();
 
@@ -915,12 +976,11 @@ void RenderUI() {
 			}
 
 			// Second tab
-			ImGui::SeparatorText("Processing");
 			if (ImGui::BeginTabItem("Processing"))
 			{
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
-					Tn = T0;
+					ResetField();
 					UpdateEigens();
 					ScalarRefresh();
 				}
@@ -934,7 +994,7 @@ void RenderUI() {
 						ScalarRefresh();
 					}
 					else {
-						Tn = T0;
+						ResetField();
 						UpdateEigens();
 						ScalarRefresh();
 					}
@@ -950,8 +1010,14 @@ void RenderUI() {
 				}
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				
+				ImGui::EndTabItem();
+			}
+
+			if (ImGui::BeginTabItem("Profiling")) {
 				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
-				ImGui::SeparatorText("Memory Status");
+				ImGui::SeparatorText("CUDA Device");
+				ImGui::Text("Device ID: %d", in_device);
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 				float free_m, total_m, used_m;
 				size_t free_t, total_t;
@@ -967,12 +1033,25 @@ void RenderUI() {
 					total_m = 0.0f;
 				}
 				sprintf(buf, "%.1f/%.1f MB", used_m, total_m);
-				float bar_size = ImGui::GetWindowWidth() - ImGui::CalcTextSize("Memory Usage").x - 
+				float bar_size = ImGui::GetWindowWidth() - ImGui::CalcTextSize("Memory Usage").x -
 					ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x;
 				ImGui::ProgressBar((used_m / total_m), ImVec2(bar_size, 0.0f), buf);
 				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 				ImGui::Text("Memory Usage");
 				ImGui::EndTabItem();
+
+				ImGui::SeparatorText("Timers");
+				ImGui::Text("Load Field: %f s", t_loading);
+				ImGui::Text("Reset Field: %f s", t_resetfield);
+				ImGui::Text("Eigenvalue Calculation: %f s", t_eigenvalues);
+				ImGui::Text("Eigenvector Calculation: %f s", t_eigenvectors);
+				ImGui::Text("Colormap Eigenvalues: %f s", t_cmap_eval);
+				ImGui::Text("Colormap Eigenvectors: %f s", t_cmap_evec);
+				ImGui::Text("Colormap Fractional Anisotropy: %f s", t_cmap_fa);
+				ImGui::Text("Colormap Linear Anisotropy: %f s", t_cmap_linear);
+				ImGui::Text("Colormap Plate Anisotropy: %f s", t_cmap_plate);
+				ImGui::Text("Colormap Spherical Anisotropy: %f s", t_cmap_sphere);
+				ImGui::Text("Gaussian Blur: %f s", t_gaussian);
 			}
 
 			// Third tab
