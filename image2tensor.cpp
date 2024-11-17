@@ -284,7 +284,7 @@ int main(int argc, char** argv) {
 
 		T = tira::volume<glm::mat3>(Dx.X(), Dx.Y(), Dx.Z());
 
-		std::cout << "Generating tensor field...";
+		std::cout << "Generating tensor field..." << std::endl;
 		// build the tensor field
 		for (size_t zi = 0; zi < T.Z(); zi++) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
@@ -300,8 +300,9 @@ int main(int argc, char** argv) {
 					T(xi, yi, zi)[2][1] = T(xi, yi, zi)[1][2];							// Dzy
 				}
 			}
+			tira::progressbar((float)zi / (float)T.Z());
 		}
-		std::cout << " done." << std::endl;
+		std::cout << std::endl;
 
 		if (in_sigma > 0) {
 			unsigned int raw_width;
@@ -316,7 +317,6 @@ int main(int argc, char** argv) {
 		// save the tensor field to an output file
 		tira::field<float> Tout({ T.shape()[0], T.shape()[1], T.shape()[2], 3, 3 }, (float*)T.data());
 		Tout.save_npy(in_outputname);
-		std::cout << "Saved as " << in_outputname << std::endl;
 	}
 
 	return 0;

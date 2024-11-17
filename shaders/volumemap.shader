@@ -28,11 +28,9 @@ uniform float opacity;
 uniform sampler3D mapped_volume;
 
 void main() {
-	//color = vec4(texcoord.x, texcoord.y, texcoord.z, 1.0);
-	//color = texture(mapped_volume, vec3(texcoord.x, texcoord.y, texcoord.z));
-	color = vec4(1.0f, 1.0f, 1.0f, opacity) * texelFetch(mapped_volume, ivec3(texcoord.x, texcoord.y, texcoord.z), 0);
-	//color = (texture(scalar, vertex_texcoord) - minval) / (maxval - minval);
-	//color = texture(mapped_volume, texcoord);
-
+	if(texcoord.x < 0 || texcoord.y < 0 || texcoord.z < 0 || texcoord.x > 1 || texcoord.y > 1 || texcoord.z > 1)
+		color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+	else
+		color = vec4(1.0f, 1.0f, 1.0f, opacity) * texture(mapped_volume, vec3(texcoord.x, texcoord.y, texcoord.z));
 };
 )"

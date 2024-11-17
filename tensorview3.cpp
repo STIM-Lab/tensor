@@ -45,6 +45,8 @@ int in_device;
 float in_gamma;
 int in_cmap;
 int step = 4;
+std::vector<float> in_voxelsize;
+float epsilon = 0.001;
 
 // rendering variables
 tira::camera Camera;
@@ -53,7 +55,7 @@ tira::glMaterial* SCALAR_MATERIAL;
 tira::glMaterial* AXIS_MATERIAL;
 
 tira::glGeometry* axis;
-tira::glGeometry planes[2][2];
+tira::glGeometry plane;
 
 enum ScalarType { NoScalar, TensorElement, EVal, EVec, Anisotropy };
 int SCALAR_TYPE = ScalarType::EVal;
@@ -66,6 +68,8 @@ int PROCESSINGTYPE = ProcessingType::NoProcessing;
 // scalar plane variables
 bool RENDER_PLANE[] = { true, true, true };
 int PLANE_POSITION[] = { 0, 0, 0 };
+bool RENDER_EN_FACE = false;
+float EN_FACE_POSITION = 0.0f;
 
 const std::string glyph_shader_string =
 #include "shaders/glyph3d.shader"
@@ -101,7 +105,7 @@ bool perspective = false;
 bool OPEN_TENSOR = false;
 bool RENDER_GLYPHS = false;
 bool TENSOR_LOADED = false;
-bool SET_CAMERA = false;
+//bool SET_CAMERA = false;
 bool BLUR = false;
 float SIGMA;
 std::string TensorFileName;
@@ -238,28 +242,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 	}
 }
 
-void resetPlane() {
-	// Reset camera view to initial state
-	Camera.position({ 0.0f, 0.0f, -2 * Tn.smax() });
-	Camera.up({ 0.0f, 1.0f, 0.0f });
-	Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
-	Camera.fov(60);
 
-	PLANE_POSITION[0] = static_cast<int>(Tn.X() / 2);
-	PLANE_POSITION[1] = static_cast<int>(Tn.Y() / 2);
-	PLANE_POSITION[2] = static_cast<int>(Tn.Z() / 2);
-
-	move[1] = 0.0f;
-	move[0] = 0.0f;
-	zoom = 1.0f;
-	axes[0] = 0; axes[1] = 0; axes[2] = 0;
-	scroll_axis = 2;
-	scroll_value = 0;
-	anisotropy = 0;
-	filter = 0.1f;
-	thresh = 0.0f;
-	step = 4;
-}
 
 GLFWwindow* InitGLFW() {
 	GLFWwindow* window;
@@ -274,7 +257,7 @@ GLFWwindow* InitGLFW() {
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
 	// Create window with graphics context
-	window = glfwCreateWindow(1600, 1200, "GLFW+OpenGL3 Hello World Program", NULL, NULL);
+	window = glfwCreateWindow(1600, 1200, "TensorView 3D", NULL, NULL);
 	if (window == NULL)
 		return NULL;
 	glfwMakeContextCurrent(window);
@@ -571,28 +554,72 @@ void ScalarRefresh() {
 	}
 }
 
-// Load a tensor field from a NumPy file
-void LoadTensorField3(std::string npy_filename) {
-	// Load the tensor field
-	T0.load_npy<float>(npy_filename);
-	Tn = T0;
-	
-	// Fix the plane position in the middle for better visualization
+void UpdateCamera() {
+	Camera.lookat({ Tn.sx() / 2.0f, Tn.sy() / 2.0f, Tn.sz() / 2.0f });
+	Camera.distance(Tn.smax() * 2);
+}
+
+void ResetPlanes() {
+
 	PLANE_POSITION[0] = static_cast<int>(Tn.X() / 2);
 	PLANE_POSITION[1] = static_cast<int>(Tn.Y() / 2);
 	PLANE_POSITION[2] = static_cast<int>(Tn.Z() / 2);
+	EN_FACE_POSITION = 0.0f;
+}
 
-	// Separate the diagonal and off-diagonal elements to be sent off to GPU as RGB volume texture-maps
-	//tira::volume<float> diagonal_elem = GetDiagValues(T);
-	//tira::volume<float> triangular_elem = GetOffDiagValues(T);
+void LoadDefaultField() {
+	T0.resize({ 21, 21, 21 });
 
-	// Copy the tensor field (including diagonal and off-diagonal RGB volumes) to GPU as texture maps
-	//GLYPH_MATERIAL->SetTexture("Diagonal", diagonal_elem, GL_RGBA32F, GL_LINEAR);
-	//GLYPH_MATERIAL->SetTexture("Upper_trian", triangular_elem, GL_RGBA32F, GL_LINEAR);
+	glm::mat3 t;
+	for (size_t zi = 0; zi < T0.Z(); zi++) {
+		for (size_t yi = 0; yi < T0.Y(); yi++) {
+			for (size_t xi = 0; xi < T0.X(); xi++) {
+				t[0][0] = T0.px(xi) * T0.px(xi);
+				t[0][1] = T0.px(xi) * T0.py(yi);
+				t[0][2] = T0.px(xi) * T0.pz(zi);
+				t[1][0] = t[0][1];
+				t[1][1] = T0.py(yi) * T0.py(yi);
+				t[1][2] = T0.py(yi) * T0.pz(zi);
+				t[2][0] = t[0][2];
+				t[2][1] = t[1][2];
+				t[2][2] = T0.pz(zi) * T0.pz(zi);
+				T0(xi, yi, zi) = t;
+			}
+		}
+	}
 
-	// Mark tensor as loaded for rendering
-	TENSOR_LOADED = true;
-	SET_CAMERA = true;
+	Tn = T0;
+
+	ResetPlanes();
+
+	TENSOR_LOADED = true;													// mark a tensor field as loaded
+
+	UpdateCamera();
+
+	//SET_CAMERA = true;
+
+	std::cout << "Tensor loaded successfully.\n" << std::endl;
+	std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
+	std::cout << "World size:\t(" << T0.sx() << " x " << T0.sy() << " x " << T0.sz() << ")" << std::endl;
+
+	UpdateEigens();
+	ColormapScalar();
+}
+
+// Load a tensor field from a NumPy file
+void LoadTensorField(std::string npy_filename) {
+	// Load the tensor field
+	T0.load_npy<float>(npy_filename);
+	T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
+	Tn = T0;
+	
+	ResetPlanes();
+
+	TENSOR_LOADED = true;													// mark a tensor field as loaded
+
+	UpdateCamera();
+
+	//SET_CAMERA = true;
 
 	std::cout << "Tensor loaded successfully.\n" << std::endl;
 	std::cout << "Size of volume:\t(" << T0.X() << " x " << T0.Y() << " x " << T0.Z() << ")" << std::endl;
@@ -725,6 +752,14 @@ void RenderUI() {
 					OpenFileDialog();
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				if (ImGui::InputFloat3("Voxel Sizes", &in_voxelsize[0])) {
+					if (in_voxelsize[0] < epsilon) in_voxelsize[0] = epsilon;
+					if (in_voxelsize[1] < epsilon) in_voxelsize[1] = epsilon;
+					if (in_voxelsize[2] < epsilon) in_voxelsize[2] = epsilon;
+					T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
+					Tn.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
+					UpdateCamera();
+				}
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
 				ImGui::SeparatorText("Planes");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
@@ -732,17 +767,22 @@ void RenderUI() {
 				ImGui::Checkbox("X", &RENDER_PLANE[0]);
 				ImGui::SetItemTooltip("Render plane X of the volume.");
 				ImGui::SameLine();
-				ImGui::SliderInt("X Position", &PLANE_POSITION[0], 0, Tn.X() - 1);
+				ImGui::SliderInt("##XPosition", &PLANE_POSITION[0], 0, Tn.X() - 1);
 
 				ImGui::Checkbox("Y", &RENDER_PLANE[1]);
 				ImGui::SetItemTooltip("Render plane Y of the volume.");
 				ImGui::SameLine();
-				ImGui::SliderInt("Y Position", &PLANE_POSITION[1], 0, Tn.Y() - 1);
+				ImGui::SliderInt("##YPosition", &PLANE_POSITION[1], 0, Tn.Y() - 1);
 
 				ImGui::Checkbox("Z", &RENDER_PLANE[2]);
 				ImGui::SetItemTooltip("Render plane Z of the volume.");
 				ImGui::SameLine();
-				ImGui::SliderInt("Z Position", &PLANE_POSITION[2], 0, Tn.Z() - 1);
+				ImGui::SliderInt("##ZPosition", &PLANE_POSITION[2], 0, Tn.Z() - 1);
+
+				ImGui::Checkbox("F", &RENDER_EN_FACE);
+				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
+				ImGui::SameLine();
+				ImGui::SliderFloat("##EFPosition", &EN_FACE_POSITION, -Tn.smax(), Tn.smax() );
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
@@ -933,63 +973,92 @@ void RenderUI() {
 
 void RenderPlane(int p) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
-	glm::mat4 Mtex = glm::mat4(1.0f);
+	glm::mat4 Mobj2tex = glm::mat4(1.0f);
 
 	glm::vec3 pos;
 	glm::vec3 rot;
 	glm::vec3 scale = glm::vec3(Tn.sx(), Tn.sy(), Tn.sz());
 
-	glm::vec3 tpos;
-	glm::vec3 tscale;
-
+	// calculate the transformation matrix for each plane
 	if (p == 0) {
-		pos = glm::vec3((float)PLANE_POSITION[0], Tn.Y() / 2.0f, Tn.Z() / 2.0f);
-		tpos = glm::vec3((float)PLANE_POSITION[0], 0.0f, 0.0f);
-
+		pos = glm::vec3((float)Tn.px(PLANE_POSITION[0]), Tn.sy() / 2.0f, Tn.sz() / 2.0f);
 		rot = glm::vec3(0.0f, 1.0f, 0.0f);
-
-		tscale = glm::vec3(1.0f, Tn.Y(), Tn.Z());
 	}
 	else if (p == 1) {
-		pos = glm::vec3(Tn.X() / 2.0f, (float)PLANE_POSITION[1], Tn.Z() / 2.0f);
-		tpos = glm::vec3(0.0f, (float)PLANE_POSITION[1], 0.0f);
-
+		pos = glm::vec3(Tn.sx() / 2.0f, (float)Tn.py(PLANE_POSITION[1]), Tn.sz() / 2.0f);
 		rot = glm::vec3(1.0f, 0.0f, 0.0f);
-
-		tscale = glm::vec3(Tn.X(), 1.0f, Tn.Z());
 	}
-	else {
-		pos = glm::vec3(Tn.X() / 2.0f, Tn.Y() / 2.0f, (float)PLANE_POSITION[2]);
-		tpos = glm::vec3(0.0f, 0.0f, (float)PLANE_POSITION[2]);
-
+	else if (p == 2) {
+		pos = glm::vec3(Tn.sx() / 2.0f, Tn.sy() / 2.0f, (float)Tn.pz(PLANE_POSITION[2]));
 		rot = glm::vec3(0.0f, 0.0f, 1.0f);
-
-		tscale = glm::vec3(Tn.X(), Tn.Y(), 1.0f);
 	}
 
 	float radians = (p == 1) ? glm::radians(90.0f) : glm::radians(-90.0f);
 	if (p == 2) radians = glm::radians(0.0f);
 	Mobj = glm::translate(Mobj, pos);
+	//Mobj = glm::translate(Mobj, glm::vec3(Tn.dx() / 2, Tn.dy() / 2, Tn.dz() / 2));
 	Mobj = glm::scale(Mobj, scale);
 	Mobj = glm::rotate(Mobj, radians, rot);
 
-	Mtex = glm::translate(Mtex, tpos);
-	Mtex = glm::scale(Mtex, tscale);
-	Mtex = glm::rotate(Mtex, radians, rot);
+	glm::vec3 tscale(1.0f / Tn.sx(), 1.0f / Tn.sy(), 1.0f / Tn.sz());
+	Mobj2tex = glm::scale(glm::mat4(1.0f), tscale);
+
+
 
 	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
-	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mtex);
+	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
 	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
-	planes[0][0].Draw();
-	planes[0][1].Draw();
-	planes[1][0].Draw();
-	planes[1][1].Draw();
+	plane.Draw();
+}
+
+void RenderEnFacePlane(float p) {
+	glm::mat4 Mrot = glm::mat4(1.0f);
+	
+
+	glm::vec3 zp = Camera.view();
+	glm::vec3 yp = Camera.up();
+	glm::vec3 xp = Camera.side();
+
+	Mrot[0][0] = xp[0];
+	Mrot[0][1] = xp[1];
+	Mrot[0][2] = xp[2];
+
+	Mrot[1][0] = yp[0];
+	Mrot[1][1] = yp[1];
+	Mrot[1][2] = yp[2];
+
+	Mrot[2][0] = zp[0];
+	Mrot[2][1] = zp[1];
+	Mrot[2][2] = zp[2];
+
+	glm::mat4 Mobj(1.0f);
+	
+	Mobj = glm::translate(Mobj, glm::vec3(Tn.sx() / 2.0f, Tn.sy() / 2.0f, Tn.sz() / 2.0f));
+	Mobj = glm::translate(Mobj, p * Camera.view());
+	float plane_size = std::sqrt(3 * Tn.smax() * Tn.smax());
+	Mobj = glm::scale(Mobj, glm::vec3(plane_size, plane_size, plane_size));
+	Mobj = Mobj * Mrot;
+	
+
+	
+	glm::vec3 tscale(1.0f / Tn.sx(), 1.0f / Tn.sy(), 1.0f / Tn.sz());
+	glm::mat4 Mobj2tex = glm::scale(glm::mat4(1.0f), tscale);
+	
+
+	glm::vec4 test(0.0f, 0.0f, 0.0f, 1.0f);
+	glm::vec4 t = Mobj * test;
+
+	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
+	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
+	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
+	plane.Draw();
 }
 
 void RenderPlanes() {
-	if(RENDER_PLANE[0]) RenderPlane(0);
-	if(RENDER_PLANE[1]) RenderPlane(1);
-	if(RENDER_PLANE[2]) RenderPlane(2);
+	if (RENDER_PLANE[0]) RenderPlane(0);
+	if (RENDER_PLANE[1]) RenderPlane(1);
+	if (RENDER_PLANE[2]) RenderPlane(2);
+	if (RENDER_EN_FACE) RenderEnFacePlane(EN_FACE_POSITION);
 }
 
 int main(int argc, char** argv) {
@@ -1002,6 +1071,7 @@ int main(int argc, char** argv) {
 		("gamma, g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
 		("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
 		("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
+		("voxel", boost::program_options::value<std::vector<float>>(&in_voxelsize)->multitoken()->default_value(std::vector<float>{1.0f, 1.0f, 1.0f}, "1.0 1.0 1.0"), "voxel size")
 		("help", "produce help message");
 	boost::program_options::variables_map vm;
 
@@ -1045,8 +1115,10 @@ int main(int argc, char** argv) {
 
 	// If the tensor field is loaded using command-line argument
 	if (vm.count("input")) {
-		LoadTensorField3(in_filename);
-		OPEN_TENSOR = false;
+		LoadTensorField(in_filename);
+	}
+	else {
+		LoadDefaultField();
 	}
 
 	float gamma = in_gamma;
@@ -1057,16 +1129,7 @@ int main(int argc, char** argv) {
 	glm::vec4 light1(0.0f, -100.0f, 0.0f, 0.5f);
 	float ambient = 0.3;
 
-	tira::geometry<float> r = tira::rectangle<float>();
-	r = r.scale({0.5f, 0.5f});
-	r = r.scale({0.5f, 0.5f}, 1);
-	r = r.translate({-0.25, -0.25});
-
-	planes[0][0] = r.translate({ 0.0f, 0.0f }).translate({ 0.0f, 0.0f }, 1);
-	planes[0][1] = r.translate({ 0.5f, 0.0f }).translate({ 0.5f, 0.0f }, 1);
-	planes[1][0] = r.translate({ 0.0f, 0.5f }).translate({ 0.0f, 0.5f }, 1);
-	planes[1][1] = r.translate({ 0.5f, 0.5f }).translate({ 0.5f, 0.5f }, 1);
-
+	plane = tira::rectangle<float>().translate({ -0.5f, -0.5f }, 1);
 	axis = new tira::glGeometry();
 	*axis = tira::glGeometry::GenerateCylinder<float>(10, 20);
 
@@ -1077,31 +1140,12 @@ int main(int argc, char** argv) {
 		glfwGetFramebufferSize(window, &display_w, &display_h);
 
 		float aspect = (float)display_w / (float)display_h;
-		glViewport(0, 0, display_w, display_h);									// specifies the area of the window where OpenGL can render
-		glm::mat4 Mproj;
-		if (perspective)
-			Mproj = Camera.perspectivematrix(aspect);
-		else
-			Mproj = Camera.orthomatrix(aspect, zoom, move[0], move[1]);
-		glm::mat4 Mview = Camera.viewmatrix();
+		glViewport(0, 0, display_w, display_h);								// specifies the area of the window where OpenGL can render
+		glm::mat4 Mproj;													// calculate the projection matrix from the camera
+		if (perspective) Mproj = Camera.perspectivematrix(aspect);
+		else Mproj = Camera.orthomatrix(aspect, zoom, move[0], move[1]);
 
-		// If the load command for tensor field is called from ImGui file dialog
-		if (OPEN_TENSOR) {
-			LoadTensorField3(TensorFileName);								// Load the tensor field and set the texture-map
-			OPEN_TENSOR = false;
-		}
-
-		if (TENSOR_LOADED && SET_CAMERA) {
-			Camera.position({ 0.0f, 0.0f, -2 * Tn.smax() });
-			Camera.up({ 0.0f, 1.0f, 0.0f });
-			Camera.lookat({ Tn.X() / 2.0f, Tn.Y() / 2.0f, Tn.Z() / 2.0f });
-			Camera.fov(60);
-			SET_CAMERA = false;
-		}
-		else if (TENSOR_LOADED && RESET) {
-			// Reset the visualization to initial state if reset button is pushed
-			resetPlane();
-		}
+		glm::mat4 Mview = Camera.viewmatrix();								// get the view transformation matrix
 
 		glClearColor(0, 0, 0, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1119,13 +1163,13 @@ int main(int argc, char** argv) {
 		SCALAR_MATERIAL->End();
 
 		// Draw the axes
-		if (TENSOR_LOADED) {
+		/*if (TENSOR_LOADED) {
 			glDisable(GL_BLEND);
 			AXIS_MATERIAL->Bind();
 			if (RENDER_PLANE[0]) draw_axes(Mproj * Mview, 0);
 			if (RENDER_PLANE[1]) draw_axes(Mproj * Mview, 1);
 			if (RENDER_PLANE[2]) draw_axes(Mproj * Mview, 2);
-		}
+		}*/
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
