@@ -66,10 +66,12 @@ enum ProcessingType { NoProcessing, Gaussian, Vote };
 int PROCESSINGTYPE = ProcessingType::NoProcessing;
 
 // scalar plane variables
-bool RENDER_PLANE[] = { true, true, true };
+bool RENDER_PLANE[] = { false, false, false };
 int PLANE_POSITION[] = { 0, 0, 0 };
 bool RENDER_EN_FACE = false;
 float EN_FACE_POSITION = 0.0f;
+bool RENDER_VOLUMETRIC = true;
+int VOLUMETRIC_PLANES = 10;
 
 const std::string glyph_shader_string =
 #include "shaders/glyph3d.shader"
@@ -314,6 +316,28 @@ tira::volume<float> GetOffDiagValues(tira::volume<glm::mat3> T) {
 	return triangular_elem;
 }
 
+tira::volume<float> FA() {
+	tira::volume<float> A(Tn.X(), Tn.Y(), Tn.Z());
+
+	for (size_t zi = 0; zi < Tn.Z(); zi++) {
+		float z = (float)zi / (float)Tn.Z();
+		for (size_t yi = 0; yi < Tn.Y(); yi++) {
+			float y = (float)yi / (float)Tn.Y();
+			for (size_t xi = 0; xi < Tn.X(); xi++) {
+				float l0 = Ln(xi, yi, zi, 0);
+				float l1 = Ln(xi, yi, zi, 1);
+				float l2 = Ln(xi, yi, zi, 2);
+				//float lhat = (l0 + l1 + l2) / 3.0f;
+
+				float num = pow(l2 - l1, 2) + pow(l1 - l0, 2) + pow(l0 - l2, 2);
+				float den = pow(l0, 2) + pow(l1, 2) + pow(l2, 2);
+				A(xi, yi, zi) = sqrt(0.5 * num / den);
+			}
+		}
+	}
+	return A;
+}
+
 void ColormapEvec(size_t vi) {
 	tira::volume<unsigned char> C(Tn.X(), Tn.Y(), Tn.Z(), 3);
 
@@ -365,36 +389,40 @@ void ColormapEvec(size_t vi) {
 			}
 		}
 	}
+
+	tira::volume<float> Anisotropy = FA();
+	tira::volume<float> TensorSize = Ln.channel(2);	
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
+
+	
 }
 
 void ColormapEval(int eval) {
 	tira::volume<float> E = Ln.channel(eval);
 	tira::volume<unsigned char> C = E.cmap(ColorMap::Magma);
+
+	tira::volume<float> Anisotropy = FA();
+	tira::volume<float> TensorSize = Ln.channel(2);
+
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 }
 
+
+
 void ColormapFA() {
-	tira::volume<float> A(Tn.X(), Tn.Y(), Tn.Z());
-
-	for (size_t zi = 0; zi < Tn.Z(); zi++) {
-		float z = (float)zi / (float)Tn.Z();
-		for (size_t yi = 0; yi < Tn.Y(); yi++) {
-			float y = (float)yi / (float)Tn.Y();
-			for (size_t xi = 0; xi < Tn.X(); xi++) {
-				float l0 = Ln(xi, yi, zi, 0);
-				float l1 = Ln(xi, yi, zi, 1);
-				float l2 = Ln(xi, yi, zi, 2);
-				//float lhat = (l0 + l1 + l2) / 3.0f;
-
-				float num = pow(l2 - l1, 2) + pow(l1 - l0, 2) + pow(l0 - l2, 2);
-				float den = pow(l0, 2) + pow(l1, 2) + pow(l2, 2);
-				A(xi, yi, zi) = sqrt(0.5 * num / den);
-			}
-		}
-	}
+	
+	tira::volume<float> A = FA();	
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = (tira::volume<unsigned char>)(A * 255);
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 }
 
 void ColormapLinearA() {
@@ -418,6 +446,9 @@ void ColormapLinearA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = A * 255;
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 }
 
 void ColormapPlateA() {
@@ -441,6 +472,9 @@ void ColormapPlateA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = A * 255;
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 }
 
 void ColormapSphereA() {
@@ -464,6 +498,9 @@ void ColormapSphereA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+
+	tira::volume<unsigned char> Alpha = A * 255;
+	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 }
 
 void ColormapScalar() {
@@ -565,6 +602,7 @@ void ResetPlanes() {
 	PLANE_POSITION[1] = static_cast<int>(Tn.Y() / 2);
 	PLANE_POSITION[2] = static_cast<int>(Tn.Z() / 2);
 	EN_FACE_POSITION = 0.0f;
+	VOLUMETRIC_PLANES = std::max(Tn.X(), std::max(Tn.Y(), Tn.Z()));
 }
 
 void LoadDefaultField() {
@@ -783,6 +821,12 @@ void RenderUI() {
 				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
 				ImGui::SameLine();
 				ImGui::SliderFloat("##EFPosition", &EN_FACE_POSITION, -Tn.smax(), Tn.smax() );
+
+				ImGui::Checkbox("V", &RENDER_VOLUMETRIC);
+				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
+				ImGui::SameLine();
+				ImGui::SliderInt("##VPlanes", &VOLUMETRIC_PLANES, 0, 4 * std::max(Tn.X(), std::max(Tn.Y(), Tn.Z())));
+
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
@@ -1007,7 +1051,6 @@ void RenderPlane(int p) {
 
 	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
-	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 	plane.Draw();
 }
 
@@ -1050,8 +1093,19 @@ void RenderEnFacePlane(float p) {
 
 	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
-	SCALAR_MATERIAL->SetUniform1f("opacity", opacity);
 	plane.Draw();
+}
+
+void RenderVolumetric(unsigned int n) {
+
+	float depth = Tn.smax();
+	float dfar = depth / 2.0f;
+	float dstep = depth / n;
+
+	for (unsigned int di = 0; di < n; di++) {
+		RenderEnFacePlane(dfar - di * dstep);
+	}
+
 }
 
 void RenderPlanes() {
@@ -1059,6 +1113,7 @@ void RenderPlanes() {
 	if (RENDER_PLANE[1]) RenderPlane(1);
 	if (RENDER_PLANE[2]) RenderPlane(2);
 	if (RENDER_EN_FACE) RenderEnFacePlane(EN_FACE_POSITION);
+	if (RENDER_VOLUMETRIC) RenderVolumetric(VOLUMETRIC_PLANES);
 }
 
 int main(int argc, char** argv) {

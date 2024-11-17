@@ -24,13 +24,15 @@ void main() {
 layout(location = 0) out vec4 color;
 
 in vec4 texcoord;
-uniform float opacity;
 uniform sampler3D mapped_volume;
+uniform sampler3D opacity;
 
 void main() {
 	if(texcoord.x < 0 || texcoord.y < 0 || texcoord.z < 0 || texcoord.x > 1 || texcoord.y > 1 || texcoord.z > 1)
 		color = vec4(0.0f, 0.0f, 0.0f, 0.0f);
-	else
-		color = vec4(1.0f, 1.0f, 1.0f, opacity) * texture(mapped_volume, vec3(texcoord.x, texcoord.y, texcoord.z));
+	else {
+		color = vec4(1.0f, 1.0f, 1.0f, 1.0f) * texture(mapped_volume, vec3(texcoord.x, texcoord.y, texcoord.z));
+		color.a = texture(opacity, vec3(texcoord.x, texcoord.y, texcoord.z)).r;
+	}
 };
 )"
