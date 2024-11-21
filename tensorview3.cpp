@@ -126,6 +126,7 @@ float filter = 0.1f;
 float zoom = 1.0f;
 int cmap = 1;
 float opacity = 1.0f;
+float alpha = 1.0f;
 float thresh = 0.0f;
 bool perspective = true;
 
@@ -268,8 +269,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 		if (move[1] < -100) move[1] = -100;
 	}
 }
-
-
 
 GLFWwindow* InitGLFW() {
 	GLFWwindow* window;
@@ -442,8 +441,6 @@ void ColormapEval(int eval) {
 	auto t1 = tic();
 	t_cmap_eval = duration(t0, t1);
 }
-
-
 
 void ColormapFA() {
 	auto t0 = tic();
@@ -859,6 +856,10 @@ void RenderUI() {
 					Tn.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
 					UpdateCamera();
 				}
+
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::PushItemWidth(-100);
+				ImGui::SliderFloat("alpha", &alpha, 0.01f, 1.0f, "%.2f");
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
 				ImGui::SeparatorText("Planes");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
@@ -1286,7 +1287,7 @@ int main(int argc, char** argv) {
 		
 		SCALAR_MATERIAL->Begin();
 		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
-
+		SCALAR_MATERIAL->SetUniform1f("alpha", alpha);
 		if (TENSOR_LOADED) {
 			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
