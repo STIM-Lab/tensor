@@ -7,7 +7,7 @@ import skimage as ski
 import os
 
 # adds Gaussian noise to a symmetric second order tensor field        
-def addGaussianT(T, sigma1, sigma0 = None):
+def addGaussian2d(T, sigma1, sigma0 = None):
     
     if sigma0 is None:
         sigma0 = sigma1
@@ -92,11 +92,10 @@ def genBoxGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = addGaussianT(T, noise, 0)
+        T = addGaussian2d(T, noise, 0)
         
     return T
     
-
 def genCircleGrid2(N, circles, linewidth, noise=0):
     
     x = np.linspace(0, N, N)                    # create a meshgrid of coordinates
@@ -163,7 +162,6 @@ def genSpiral3(N, d):
         
         t = t + dt
         
-
 def genSpiral2T(N, d, noise = 0):
     
     T = np.zeros((N, N, 2, 2)).astype(np.float32)
@@ -204,11 +202,9 @@ def genSpiral2T(N, d, noise = 0):
         t = t + dt
         
     if noise != 0:
-        T = addGaussianT(T, noise, 0)
+        T = addGaussian2d(T, noise, 0)
     return T
-
-
-       
+      
 # saves an image stack, assuming the color value is the fastest (last) dimension    
 def saveColorStack(filename, I):
     # get the number of images to save
@@ -222,7 +218,6 @@ def saveColorStack(filename, I):
         filestring = filename + "%0" + str(digits) + "d.bmp"
         ski.io.imsave(filestring %zi, I8[zi, :, :, :])
     
-
 # saves a stack of images
 def savestack(filename, I):
     
@@ -237,85 +232,79 @@ def savestack(filename, I):
         filestring = filename + "%0" + str(digits) + "d.bmp"
         ski.io.imsave(filestring %zi, I8[:, :, zi])
     
-# if __name__ == "__main__":    
-#     N = 1000
-#     boxes = 5
-#     width = 1
-#     max_noise = 1.0
-#     n_noise = 5
-#     noise = np.linspace(0.0, 1.0, n_noise)
+def genSample3D(shape, noise=0):
+    vol = np.zeros((shape));
     
-#     if not os.path.exists("data"):
-#         os.mkdir("data")
+    # for solid sphere
+    center_solid = (shape[0] // 4, shape[1] // 4, shape[2] // 4)
+    radius_solid = shape[0] // 10
+
+    # for hollow sphere
+    center_hollow = (shape[0] - shape[0] // 4, shape[1] - shape[1] // 4, shape[2] - shape[2] // 4)
+    radius_hollow = shape[0] // 10
+    thick_hollow = 2
     
-#     for ni in range(len(noise)):
+    # for donut (torus shape)
+    center_donut = (shape[0] // 4, shape[1] // 2, shape[2] - shape[2] // 4)
+    radius_donut = shape[0] // 8
+    thick_donut = 5
     
-#         I = genBoxGrid2(N, boxes, width, noise[ni])
-#         ski.io.imsave("data/boxgrid2_" + str(noise[ni]*10) + ".png", I.astype(np.uint8))
-        
-#         I = genCircleGrid2(N, boxes, width, noise[ni])
-#         ski.io.imsave("data/circlegrid2_"+ str(noise[ni]*10) + ".png", I.astype(np.uint8))
-        
-#         T = genBoxGrid2T(N, boxes, width, noise[ni])
-#         np.save("data/boxgrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
-        
-#         T = genCircleGrid2T(N, boxes, width, noise[ni])
-#         np.save("data/circlegrid2t_" + str(noise[ni]*10) + ".npy", T.astype(np.float32))
+    # for curved tube (partial donut)
+    center_curve = (shape[0] - shape[0] // 3, shape[1] // 8, -shape[2] // 6)
+    radius_curve = shape[0] // 1.5
+    thick_curve = 2
+    
+    # for straight tube
+    radius_tube = 2
+    
+    t_values = np.linspace(0, 1, 100)  # Parameter range for smooth curve
+    curve_x = (t_values) * (shape[0] // 2) + shape[0] // 2          # Starts at max x, curves to x=0
+    curve_y = t_values * (shape[1] // 2) + shape[1] // 2            # Moves from y=0 to max y
+    curve_z = t_values * (shape[2] // 2)                            # Moves from z=0 to max z
+    
+    for x in range(shape[0]):
+        for y in range(shape[1]):
+            for z in range(shape[2]):
+                
+                # solid sphere
+                if np.sqrt((x - center_solid[0])**2 + (y - center_solid[1])**2 + (z - center_solid[2])**2) <= radius_solid:
+                    vol[x, y, z] = 1
+                
+                # hollow sphere
+                dist_hollow = np.sqrt((x - center_hollow[0])**2 + (y - center_hollow[1])**2 + (z - center_hollow[2])**2)
+                if radius_hollow - thick_hollow <= dist_hollow <= radius_hollow:
+                    vol[x, y, z] = 1
+                    
+                # donut
+                distance_xy = np.sqrt((y - center_donut[1])**2 + (x - center_donut[0])**2)
+                if (radius_donut - thick_donut) <= distance_xy <= (radius_donut + thick_donut):
+                    # check the vertical distance from the center of the tube
+                    if np.abs(z - center_donut[2]) <= thick_donut:
+                        # check if the distance from the tube's center is correct
+                        distance_donut = np.sqrt((distance_xy - radius_donut)**2 + (z - center_donut[2])**2)
+                        if distance_donut <= thick_donut:
+                            vol[x, y, z] = 1
+                            
+                # curved tube
+                distance_yz = np.sqrt((y - center_curve[1])**2 + (z - center_curve[2])**2)
+                if (radius_curve - thick_curve) <= distance_yz <= (radius_curve + thick_curve):
+                    if np.abs(x - center_curve[0]) <= thick_curve:
+                        distance_curve = np.sqrt((distance_yz - radius_curve)**2 + (x - center_curve[0])**2)
+                        if distance_curve <= thick_curve:
+                            vol[x, y, z] = 1
+                
+                # straight tube
+                dist_tube = np.sqrt((x - curve_x)**2 + (y - curve_y)**2 + (z - curve_z)**2)
+                if np.min(dist_tube) <= radius_tube:
+                    vol[x, y, z] = 1
+    vol *= 255
+    if noise != 0:
+        vol = np.random.normal(0, noise, vol.shape) + vol
+    vol[vol<0] = 0
+    vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
+    return vol
 
-N = 2000
-spiral_size = 200
-sigma = 3
-noise = 2
-grid_size = 10
-line_width = 1
+size = 100
+vol = genSample3D((size, size, size), 5)
 
-T = genSpiral2T(N, spiral_size, 0)
-T = addShiftT(T, 3, 0.9)
-#T = addGaussianT(T, 0.2)
-np.save("spiral.npy", T)
-tv.visualize(T)
-
-#V = tv.vote2(T)
-#plt.figure()
-#tv.visualize(V, glyphs=False)
-
-I = genBoxGrid2(N, grid_size, line_width)
-ski.io.imsave("boxgrid.bmp", I.astype(np.uint8))
-
-I = genCircleGrid2(N, grid_size, line_width)
-ski.io.imsave("circlegrid.bmp", I.astype(np.uint8))
-
-I = ski.io.imread("physarum.bmp")[:, :, 0].astype(np.float32) / 255.0
-
-eta = np.random.normal(0.0, noise, I.shape)
-In = I + np.abs(eta)
-
-I = (In - np.min(In)) / (np.max(In) - np.min(In))
-ski.io.imsave("physarumn.bmp", (I * 255).astype(np.uint8))
-#%%    
-# N = 500
-# d = 60
-# I = genSpiral3(N, d)
-# sigma = 2
-# I = sp.ndimage.gaussian_filter(I, (sigma, sigma, sigma))
-# I = I * 15
-# I[I > 1] = 1
-
-# # convert the single-channel image into a color image
-# c = np.linspace(0, 1, N).astype(np.float32)
-# cr = np.linspace(1, 0, N).astype(np.float32)
-# R, G, B = np.meshgrid(cr, c, c)
-
-# C = np.zeros((N, N, N, 3))
-# C[:, :, :, 0] = I * R
-# C[:, :, :, 1] = I * G
-# C[:, :, :, 2] = I * B
-
-# plt.imshow(C[60])
-# saveColorStack("test", C)
-
-# #T = genSpiral2T(N, 20)
-# #B = T #sp.ndimage.gaussian_filter(T, (sigma, sigma, 0, 0))
-# #tv.visualize(B)
-# #V = tv.vote2(T)
-# #tv.visualize(V)
+np.save('synthetic_vol.npy', vol)

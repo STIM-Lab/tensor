@@ -149,7 +149,7 @@ def stickvote3(T, sigma=3, sigma2=0):
     
     # create a padded vote field to store the vote results
     pad = int(3 * sigmax)
-    Z = np.zeros(T.shape)
+    Z = np.zeros(T.shape, dtype=np.float32)
     VF = np.pad(Z, ((pad, pad), (pad, pad), (pad, pad), (0, 0), (0, 0)))
     
     # for each pixel in the tensor field
@@ -206,9 +206,9 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
 #plt.imshow(vals[:, :, 50, 2])
 #np.save("stickfield.npy", V.astype(np.float32))
 
-#path = '//kashyyyk.ee.e.uh.edu/scratch/smith'
-path = 'sbfsem/'
-volume = it.images2volume(path)
-structure = it.structure3d(volume, sigma=3)
-V = stickvote3(structure)
-#np.save('../../build/tensor/tensor_vote.npy', V)
+
+volume = np.load('synthetic_vol.npy')
+structure = it.structure3d(volume, sigma=3).astype(np.float32)
+np.save('../../build/tensor/tensor_synth.npy', structure)
+V = stickvote3(structure, 3, 0)
+np.save('../../build/tensor/vote_synth.npy', V)

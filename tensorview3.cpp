@@ -55,6 +55,7 @@ float epsilon = 0.001;
 tira::camera Camera;
 
 tira::glMaterial* SCALAR_MATERIAL;
+tira::glMaterial* PLANES_MATERIAL;
 tira::glMaterial* AXIS_MATERIAL;
 
 tira::glGeometry* axis;
@@ -82,12 +83,16 @@ const std::string glyph_shader_string =
 const std::string volume_shader_string =
 #include "shaders/volume.shader"
 ;
-const std::string scalar_shader_string =
-#include "shaders/volumemap.shader"
+const std::string enface_shader_string =
+#include "shaders/volumemap_enface.shader"
 ;
-const std::string AXIS_MATERIAL_string =
+const std::string planes_shader_string =
+#include "shaders/volumemap_planes.shader"
+;
+const std::string axis_material_string =
 #include "shaders/axis.shader"
 ;
+
 
 
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
@@ -418,6 +423,7 @@ void ColormapEvec(size_t vi) {
 	tira::volume<float> Anisotropy = FA();
 	tira::volume<float> TensorSize = Ln.channel(2);	
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -435,6 +441,7 @@ void ColormapEval(int eval) {
 	tira::volume<float> TensorSize = Ln.channel(2);
 
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -447,6 +454,7 @@ void ColormapFA() {
 	tira::volume<float> A = FA();	
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = (tira::volume<unsigned char>)(A * 255);
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -476,6 +484,7 @@ void ColormapLinearA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -505,6 +514,7 @@ void ColormapPlateA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -534,6 +544,7 @@ void ColormapSphereA() {
 	}
 	tira::volume<unsigned char> C = A.cmap(0, 1, ColorMap::Magma);
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
+	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
 	tira::volume<unsigned char> Alpha = A * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
@@ -1097,40 +1108,47 @@ void RenderUI() {
 
 void RenderPlane(int p) {
 	glm::mat4 Mobj = glm::mat4(1.0f);
-	glm::mat4 Mobj2tex = glm::mat4(1.0f);
+	glm::mat4 Mtex = glm::mat4(1.0f);
 
 	glm::vec3 pos;
 	glm::vec3 rot;
 	glm::vec3 scale = glm::vec3(Tn.sx(), Tn.sy(), Tn.sz());
 
+	glm::vec3 tpos;
+	glm::vec3 tscale;
+
 	// calculate the transformation matrix for each plane
 	if (p == 0) {
 		pos = glm::vec3((float)Tn.px(PLANE_POSITION[0]), Tn.sy() / 2.0f, Tn.sz() / 2.0f);
 		rot = glm::vec3(0.0f, 1.0f, 0.0f);
+		tpos = glm::vec3((float)Tn.px(PLANE_POSITION[0]), 0.0f, 0.0f);
+		tscale = glm::vec3(1.0f, Tn.sy(), Tn.sz());
 	}
 	else if (p == 1) {
 		pos = glm::vec3(Tn.sx() / 2.0f, (float)Tn.py(PLANE_POSITION[1]), Tn.sz() / 2.0f);
 		rot = glm::vec3(1.0f, 0.0f, 0.0f);
+		tpos = glm::vec3(0.0f, (float)Tn.py(PLANE_POSITION[1]), 0.0f);
+		tscale = glm::vec3(Tn.sx(), 1.0f, Tn.sz());
 	}
 	else if (p == 2) {
 		pos = glm::vec3(Tn.sx() / 2.0f, Tn.sy() / 2.0f, (float)Tn.pz(PLANE_POSITION[2]));
 		rot = glm::vec3(0.0f, 0.0f, 1.0f);
+		tpos = glm::vec3(0.0f, 0.0f, (float)Tn.pz(PLANE_POSITION[2]));
+		tscale = glm::vec3(Tn.sx(), Tn.sy(), 1.0f);
 	}
 
 	float radians = (p == 1) ? glm::radians(90.0f) : glm::radians(-90.0f);
 	if (p == 2) radians = glm::radians(0.0f);
 	Mobj = glm::translate(Mobj, pos);
-	//Mobj = glm::translate(Mobj, glm::vec3(Tn.dx() / 2, Tn.dy() / 2, Tn.dz() / 2));
 	Mobj = glm::scale(Mobj, scale);
 	Mobj = glm::rotate(Mobj, radians, rot);
 
-	glm::vec3 tscale(1.0f / Tn.sx(), 1.0f / Tn.sy(), 1.0f / Tn.sz());
-	Mobj2tex = glm::scale(glm::mat4(1.0f), tscale);
+	Mtex = glm::translate(Mtex, pos);
+	Mtex = glm::scale(Mtex, tscale);
+	Mtex = glm::rotate(Mtex, radians, rot);
 
-
-
-	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
-	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
+	PLANES_MATERIAL->SetUniformMat4f("Mobj", Mobj);
+	PLANES_MATERIAL->SetUniformMat4f("Mtex", Mtex);
 	plane.Draw();
 }
 
@@ -1162,17 +1180,15 @@ void RenderEnFacePlane(float p) {
 	Mobj = glm::scale(Mobj, glm::vec3(plane_size, plane_size, plane_size));
 	Mobj = Mobj * Mrot;
 	
-
-	
 	glm::vec3 tscale(1.0f / Tn.sx(), 1.0f / Tn.sy(), 1.0f / Tn.sz());
 	glm::mat4 Mobj2tex = glm::scale(glm::mat4(1.0f), tscale);
-	
 
 	glm::vec4 test(0.0f, 0.0f, 0.0f, 1.0f);
 	glm::vec4 t = Mobj * test;
 
 	SCALAR_MATERIAL->SetUniformMat4f("Mobj", Mobj);
 	SCALAR_MATERIAL->SetUniformMat4f("Mtex", Mobj2tex * Mobj);
+
 	plane.Draw();
 }
 
@@ -1188,12 +1204,15 @@ void RenderVolumetric(unsigned int n) {
 
 }
 
+void RenderVolume() {
+	if (RENDER_EN_FACE) RenderEnFacePlane(EN_FACE_POSITION);
+	if (RENDER_VOLUMETRIC) RenderVolumetric(VOLUMETRIC_PLANES);
+}
+
 void RenderPlanes() {
 	if (RENDER_PLANE[0]) RenderPlane(0);
 	if (RENDER_PLANE[1]) RenderPlane(1);
 	if (RENDER_PLANE[2]) RenderPlane(2);
-	if (RENDER_EN_FACE) RenderEnFacePlane(EN_FACE_POSITION);
-	if (RENDER_VOLUMETRIC) RenderVolumetric(VOLUMETRIC_PLANES);
 }
 
 int main(int argc, char** argv) {
@@ -1244,8 +1263,9 @@ int main(int argc, char** argv) {
 	glDisable(GL_CULL_FACE);
 
 
-	SCALAR_MATERIAL = new tira::glMaterial(scalar_shader_string);
-	AXIS_MATERIAL = new tira::glMaterial(AXIS_MATERIAL_string);
+	SCALAR_MATERIAL = new tira::glMaterial(enface_shader_string);
+	PLANES_MATERIAL = new tira::glMaterial(planes_shader_string);
+	AXIS_MATERIAL = new tira::glMaterial(axis_material_string);
 
 
 	// If the tensor field is loaded using command-line argument
@@ -1285,26 +1305,33 @@ int main(int argc, char** argv) {
 		glClearColor(0, 0, 0, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
-		SCALAR_MATERIAL->Begin();
-		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
-		SCALAR_MATERIAL->SetUniform1f("alpha", alpha);
 		if (TENSOR_LOADED) {
 			// Enable alpha blending for transparency and set blending function
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
 
-		RenderPlanes();
+		SCALAR_MATERIAL->Begin();
+		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
+		SCALAR_MATERIAL->SetUniform1f("alpha", alpha);
+		RenderVolume();
 		SCALAR_MATERIAL->End();
 
+		PLANES_MATERIAL->Begin();
+		PLANES_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
+		PLANES_MATERIAL->SetUniform1f("alpha", alpha);
+		RenderPlanes();
+		PLANES_MATERIAL->End();
+
 		// Draw the axes
-		/*if (TENSOR_LOADED) {
+		if (TENSOR_LOADED) {
 			glDisable(GL_BLEND);
 			AXIS_MATERIAL->Bind();
 			if (RENDER_PLANE[0]) draw_axes(Mproj * Mview, 0);
 			if (RENDER_PLANE[1]) draw_axes(Mproj * Mview, 1);
 			if (RENDER_PLANE[2]) draw_axes(Mproj * Mview, 2);
-		}*/
+			AXIS_MATERIAL->End();
+		}
 
 		glClear(GL_DEPTH_BUFFER_BIT);
 
