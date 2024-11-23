@@ -24,6 +24,7 @@ glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned in
 	unsigned int& out_depth, int deviceID = 0);
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
 float* cudaEigenvectors3(float* tensors, float* lambda, size_t n, int device);
+void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device);
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
@@ -103,8 +104,7 @@ extern int step;                                        // the steps between eac
 
 /// Profiling Timers
 float inf = std::numeric_limits<float>::infinity();
-float t_eigenvalues = inf;
-float t_eigenvectors = inf;
+float t_eigendecomposition = inf;
 float t_loading = inf;
 float t_resetfield = inf;
 float t_cmap_evec = inf;
@@ -437,13 +437,13 @@ void ColormapEval(int eval) {
 	tira::volume<float> E = Ln.channel(eval);
 	tira::volume<unsigned char> C = E.cmap(ColorMap::Magma);
 
-	tira::volume<float> Anisotropy = FA();
+	//tira::volume<float> Anisotropy = FA();
 	tira::volume<float> TensorSize = Ln.channel(2);
 
 	SCALAR_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 	PLANES_MATERIAL->SetTexture("mapped_volume", C, GL_RGB, GL_NEAREST);
 
-	tira::volume<unsigned char> Alpha = Anisotropy * (TensorSize * (1.0f / Ln.maxv())) * 255;
+	tira::volume<unsigned char> Alpha = TensorSize * (1.0f / Ln.maxv()) * 255;
 	SCALAR_MATERIAL->SetTexture("opacity", Alpha, GL_LUMINANCE, GL_NEAREST);
 	auto t1 = tic();
 	t_cmap_eval = duration(t0, t1);
@@ -625,7 +625,7 @@ void GaussianFilter(const float sigma) {
 }
 
 void UpdateEigens() {
-	auto t0 = tic();
+	/*auto t0 = tic();
 	float* eigenvalues_raw = cudaEigenvalues3(reinterpret_cast<float*>(Tn.data()), Tn.size(), in_device);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
 	auto t1 = tic();
@@ -635,9 +635,19 @@ void UpdateEigens() {
 	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
 	auto t2 = tic();
 	t_eigenvectors = duration(t1, t2);
+	*/
 
+	auto t0 = tic();
+	float* eigenvalues_raw;
+	float* eigenvectors_raw;
+	cudaEigendecomposition3D((float*)Tn.data(), eigenvalues_raw, eigenvectors_raw, Tn.size(), in_device);
+	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
+	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
 	free(eigenvalues_raw);
 	free(eigenvectors_raw);
+	auto t1 = tic();
+	t_eigendecomposition = duration(t0, t1);
+	
 }
 
 void ScalarRefresh() {
@@ -1055,8 +1065,7 @@ void RenderUI() {
 				ImGui::SeparatorText("Timers");
 				ImGui::Text("Load Field: %f s", t_loading);
 				ImGui::Text("Reset Field: %f s", t_resetfield);
-				ImGui::Text("Eigenvalue Calculation: %f s", t_eigenvalues);
-				ImGui::Text("Eigenvector Calculation: %f s", t_eigenvectors);
+				ImGui::Text("Eigendecomposition Calculation: %f s", t_eigendecomposition);
 				ImGui::Text("Colormap Eigenvalues: %f s", t_cmap_eval);
 				ImGui::Text("Colormap Eigenvectors: %f s", t_cmap_evec);
 				ImGui::Text("Colormap Fractional Anisotropy: %f s", t_cmap_fa);

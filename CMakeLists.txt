@@ -24,6 +24,7 @@ find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
 #find_package(Boost CONFIG)
 find_package(PNG REQUIRED)
+find_package (JPEG REQUIRED)
 
 
 #build the executable in the binary directory on MS Visual Studio
@@ -73,6 +74,7 @@ include_directories(
 			${GLFW_INCLUDE_DIRS}
 			${TIRA_INCLUDE_DIRS}
 			${X11_INCLUDE_DIR}
+			JPEG::JPEG
 )
 
 # tensorview executable
@@ -92,6 +94,7 @@ target_link_libraries(tensorview2
 				Boost::program_options
 				PRIVATE imgui::imgui
 				PNG::PNG
+				JPEG::JPEG
 )
 
 #create an executable
@@ -123,6 +126,7 @@ target_link_libraries(image2tensor
 				Boost::program_options
 				${X11_LIBRARIES}
 				PNG::PNG
+				JPEG::JPEG
 
 )
 
@@ -138,4 +142,8 @@ target_link_libraries(tensorvote
 				PRIVATE glm::glm
 				Boost::program_options
 )
+
+target_compile_options(tensorview3 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+		--generate-line-info
+		>)
 

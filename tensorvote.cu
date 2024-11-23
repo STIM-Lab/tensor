@@ -22,7 +22,7 @@ extern float t_devicefree;
 extern float t_deviceprops;
 
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
+float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
 
 
 static void HandleError(cudaError_t err, const char* file, int line)
@@ -317,7 +317,7 @@ void cudaVote2D(float* input_field, float* output_field,
 
     start = std::chrono::high_resolution_clock::now();
     float* L = cudaEigenvalues2(input_field, s0 * s1, device);
-    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1, device);
+    float* V = cudaEigenvectors2DPolar(input_field, L, s0 * s1, device);
     end = std::chrono::high_resolution_clock::now();
     float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 

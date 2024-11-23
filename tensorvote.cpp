@@ -6,8 +6,8 @@
 #include <chrono>
 
 #include "tensorvote.cuh"
-glm::vec2 Eigenvalues2D(glm::mat2 T);
-glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
+//glm::vec2 Eigenvalues2D(glm::mat2 T);
+//glm::vec2 Eigenvector2D(glm::mat2 T, glm::vec2 lambdas, unsigned int index = 1);
 void cpuEigendecomposition(float* input_field, float* eigenvectors, float* eigenvalues, unsigned int sx, unsigned int sy);
 VoteContribution StickVote(float u, float v, float sigma, float sigma2, float* eigenvectors, unsigned int power);
 glm::mat2 PlateVote(float u, float v, float sigma, float sigma2);
@@ -16,7 +16,7 @@ void cudaVote2D(float* input_field, float* output_field,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
+float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
 
 #include <tira/field.h>
 #include <tira/image.h>
@@ -63,7 +63,7 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
     int hw = (int)(w / 2);                                      // calculate the half window size
 
     float* L = cudaEigenvalues2(input_field, s0 * s1, in_device);
-    float* V = cudaEigenvectorsPolar(input_field, L, s0 * s1, in_device);
+    float* V = cudaEigenvectors2DPolar(input_field, L, s0 * s1, in_device);
 
     auto start = std::chrono::high_resolution_clock::now();
     //cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field

@@ -28,7 +28,7 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
 
 
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
-float* cudaEigenvectorsPolar(float* tensors, float* evals, unsigned int n, int device);
+float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
 
 void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
@@ -165,7 +165,7 @@ tira::image<float> CalculateEccentricity() {
 void UpdateEigens() {
     float* eigenvalues_raw = cudaEigenvalues2(reinterpret_cast<float*>(Tn.data()), Tn.X() * Tn.Y(), in_device);
     Ln = tira::image<float>(eigenvalues_raw, Tn.X(), Tn.Y(), 2);
-    float* eigenvectors_raw = cudaEigenvectorsPolar(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, Tn.X() * Tn.Y(), in_device);
+    float* eigenvectors_raw = cudaEigenvectors2DPolar(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, Tn.X() * Tn.Y(), in_device);
     THETAn = tira::image<float>(eigenvectors_raw, Tn.X(), Tn.Y(), 2);
 
     free(eigenvalues_raw);
