@@ -94,7 +94,9 @@ const std::string axis_material_string =
 #include "shaders/axis.shader"
 ;
 
-
+// cropping variables
+static int position_values[3] = { 0, 0, 0 };
+static int width_values[3] = { 0, 0, 0 };
 
 float ui_scale = 1.5f;                                  // scale value for the UI and UI text
 bool RESET = false;
@@ -575,6 +577,14 @@ void ResetField() {
 	Tn = T0;
 	auto t1 = tic();
 	t_resetfield = duration(t0, t1);
+
+	position_values[0] = Tn.sx() / 2;
+	position_values[1] = Tn.sy() / 2;
+	position_values[2] = Tn.sz() / 2;
+
+	width_values[0] = Tn.sx();
+	width_values[1] = Tn.sy();
+	width_values[2] = Tn.sz();
 }
 
 /// <summary>
@@ -729,7 +739,7 @@ void LoadTensorField(std::string npy_filename) {
 
 	T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
 	ResetField();
-	
+
 	ResetPlanes();
 
 	TENSOR_LOADED = true;													// mark a tensor field as loaded
@@ -842,7 +852,7 @@ void RenderUI() {
 
 		ImGui::Begin("Tensor");
 
-		window_focused = (ImGui::IsWindowHovered()) ? false : true;
+		window_focused = (ImGui::IsAnyItemHovered()) ? false : true;
 
 		// Change style 
 		ImGuiStyle& style = ImGui::GetStyle();
@@ -881,6 +891,7 @@ void RenderUI() {
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				ImGui::PushItemWidth(-100);
 				ImGui::SliderFloat("alpha", &alpha, 0.01f, 1.0f, "%.2f");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
 				ImGui::SeparatorText("Planes");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
@@ -905,11 +916,61 @@ void RenderUI() {
 				ImGui::SameLine();
 				ImGui::SliderFloat("##EFPosition", &EN_FACE_POSITION, -Tn.smax(), Tn.smax() );
 
+				///////////////////////////////////////////////  Render Volume  //////////////////////////////////////////////////
+				ImGui::SeparatorText("Volume");
+				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				ImGui::Checkbox("V", &RENDER_VOLUMETRIC);
 				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
 				ImGui::SameLine();
 				ImGui::SliderInt("##VPlanes", &VOLUMETRIC_PLANES, 0, 4 * std::max(Tn.X(), std::max(Tn.Y(), Tn.Z())));
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
 
+				///////////////////////////////////////////////   Cropping   ///////////////////////////////////////////////////
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
+
+				ImGui::Indent();
+				ImGui::Text("Position");
+				ImGui::SameLine();
+				ImGui::Text("Width");
+				ImGui::Unindent();
+
+				float child_width = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x * 2;
+
+				// position control
+				ImGui::BeginChild("position", ImVec2(child_width / 2.0f, 175), ImGuiChildFlags_Border);
+				for (int i = 0; i < 3; i++) {
+					if (i > 0) ImGui::SameLine();
+					ImGui::PushID(i);
+					ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.5f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.6f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.7f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.9f, 0.9f));
+					int size = (i == 0) ? Tn.sx() : ((i == 1) ? Tn.sy() : Tn.sz());
+					ImGui::VSliderInt("##pos", ImVec2(50, 150), &position_values[i], 1, size);
+					ImGui::PopStyleColor(4);
+					ImGui::PopID();
+				}
+				ImGui::EndChild();
+				ImGui::SameLine();
+
+				// width control
+				ImGui::BeginChild("width", ImVec2(child_width / 2.0f, 175), ImGuiChildFlags_Border);
+				for (int i = 0; i < 3; i++) {
+					ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(child_width / 2.0f, child_width / 2.0f));
+					if (i > 0) ImGui::SameLine();
+					ImGui::PushID(i);
+					ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.5f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.6f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.7f, 0.5f));
+					ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.9f, 0.9f));
+					int width_max = (i == 0) ? Tn.sx() : ((i == 1) ? Tn.sy() : Tn.sz());
+					ImGui::VSliderInt("##width", ImVec2(50, 150), &width_values[i], 0, width_max);
+					ImGui::PopStyleColor(4);
+					ImGui::PopStyleVar();
+					ImGui::PopID();
+				}
+				ImGui::EndChild();
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
@@ -1001,6 +1062,9 @@ void RenderUI() {
 			if (ImGui::BeginTabItem("Processing"))
 			{
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::SeparatorText("Filter");
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
+
 				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
 					ResetField();
 					UpdateEigens();
@@ -1031,8 +1095,6 @@ void RenderUI() {
 					}
 				}
 
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				
 				ImGui::EndTabItem();
 			}
 
@@ -1311,6 +1373,11 @@ int main(int argc, char** argv) {
 
 		glm::mat4 Mview = Camera.viewmatrix();								// get the view transformation matrix
 
+		if (OPEN_TENSOR) {
+			LoadTensorField(TensorFileName);
+			OPEN_TENSOR = false;
+		}
+
 		glClearColor(0, 0, 0, 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		
@@ -1322,10 +1389,13 @@ int main(int argc, char** argv) {
 
 		SCALAR_MATERIAL->Begin();
 		SCALAR_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
+		SCALAR_MATERIAL->SetUniform3f("crop_pos", (float)position_values[0] / Tn.sx(),
+			(float)position_values[1] / Tn.sy(), (float)position_values[2] / Tn.sz());
+		SCALAR_MATERIAL->SetUniform3f("crop_wid", (float)width_values[0] / Tn.sx(), 
+			(float)width_values[1] / Tn.sy(), (float)width_values[2] / Tn.sz());
 		SCALAR_MATERIAL->SetUniform1f("alpha", alpha);
 		RenderVolume();
 		SCALAR_MATERIAL->End();
-
 		PLANES_MATERIAL->Begin();
 		PLANES_MATERIAL->SetUniformMat4f("Mview", Mproj * Mview);
 		PLANES_MATERIAL->SetUniform1f("alpha", alpha);
