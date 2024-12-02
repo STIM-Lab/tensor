@@ -32,11 +32,16 @@ vec4 rainbow_cycle_cmap(float low, float high, float v){
 
 float eccentricity(float l0, float l1){
 	float ratio = pow(l0, 2) / pow(l1, 2);
+	if(ratio > 1.0f) return 0.0f;
+	if(ratio < 0.0f) return 1.0f;
 	return sqrt(1.0f - ratio);	// otherwise calculate the elliptical eccentricity [0, 1]
 }
 
 float superquadric(float ecc, float theta, float l0, float l1){
-	float n = mix(2, 5, pow(ecc, 3));
+	float gamma = ecc;
+	float beta = pow(1.0f - ecc, gamma);
+	if(beta < 0.1) beta = 0.1;
+	float n = 2.0f / beta;
 	float a = 1.0f;
 	float b = l0/l1;
 	
