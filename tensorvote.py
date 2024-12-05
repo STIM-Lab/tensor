@@ -20,11 +20,9 @@ def eigmag(T):
     idx = np.argsort(magValues, -1)
     
     sortedValues = np.take_along_axis(eigenValues, idx, -1)
-    #sortedValues = eigenValues
     sortedVectors = np.zeros_like(eigenVectors)
     sortedVectors[..., 0, :] = np.take_along_axis(eigenVectors[..., 0, :], idx, -1)
     sortedVectors[..., 1, :] = np.take_along_axis(eigenVectors[..., 1, :], idx, -1)
-    #eigenVectors = np.take_along_axis(eigenVectors, idx, -1)
     
     return sortedValues, sortedVectors
 
@@ -48,11 +46,6 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     # calculate the normalized direction vector
     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
        
-    # if L == 0, assume that D is zero (and 1-qTd = 1)
-    #D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    #D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
-    
-    # if L == 0, assume that D is zero (and 1-qTd = 1)
     D[:, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
     D[:, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
     
@@ -79,7 +72,6 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     sin_2_theta = 1 - cos_2_theta    
     
     DECAY = (d1 * sin_2_theta + d2 * cos_2_theta)[..., np.newaxis, np.newaxis]
-    #decay = g1 * sin_2_theta + g2 * cos_2_theta
     
     V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
     return V
@@ -115,44 +107,6 @@ def stickvote2(T, sigma=3, sigma2=0):
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
 
-# def platefield2(RX, RY, sigma1, sigma2):
-#     # calculate the length (distance) value
-#     L = np.sqrt(RX**2 + RY**2)
-    
-#     # calculate the decay based on the desired properties
-#     if sigma1 == 0:
-#         g1 = 0
-#     else:
-#         g1 = np.exp(- L**2 / sigma1**2)[..., np.newaxis, np.newaxis]
-        
-#     if sigma2 == 0:
-#         g2 = 0
-#     else:
-#         g2 = np.exp(- L**2 / sigma2**2)[..., np.newaxis, np.newaxis]
-        
-#     # calculate each component of the integral
-#     C1 = g1 * (np.pi/2) * np.eye(2)
-    
-#     # calculate the normalized direction vector
-#     D = np.zeros((RX.shape[0], RX.shape[1], 2, 1))
-#     D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-#     D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
-    
-#     PHI = np.arctan2(D[:, :, 1, 0], D[:, :, 0, 0])
-    
-#     # calculate the matrix component
-#     I2 = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
-#     I2[:, :, 0, 0] = np.cos(2 * PHI) + 2
-#     I2[:, :, 1, 1] = 2 - np.cos(2 * PHI)
-#     I2[:, :, 0, 1] = np.sin(2 * PHI)
-#     I2[:, :, 1, 0] = I2[:, :, 0, 1]
-    
-#     C2 = g2 * (np.pi/8) * I2
-#     C3 = g1 * (np.pi/8) * I2
-    
-#     P = C1 + C2 - C3
-#     return P
-
 def platefield2(RX, RY, sigma1, sigma2=0):
     
     ALPHA = np.arctan2(RY, RX)
@@ -160,7 +114,6 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     
     L = np.sqrt(RX**2 + RY**2)
     
-    #c = (np.exp(- L**2 / sigma1**2) / sigma1**2)
     c = 1 / (np.pi * (sigma1**2 + sigma2**2))
     
     e1 = 0
@@ -210,6 +163,7 @@ def platevote2_numerical(T, sigma1=3, sigma2=0, N=10):
     
     # perform the eigendecomposition of the field
     evals, evecs = np.linalg.eigh(T)
+    evals_mag = np.abs(evals)
 
     
     # calculate the optimal window size
@@ -224,9 +178,8 @@ def platevote2_numerical(T, sigma1=3, sigma2=0, N=10):
     
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
-        #vfx0 = x0 + pad
         for x1 in range(T.shape[1]):
-            scale = evals[x0, x1, 0]
+            scale = (evals_mag[x0, x1, 1] - evals_mag[x0, x1, 0]) * np.sign(evals[x0, x1, 1])
             S = scale * platefield2_numerical(X0, X1, sigma, sigma2)
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
@@ -237,7 +190,7 @@ def platevote2_numerical(T, sigma1=3, sigma2=0, N=10):
 def platevote2(T, sigma=3, sigma2=0):
     
     # perform the eigendecomposition of the field
-    evals, evecs = np.linalg.eigh(T)
+    evals, _ = np.linalg.eigh(T)
 
     
     # calculate the optimal window size
