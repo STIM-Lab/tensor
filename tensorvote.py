@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import math
+import argparse
 
 '''
 
@@ -415,3 +416,12 @@ def iterative_stick2(T, sigma, iterations, dsigma=1):
         V.append(T)
         
     return V
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Tensor Voting')
+    parser.add_argument('-i', '--input', type=str, help='Input file (npy)')
+    parser.add_argument('-o', '--output', type=str, help='Output file (npy)')
+    parser.add_argument('-s', '--sigma', type=float, help='Sigma for image to tensor conversion')
+    parser.add_argument('-v', '--visualize')
+    args = parser.parse_args()
+
