@@ -85,7 +85,6 @@ def stickvote2(T, sigma=3, sigma2=0):
     evals, evecs = eigmag(T)
     evals_mag = np.abs(evals)
     
-    
     # store the eigenvector corresponding to the largest eigenvalue
     E = evecs[:, :, :, 1]
     
@@ -124,7 +123,6 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     if(sigma2 > 0):
         e2 = np.exp(- L**2 / sigma2**2)
     
-    
     M = np.zeros((RX.shape[0], RX.shape[1], 2, 2))
     
     COS_2ALPHA = np.cos(TWO_ALPHA)
@@ -134,7 +132,6 @@ def platefield2(RX, RY, sigma1, sigma2=0):
     M[:, :, 0, 1] = (0.25 * SIN_2ALPHA)
     M[:, :, 1, 0] = (0.25 * SIN_2ALPHA)
     M[:, :, 1, 1] = (0.25 * (2 - COS_2ALPHA))
-
     
     T = np.zeros((RX.shape[0], RX.shape[1], 2, 2))    
     
@@ -165,7 +162,6 @@ def platevote2_numerical(T, sigma1=3, sigma2=0, N=10):
     # perform the eigendecomposition of the field
     evals, evecs = np.linalg.eigh(T)
     evals_mag = np.abs(evals)
-
     
     # calculate the optimal window size
     sigma = max(sigma1, sigma2)
@@ -192,7 +188,6 @@ def platevote2(T, sigma=3, sigma2=0):
     
     # perform the eigendecomposition of the field
     evals, _ = np.linalg.eigh(T)
-
     
     # calculate the optimal window size
     w = int(6 * sigma + 1)
@@ -301,8 +296,6 @@ def eccentricity_decay(T, rate):
     
     ecc = eccentricity(T)
     return T * np.power(ecc[..., np.newaxis, np.newaxis], rate)
-    
-    
 
 # visualize a tensor field T (NxMx2x2)
 def visualize(T, glyphs=False, glyphscalar="l1"):
@@ -314,7 +307,6 @@ def visualize(T, glyphs=False, glyphscalar="l1"):
     THETA0[neg] = np.pi - np.abs(THETA0[neg])
     THETA0 = THETA0 / np.pi
     
-    
     cmap = matplotlib.colormaps["hsv"]              # get the angle color
     C0 = cmap(THETA0)
     
@@ -324,13 +316,10 @@ def visualize(T, glyphs=False, glyphscalar="l1"):
     THETA1[neg] = np.pi - np.abs(THETA1[neg])
     THETA1 = THETA1 / np.pi
     
-    
     cmap = matplotlib.colormaps["hsv"]              # get the angle color
     C1 = cmap(THETA1)
     
-    
     ecc = eccentricity(T)[..., np.newaxis]
-    
     
     C0 = ecc * C0 + (1 - ecc)                         # scale the saturation by the eccentricity (lower eccentricity is whiter)
     l1_max = np.max(np.abs(L[..., 1]))
@@ -347,8 +336,6 @@ def visualize(T, glyphs=False, glyphscalar="l1"):
     plt.subplot(2, 3, 2)
     plt.imshow(C1[:, :, 0:3], origin="lower")
     plt.title("Vector 1 Angle")
-    
-    
     
     plt.subplot(2, 3, 3)
     plt.imshow(ecc, cmap="magma", origin="lower")
@@ -380,10 +367,8 @@ def visualize(T, glyphs=False, glyphscalar="l1"):
             plt.colorbar()
         l1_sum = np.sum(L[..., 1])
         plt.title("Eigenvalue 1, integral = " + str(l1_sum))
-    
-    
-    
-    
+        
+    plt.show()
     
 # performs iterative voting on a tensor field T
 # sigma is the standard deviation for the first iteration
@@ -421,7 +406,35 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Tensor Voting')
     parser.add_argument('-i', '--input', type=str, help='Input file (npy)')
     parser.add_argument('-o', '--output', type=str, help='Output file (npy)')
-    parser.add_argument('-s', '--sigma', type=float, help='Sigma for image to tensor conversion')
-    parser.add_argument('-v', '--visualize')
+    parser.add_argument('-s', '--sigma', type=float, help='Sigma for tensor vote. Default=5', default=5)
+    parser.add_argument('-s2', '--sigma2', type=float, help='Sigma to add orthogonal votes. Default=0', default=0)
+    parser.add_argument('-v', '--visualize', action='store_true', help='Visualize the tensor field')
+    parser.add_argument('-t', '--tensor', type=str, help='Type of tensor field (both, stick, plate, none)')
     args = parser.parse_args()
+    
+    if args.input is None:
+        print("No input file specified")
+        exit()
+
+    T = np.load(args.input)
+
+    tvRan = False
+    if args.tensor == 'both':
+        V = vote2(T, args.sigma, args.sigma2)
+        tvRange = True
+    elif args.tensor == 'stick':
+        V = stickvote2(T, args.sigma, args.sigma2)
+        tvRange = True
+    elif args.tensor == 'plate':
+        V = platevote2(T, args.sigma, args.sigma2)
+        tvRange = True
+        
+    if args.output is not None:
+        np.save(args.output, V)    
+    
+    if args.visualize:
+        if tvRan:
+            visualize(V)
+        else:
+            visualize(T)
 
