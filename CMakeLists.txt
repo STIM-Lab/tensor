@@ -63,10 +63,6 @@ configure_file(demo2noise.png
 		demo2noise.png COPYONLY)
 file(COPY sbfsem DESTINATION .)
 
-# shell scripts
-configure_file(tensorvote.sh
-				tensorvote.sh COPYONLY)
-				
 #set the include directories
 include_directories(
 			${CMAKE_CURRENT_BINARY_DIR}
