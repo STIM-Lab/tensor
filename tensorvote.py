@@ -332,10 +332,12 @@ def visualize(T, glyphs=False, glyphscalar="l1"):
     plt.subplot(2, 3, 1)
     plt.imshow(C0[:, :, 0:3], origin="lower")
     plt.title("Vector 0 Angle")
+    plt.colorbar()
     
     plt.subplot(2, 3, 2)
     plt.imshow(C1[:, :, 0:3], origin="lower")
     plt.title("Vector 1 Angle")
+    plt.colorbar()
     
     plt.subplot(2, 3, 3)
     plt.imshow(ecc, cmap="magma", origin="lower")
