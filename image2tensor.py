@@ -1,6 +1,5 @@
 import os
 import sys
-import cv2
 import numpy as np
 import scipy as sp
 import tensorvote as tv
@@ -62,7 +61,7 @@ def structure3d(T, sigma, noise=0):
     float32: the structure tensor (ZxYxXx3x3)
     """
     # create the structure tensor
-    dVdz, dVdy, dVdx = np.gradient(T, edge_order=2)
+    dVdz, dVdy, dVdx = np.gradient(T, edge_order=1)
     T = np.zeros((dVdx.shape[0], dVdx.shape[1], dVdx.shape[2], 3, 3))
     T[:, :, :, 0, 0] = dVdx * dVdx
     if noise > 0:
@@ -222,7 +221,10 @@ def images2volume(folder_path, grayscale=True):
         
     images = []
     for name in images_list:
-        img = cv2.imread(os.path.join(folder_path, name), (cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR))
+        img = imread(os.path.join(folder_path, name))
+        if(grayscale and img.ndims == 3):
+            img = img[:, :, 0]
+        #img = cv2.imread(os.path.join(folder_path, name), (cv2.IMREAD_GRAYSCALE if grayscale else cv2.IMREAD_COLOR))
         images.append(img)
 
     return np.stack(images, axis=0)

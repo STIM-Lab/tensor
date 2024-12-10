@@ -196,12 +196,12 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     return V
 
-F = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
-F = it.addGaussian3T(F, 1)
-np.save("../../build/tensor/stickfield_100.npy", F.astype(np.float32))
+#F = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
+#F = it.addGaussian3T(F, 1)
+#np.save("stickfield_100.npy", F.astype(np.float32))
 
-V = stickvote3(F, 3, 0)
-np.save('../../build/tensor/stickvote_100.npy', V)
+#V = stickvote3(F, 3, 0)
+#np.save('stickvote_100.npy', V)
 
 # volume = np.load('synthetic_vol.npy')
 # structure = it.structure3d(volume, sigma=3).astype(np.float32)

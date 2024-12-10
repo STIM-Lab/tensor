@@ -299,18 +299,18 @@ def genSample3D(shape, noise=0):
                 dist_tube = np.sqrt((x - curve_x)**2 + (y - curve_y)**2 + (z - curve_z)**2)
                 if np.min(dist_tube) <= radius_tube:
                     vol[x, y, z] = 1
-    vol *= 255
+    #vol *= 255
     if noise != 0:
         vol = np.random.normal(0, noise, vol.shape) + vol
     vol[vol<0] = 0
-    vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
+    #vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
     return vol
 
 size = 50
-vol = genSample3D((size, size, size), 0)
-vol = st.structure3d(vol.astype(np.float32) / 255, 3)
-vol = st.addGaussian3T(vol, 2)
-np.save('../../build/tensor/synthetic_vol_50x50x50.npy', vol)
+vol = genSample3D((size, size, size), 0.6)
+st = st.structure3d(vol.astype(np.float32), 3)
+#vol = st.addGaussian3T(vol, 2)
+np.save('synthetic_vol_50x50x50.npy', st)
 
-V = tv3.stickvote3(vol, 3, 0)
-np.save('../../build/tensor/synthetic_vote_50x50x50.npy', V)
+#V = tv3.stickvote3(vol, 3, 0)
+#np.save('synthetic_vote_50x50x50.npy', V)
