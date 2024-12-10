@@ -97,6 +97,7 @@ target_link_libraries(tensorview2
 add_executable(tensorview3
 				tensorview3.cpp
 				cuda_calls.cu
+				tensorvote.cu
 				ImGuiFileBrowser/ImGuiFileBrowser.cpp
 				ImGuiFileBrowser/ImGuiFileBrowser.h
 				ImGuiFileBrowser/dirent.h

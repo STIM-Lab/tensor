@@ -128,7 +128,7 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     #V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
     V = DECAY * np.matmul(Rq, Rqt)
-    return V
+    return V.astype(np.float32)
 
 # calculate the vote result of the tensor field T
 # k is the eigenvector used as the voting direction
@@ -196,19 +196,15 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     return V
 
-#V = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
-#vals, vecs = np.linalg.eigh(V)
-# N = 101
-# r = np.linspace(-N/2, N/2, N)
-# X, Y, Z = np.meshgrid(r, r, r)
-#decay = decay_integrate(10, 5, 2)
-#eta = eta(10, 5, 2)
-#plt.imshow(vals[:, :, 50, 2])
-#np.save("stickfield.npy", V.astype(np.float32))
+F = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
+F = it.addGaussian3T(F, 1)
+np.save("../../build/tensor/stickfield_100.npy", F.astype(np.float32))
 
+V = stickvote3(F, 3, 0)
+np.save('../../build/tensor/stickvote_100.npy', V)
 
-volume = np.load('synthetic_vol.npy')
-structure = it.structure3d(volume, sigma=3).astype(np.float32)
-np.save('../../build/tensor/tensor_synth.npy', structure)
-V = stickvote3(structure, 3, 0)
-np.save('../../build/tensor/vote_synth.npy', V)
+# volume = np.load('synthetic_vol.npy')
+# structure = it.structure3d(volume, sigma=3).astype(np.float32)
+# np.save('../../build/tensor/tensor_synth.npy', structure)
+# V = stickvote3(structure, 3, 0)
+# np.save('../../build/tensor/vote_synth.npy', V)

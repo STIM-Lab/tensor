@@ -55,16 +55,16 @@ float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
     return tira::cuda::Eigenvalues3D<float>(tensors, n);
 }
 
-float* cudaEigenvectors3(float* tensors, float* lambda, size_t n, int device) {
-    if (device < 0) return tira::cpu::Eigenvectors2DPolar(tensors, lambda, n);
-
-    return tira::cuda::Eigenvectors3DPolar<float>(tensors, lambda, n);
-}
-
 float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
     if (device < 0) return tira::cpu::Eigenvectors2DPolar(tensors, evals, n);
 
     return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n, device);
+}
+
+float* cudaEigenvectors3DPolar(float* tensors, float* evals, unsigned int n, int device) {
+    if (device < 0) return tira::cpu::Eigenvectors3DPolar(tensors, evals, n);
+
+    return tira::cuda::Eigenvectors3DPolar<float>(tensors, evals, n);
 }
 
 void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device) {

@@ -3,11 +3,12 @@ import scipy as sp
 import matplotlib.pyplot as plt
 import image2tensor as st
 import tensorvote as tv
+import tensorvote3d as tv3
 import skimage as ski
 import os
 
 # adds Gaussian noise to a symmetric second order tensor field        
-def addGaussian2d(T, sigma1, sigma0 = None):
+def addGaussian2T(T, sigma1, sigma0 = None):
     
     if sigma0 is None:
         sigma0 = sigma1
@@ -35,7 +36,8 @@ def addGaussian2d(T, sigma1, sigma0 = None):
     
     return T + ETA1 + ETA0
 
-def addShiftT(T, sigmax, dropout=0.5):
+
+def addShiftT(T, sigma, dropout=0.5):
 
         
     x = np.array(range(0, T.shape[0]))
@@ -92,7 +94,7 @@ def genBoxGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = addGaussian2d(T, noise, 0)
+        T = addGaussian2T(T, noise, 0)
         
     return T
     
@@ -132,7 +134,7 @@ def genCircleGrid2T(N, b, linewidth, noise):
     
     T = st.structure2d(I)
     if noise != 0:
-        T = addGaussianT(T, noise, 0)
+        T = addGaussian2T(T, noise, 0)
         
     return T
 
@@ -202,7 +204,7 @@ def genSpiral2T(N, d, noise = 0):
         t = t + dt
         
     if noise != 0:
-        T = addGaussian2d(T, noise, 0)
+        T = addGaussian2T(T, noise, 0)
     return T
       
 # saves an image stack, assuming the color value is the fastest (last) dimension    
@@ -247,7 +249,7 @@ def genSample3D(shape, noise=0):
     # for donut (torus shape)
     center_donut = (shape[0] // 4, shape[1] // 2, shape[2] - shape[2] // 4)
     radius_donut = shape[0] // 8
-    thick_donut = 5
+    thick_donut = 3
     
     # for curved tube (partial donut)
     center_curve = (shape[0] - shape[0] // 3, shape[1] // 8, -shape[2] // 6)
@@ -304,7 +306,11 @@ def genSample3D(shape, noise=0):
     vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
     return vol
 
-size = 100
-vol = genSample3D((size, size, size), 5)
+size = 50
+vol = genSample3D((size, size, size), 0)
+vol = st.structure3d(vol.astype(np.float32) / 255, 3)
+vol = st.addGaussian3T(vol, 2)
+np.save('../../build/tensor/synthetic_vol_50x50x50.npy', vol)
 
-np.save('synthetic_vol.npy', vol)
+V = tv3.stickvote3(vol, 3, 0)
+np.save('../../build/tensor/synthetic_vote_50x50x50.npy', V)

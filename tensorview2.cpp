@@ -488,15 +488,12 @@ void RenderUI() {
 
             if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
                 LoadTensorField(filename);
-                SCALARTYPE = ScalarType::EVal0;
-                ScalarRefresh();
-                FIELD_LOADED = true;
-                RENDER_GLYPHS = true;
+                FileName = filename.c_str();
+                GLYPH_ROWS = static_cast<int>(Tn.shape()[0]);
 
-                if (GLYPH_MATERIAL == nullptr) {
-                    GLYPH_GEOMETRY = tira::glGeometry::GenerateCircle<float>(100);
-                    GLYPH_MATERIAL = new tira::glMaterial(glyph_shader_string);
-                }
+                ScalarRefresh();
+                RegenerateGlyphs();
+                CameraPos = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
             }
         }
         ImGuiFileDialog::Instance()->Close();									// close the file dialog box		

@@ -92,7 +92,7 @@ __host__ __device__ glm::vec2 Eigenvector2D(glm::mat2 T, float lambda) {
     }
 }
 
-__host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
+__host__ void cpuEigendecomposition2D(float *input_field, float *eigenvectors, float *eigenvalues, unsigned int sx, unsigned int sy) {
 
     unsigned int i;
     for (unsigned int yi = 0; yi < sy; yi++) { // for each tensor in the field
@@ -120,20 +120,17 @@ __host__ void cpuEigendecomposition(float *input_field, float *eigenvectors, flo
     }
 }
 
-__host__ __device__ float decay(float t2, float length, float sigma, unsigned int power = 1) {
+__host__ __device__ float decay(float term, float length, float sigma, unsigned int power = 1) {
     float c = exp(-(length * length) / (sigma * sigma));
 
-    //float sin_theta_2 = 1 - t2;
-    float tp = t2;
-    for (unsigned int pi = 1; pi < power; pi++) {
-        tp *= t2;
-    }
+    float tp = term;
+    for (unsigned int pi = 1; pi < power; pi++)
+        tp *= term;
 
-    float D = c * tp;
-    return D;
+    return c * tp;
 }
 
-__host__ __device__ float PlateDecay(float length, float sigma) {
+__host__ __device__ float PlateDecay2D(float length, float sigma) {
     float c = PI * exp(-(length * length) / (sigma * sigma)) / 2.0f;
 
     return c;
@@ -146,7 +143,7 @@ __host__ __device__ double factorial(unsigned int n) {
     return fac;
 }
 
-__host__ __device__ double sticknorm(double sigma1, double sigma2, unsigned int p) {
+__host__ __device__ double sticknorm2D(double sigma1, double sigma2, unsigned int p) {
     double num = PI * factorial(2 * p);
     double ex = std::pow(2, 2 * p);
     double facp = factorial(p);
@@ -162,7 +159,7 @@ __host__ __device__ double sticknorm(double sigma1, double sigma2, unsigned int 
 /// <param name="sigma">decay value (standard deviation)</param>
 /// <param name="eigenvectors">array containing the largest eigenvector</param>
 /// <returns></returns>
-__host__ __device__  VoteContribution StickVote(float u, float v, float sigma1, float sigma2, float* eigenvectors, unsigned int power) {
+__host__ __device__  VoteContribution2D StickVote2D(float u, float v, float sigma1, float sigma2, float* eigenvectors, unsigned int power) {
 
     glm::vec2 q(eigenvectors[0], eigenvectors[1]);          // get the eigenvector
 
@@ -186,13 +183,13 @@ __host__ __device__  VoteContribution StickVote(float u, float v, float sigma1, 
     glm::mat2 RqRq = glm::outerProduct(Rq, Rq);
 
 
-    VoteContribution S;
+    VoteContribution2D S;
     S.votes = RqRq;
     S.decay = eta1 + eta2;
     return S;
 }
 
-__host__ __device__  glm::mat2 PlateVote(float u, float v, float sigma1, float sigma2) {
+__host__ __device__  glm::mat2 PlateVote2D(float u, float v, float sigma1, float sigma2) {
 
     float length = sqrt(u * u + v * v);                     // calculate the distance between voter and votee
     float l2 = length * length;
@@ -232,7 +229,7 @@ __host__ __device__  glm::mat2 PlateVote(float u, float v, float sigma1, float s
 /// @param w Window size
 /// @param width Tensor field width in pixels
 /// @param height Tensor field height in pixels
-__global__ void kernelStickVote(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
+__global__ void kernelStickVote2D(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
     int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
     int x1 = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -254,7 +251,7 @@ __global__ void kernelStickVote(float* VT, float* L, float* V, float sigma1, flo
                     float Vcart[2];
                     Vcart[0] = std::cos(V[(r0 * s1 + r1) * 2 + 1]);
                     Vcart[1] = std::sin(V[(r0 * s1 + r1) * 2 + 1]);
-                    VoteContribution vote = StickVote(u, v, sigma1, sigma2, Vcart, power);
+                    VoteContribution2D vote = StickVote2D(u, v, sigma1, sigma2, Vcart, power);
                     float l0 = L[(r0 * s1 + r1) * 2 + 0];
                     float l1 = L[(r0 * s1 + r1) * 2 + 1];
                     float scale = std::abs(l1) - std::abs(l0);
@@ -271,7 +268,7 @@ __global__ void kernelStickVote(float* VT, float* L, float* V, float sigma1, flo
     VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
 }
 
-__global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
+__global__ void kernelPlateVote2D(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
     int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
     int x1 = blockDim.y * blockIdx.y + threadIdx.y;
 
@@ -290,7 +287,7 @@ __global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma1, flo
                 r1 = x1 + u;
                 if (r1 >= 0 && r1 < s1) {
                     float l0 = L[(r0 * s1 + r1) * 2 + 0];
-                    Votee = Votee + l0 * PlateVote(u, v, sigma1, sigma2);
+                    Votee = Votee + l0 * PlateVote2D(u, v, sigma1, sigma2);
                 }
             }
         }
@@ -302,9 +299,7 @@ __global__ void kernelPlateVote(float* VT, float* L, float* V, float sigma1, flo
     VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
 }
 
-void cudaVote2D(float* input_field, float* output_field, 
-    unsigned int s0, unsigned int s1, 
-    float sigma, float sigma2, 
+void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2, 
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug) {
     
     auto start = std::chrono::high_resolution_clock::now();
@@ -351,7 +346,7 @@ void cudaVote2D(float* input_field, float* output_field,
     dim3 threads(blockDim, blockDim);
     dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1);
 
-    float sn = 1.0 / sticknorm(sigma, sigma2, power);
+    float sn = 1.0 / sticknorm2D(sigma, sigma2, power);
   
 
     if (debug) {
@@ -360,9 +355,9 @@ void cudaVote2D(float* input_field, float* output_field,
 
     start = std::chrono::high_resolution_clock::now();
     if(STICK)
-        kernelStickVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);              // call the CUDA kernel for voting
+        kernelStickVote2D << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);              // call the CUDA kernel for voting
     if (PLATE)
-        kernelPlateVote << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);
+        kernelPlateVote2D << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);
     cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     float t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -397,3 +392,40 @@ void cudaVote2D(float* input_field, float* output_field,
     }
 }
 
+
+
+/// <summary>
+/// Calculate the stick vote for the relative position (u, v) given the voter eigenvales and eigenvectors
+/// </summary>
+/// <param name="u">u coordinate for the relative position of the receiver</param>
+/// <param name="v">v coordinate for the relative position of the receiver</param>
+/// <param name="sigma">decay value (standard deviation)</param>
+/// <param name="eigenvectors">array containing the largest eigenvector</param>
+/// <returns></returns>
+__host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, float sigma1, float sigma2, float* eigenvectors, unsigned int power) {
+
+    glm::vec3 q(eigenvectors[0], eigenvectors[1], eigenvectors[2]);             // get the eigenvector
+
+    glm::vec3 d = glm::vec3(u, v, w);                                           // normalize the direction vector
+    float l = glm::length(d);                                                   // calculate ell (distance between voter/votee)
+    if (l == 0) d = glm::vec3(0, 0, 0);                                         // assumes that the voter DOES contribute to itself
+    else d = glm::normalize(d);
+
+    float qTd = glm::dot(q, d);
+
+    float term1 = 0;
+    float term2 = 0;
+    if (sigma1 > 0)
+        term1 = decay(1 - qTd * qTd, l, sigma1, power);                          // calculate the decay function
+    if (sigma2 > 0)
+        term2 = decay(qTd * qTd, l, sigma2, power);
+
+    glm::mat3 R = glm::mat3(1.0f) - 2.0f * glm::outerProduct(d, d);
+    glm::vec3 Rq = R * q;
+    glm::mat3 RqRq = glm::outerProduct(Rq, Rq);
+
+    VoteContribution3D S;
+    S.votes = RqRq;
+    S.decay = term1 + term2;
+    return S;
+}

@@ -50,7 +50,7 @@ def structure2d(I, sigma=3, deriv=1, noise=0):
     return T
 
 
-def structure3d(T, sigma, noise=0, SAVE=False):
+def structure3d(T, sigma, noise=0):
     """
     This function takes a 3D grayscale volume and returns the structure tensor
     for visualization in tensorview3D.
@@ -92,10 +92,7 @@ def structure3d(T, sigma, noise=0, SAVE=False):
         T = sp.signal.convolve(T, kernel, mode="same") 
         #T = sp.ndimage.gaussian_filter(T, [sigma, sigma, sigma, 0, 0])         # my version
     
-    if SAVE:
-        np.save('tensorfield.npy', T.astype(np.float32))
-    else:
-        return T
+    return T.astype(np.float32)
 
 
 def structure2d_nz(I, w=3):
@@ -229,3 +226,54 @@ def images2volume(folder_path, grayscale=True):
         images.append(img)
 
     return np.stack(images, axis=0)
+
+
+# adds Gaussian noise to a symmetric second-order tensor field in 3D
+def addGaussian3T(T, sigma1, sigma0=None):
+    if sigma0 is None:
+        sigma0 = sigma1
+
+    # Generate random orientations in 3D
+    PHI = np.random.uniform(0, 2 * np.pi, T.shape[:3])      # Azimuthal angle
+    THETA = np.random.uniform(0, np.pi, T.shape[:3])        # Polar angle
+
+    # Convert spherical to Cartesian coordinates
+    X = np.sin(THETA) * np.cos(PHI)
+    Y = np.sin(THETA) * np.sin(PHI)
+    Z = np.cos(THETA)
+
+    # Generate random eigenvalues for principal axes
+    lambda_1 = np.abs(np.random.normal(0.0, sigma1, T.shape[:3]))
+    lambda_0 = np.abs(np.random.normal(0.0, sigma0, T.shape[:3]))
+
+    # Create noise tensors for lambda_1
+    ETA1 = np.zeros_like(T)
+    ETA1[..., 0, 0] = X * X * lambda_1
+    ETA1[..., 0, 1] = X * Y * lambda_1
+    ETA1[..., 0, 2] = X * Z * lambda_1
+    ETA1[..., 1, 0] = ETA1[..., 0, 1]
+    ETA1[..., 1, 1] = Y * Y * lambda_1
+    ETA1[..., 1, 2] = Y * Z * lambda_1
+    ETA1[..., 2, 0] = ETA1[..., 0, 2]
+    ETA1[..., 2, 1] = ETA1[..., 1, 2]
+    ETA1[..., 2, 2] = Z * Z * lambda_1
+
+    # Create orthogonal vectors for lambda_0 noise
+    X0, Y0, Z0 = -Y, X, np.zeros_like(Z)  # Perpendicular in the XY plane
+    valid_mask = (X != 0) | (Y != 0)
+    Z0[~valid_mask] = 1  # Avoid zero vectors; assign arbitrary orthogonal vectors
+    mag = np.sqrt(X0**2 + Y0**2 + Z0**2)
+    X0, Y0, Z0 = X0 / mag, Y0 / mag, Z0 / mag
+
+    ETA0 = np.zeros_like(T)
+    ETA0[..., 0, 0] = X0 * X0 * lambda_0
+    ETA0[..., 0, 1] = X0 * Y0 * lambda_0
+    ETA0[..., 0, 2] = X0 * Z0 * lambda_0
+    ETA0[..., 1, 0] = ETA0[..., 0, 1]
+    ETA0[..., 1, 1] = Y0 * Y0 * lambda_0
+    ETA0[..., 1, 2] = Y0 * Z0 * lambda_0
+    ETA0[..., 2, 0] = ETA0[..., 0, 2]
+    ETA0[..., 2, 1] = ETA0[..., 1, 2]
+    ETA0[..., 2, 2] = Z0 * Z0 * lambda_0
+
+    return T + ETA1 + ETA0
