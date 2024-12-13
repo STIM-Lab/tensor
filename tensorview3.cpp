@@ -22,9 +22,10 @@
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height,
 	unsigned int& out_depth, int deviceID = 0);
-float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
-float* cudaEigenvectors3DPolar(float* tensors, float* lambda, size_t n, int device);
 void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device);
+void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+	unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
+
 
 GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 const char* glsl_version = "#version 130";              // specify the version of GLSL
@@ -143,6 +144,9 @@ bool BLUR = false;
 float SIGMA;
 float TV_SIGMA1 = 3;
 float TV_SIGMA2 = 0;
+bool TV_STICK = true;
+bool TV_PLATE = false;
+int TV_POWER = 1;
 std::string TensorFileName;
 
 bool OPEN_VOLUME = false;
@@ -634,105 +638,19 @@ void GaussianFilter(const float sigma) {
 	t_gaussian = duration(t0, t1);
 }
 
-//void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2,
-//	float sigma, float sigma2, unsigned int w, unsigned int power = 1, bool PLATE = false, bool debug = false) {
-//
-//	int hw = (int)(w / 2);                                      // calculate the half window size
-//
-//	float* L = cudaEigenvalues3(input_field, s0 * s1 * s2, in_device);
-//	float* V = cudaEigenvectors3DPolar(input_field, L, s0 * s1 * s2, in_device);
-//
-//	auto start = std::chrono::high_resolution_clock::now();
-//	//cpuEigendecomposition(input_field, &V[0], &L[0], s0, s1);   // calculate the eigendecomposition of the entire field
-//	auto end = std::chrono::high_resolution_clock::now();
-//	//t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-//
-//	float scale;
-//	int r0, r1, r2;                                                         // x, y and z coordinates within the window
-//	for (unsigned int x0 = 0; x0 < s0; x0++) {                          // for each pixel in the image
-//		for (unsigned int x1 = 0; x1 < s1; x1++) {
-//			for (unsigned int x2 = 0; x2 < s2; x2++) {
-//				glm::mat3 receiver(0.0f);                               // initialize a receiver tensor to zero
-//				float total_decay = 0.0f;
-//
-//				for (int w0 = -hw; w0 < hw; w0++) {                     // for each pixel in the window
-//					r0 = x0 + w0;
-//					if (r0 >= 0 && r0 < s0) {                           // if the pixel is inside the image (along the y axis)
-//						for (int w1 = -hw; w1 < hw; w1++) {
-//							r1 = x1 + w1;
-//							if (r1 >= 0 && r1 < s1) {                   // if the pixel is inside the image (along the x axis)
-//								for (int w2 = -hw; w2 < hw; w2++) {
-//									r2 = x2 + w2;
-//									if (r2 >= 0 && r2 < s2) {
-//										// calculate the saliency (vote contribution)
-//										float l0 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 0];
-//										float l1 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 1];
-//										float l2 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 2];
-//
-//										glm::vec3 Vcart;                // calculate the largest eigenvector in cartesian coordinates
-//										Vcart.x = V[(r0 * s1 * s2 + r1 * s2 + r2) * 9 + 0];
-//										Vcart.y = V[(r0 * s1 * s2 + r1 * s2 + r2) * 9 + 1];
-//										Vcart.z = V[(r0 * s1 * s2 + r1 * s2 + r2) * 9 + 2];
-//										VoteContribution3D vote = StickVote3D(w0, w1, w2, sigma, sigma2, (float*)&Vcart, power);
-//
-//										scale = std::abs(l2) - std::abs(l1);
-//										if (l2 < 0.0f) scale = scale * (-1);
-//										receiver = receiver + scale * vote.votes * vote.decay;
-//
-//										//if (PLATE) {                        // apply the plate vote
-//
-//										//    scale = L[(r0 * s1 + r1) * 2 + 0];
-//										//    //receiver = receiver + scale * vote.votes * vote.decay;
-//										//    receiver = receiver + PlateVote(u, v, sigma, sigma2);
-//										//}
-//
-//										if (debug) {
-//											total_decay += vote.decay;
-//										}
-//									}
-//								}
-//							}
-//						}
-//					}
-//				}
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 0] += receiver[0][0];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 1] += receiver[0][1];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 2] += receiver[0][2];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 3] += receiver[1][0];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 4] += receiver[1][1];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 5] += receiver[1][2];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 6] += receiver[2][0];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 7] += receiver[2][1];
-//				output_field[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 8] += receiver[2][2];
-//
-//			}
-//		}
-//	}
-//	end = std::chrono::high_resolution_clock::now();
-//}
-
 void TensorVote(const float sigma, const float sigma2, const unsigned int p, const bool stick, const bool plate) {
 	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());
 
+	std::cout << "Tensor voting in progress...\t";
 	const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
-	/*cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()),
+	cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()),
 		static_cast<unsigned int>(T0.shape()[0]), static_cast<unsigned int>(T0.shape()[1]), static_cast<unsigned int>(T0.shape()[2]),
-		sigma, sigma2, w, p, in_device, stick, plate, false);*/
+		sigma, sigma2, w, p, in_device, stick, plate, false);
+
+	std::cout << "Done." << std::endl;
 }
 
 void UpdateEigens() {
-	/*auto t0 = tic();
-	float* eigenvalues_raw = cudaEigenvalues3(reinterpret_cast<float*>(Tn.data()), Tn.size(), in_device);
-	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
-	auto t1 = tic();
-	t_eigenvalues = duration(t0, t1);
-
-	float* eigenvectors_raw = cudaEigenvectors3(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, Tn.size(), in_device);
-	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
-	auto t2 = tic();
-	t_eigenvectors = duration(t1, t2);
-	*/
-
 	auto t0 = tic();
 	float* eigenvalues_raw;
 	float* eigenvectors_raw;
@@ -743,7 +661,6 @@ void UpdateEigens() {
 	free(eigenvectors_raw);
 	auto t1 = tic();
 	t_eigendecomposition = duration(t0, t1);
-	
 }
 
 void ScalarRefresh() {
@@ -1180,7 +1097,7 @@ void RenderUI() {
 				///////////////////////////////////////////////  Tensor Voting  ///////////////////////////////////////////////////
 
 				if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
-					TensorVote(TV_SIGMA1, TV_SIGMA2, 1, true, false);
+					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
 					UpdateEigens();
 					ScalarRefresh();
 				}
@@ -1188,7 +1105,7 @@ void RenderUI() {
 				if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f)) {
 					if (TV_SIGMA1 < 0) TV_SIGMA1 = 0.0;
 					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, 1, true, false);
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
 						UpdateEigens();
 						ScalarRefresh();
 					}
@@ -1196,11 +1113,32 @@ void RenderUI() {
 				if (ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f)) {
 					if (TV_SIGMA2 < 0) TV_SIGMA2 = 0.0;
 					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, 1, true, false);
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
 						UpdateEigens();
 						ScalarRefresh();
 					}
 				}
+				if (ImGui::InputInt("Power", &TV_POWER, 1, 5)) {
+					if (TV_POWER < 1) TV_POWER = 1;
+					if (PROCESSINGTYPE == ProcessingType::Vote) {
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
+						UpdateEigens();
+						ScalarRefresh();
+					}
+				}
+				if (ImGui::Checkbox("Stick", &TV_STICK)) {
+					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
+					UpdateEigens();
+					ScalarRefresh();
+				}
+				ImGui::BeginDisabled();
+				ImGui::SameLine();
+				if (ImGui::Checkbox("Plate", &TV_PLATE)) {
+					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
+					UpdateEigens();
+					ScalarRefresh();
+				}
+				ImGui::EndDisabled();
 				ImGui::EndTabItem();
 			}
 

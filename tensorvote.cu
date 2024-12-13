@@ -23,6 +23,8 @@ extern float t_deviceprops;
 
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
+float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
+float* cudaEigenvectors3DPolar(float* tensors, float* evals, unsigned int n, int device);
 
 
 static void HandleError(cudaError_t err, const char* file, int line)
@@ -347,11 +349,9 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1);
 
     float sn = 1.0 / sticknorm2D(sigma, sigma2, power);
-  
 
-    if (debug) {
+    if (debug)
         std::cout << "Stick Area: " << sn << std::endl;
-    }
 
     start = std::chrono::high_resolution_clock::now();
     if(STICK)
@@ -382,8 +382,6 @@ void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsign
     if (debug) {
         std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
         std::cout << "Voting: " << t_voting << " ms" << std::endl;
-
-
         std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
         std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
         std::cout << "cudaMalloc: " << t_devicealloc << " ms" << std::endl;
@@ -428,4 +426,164 @@ __host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, f
     S.votes = RqRq;
     S.decay = term1 + term2;
     return S;
+}
+
+/// @brief The kernel to perform the 3D stick tensor voting on the GPU
+/// @param VT Output tensor field
+/// @param L Eigenvalues of the input tensor field
+/// @param V Eigenvalues of the input tensor field
+/// @param sigma1 Sigma value for the decay function
+/// @param sigma2 Sigma value for the decay function
+/// @param power Power used to refine the vote field
+/// @param norm The decay normalization term
+/// @param w Window size
+/// @param s0 Tensor field width in pixels
+/// @param s1 Tensor field height in pixels
+/// @param s2 Tensor field depth in pixels
+__global__ void kernelStickVote3D(float* VT, float* L, float* V, float sigma, float sigma2, unsigned int power, float norm, int w, int s0, int s1, int s2) {
+    int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                     // get the x, y, and z volume coordinates for the current thread
+    int x1 = blockDim.y * blockIdx.y + threadIdx.y;
+    int x2 = blockDim.z * blockIdx.z + threadIdx.z;
+
+    if (x0 >= s0 || x1 >= s1 || x2 >= s2)                                               // if not within bounds of image, return
+        return;
+
+    glm::mat3 Votee(0.0f);
+    float scale;
+
+    int hw = int(w / 2);
+    int r0, r1, r2;
+    for (int w0 = -hw; w0 <= hw; w0++) {                                                 // for each pixel in the window
+        r0 = x0 + w0;
+        if (r0 >= 0 && r0 < s0) {
+            for (int w1 = -hw; w1 <= hw; w1++) {
+                r1 = x1 + w1;
+                if (r1 >= 0 && r1 < s1) {
+                    for (int w2 = -hw; w2 <= hw; w2++) {
+                        r2 = x2 + w2;
+                        if (r2 >= 0 && r2 < s2) {
+                            // calculate the contribution of (w0, w1, w2) to (x,y,z)
+                            float Vcart[3];
+                            float theta = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 2];
+                            float phi = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 3];
+
+                            Vcart[0] = sinf(theta) * cosf(phi);
+                            Vcart[1] = sinf(theta) * sinf(phi);
+                            Vcart[2] = cosf(theta);
+                            VoteContribution3D vote = StickVote3D(w2, w1, w0, sigma, sigma2, Vcart, power);
+
+                            //float l0 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 0];
+                            float l1 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 1];
+                            float l2 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 2];
+
+                            scale = fabsf(l2) - fabsf(l1);
+                            if (l2 < 0.0f) scale *= -1;
+
+                            Votee = Votee + scale * vote.votes * vote.decay;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 0] += Votee[0][0];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 1] += Votee[0][1];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 2] += Votee[0][2];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 3] += Votee[1][0];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 4] += Votee[1][1];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 5] += Votee[1][2];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 6] += Votee[2][0];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 7] += Votee[2][1];
+    VT[(x0 * s1 * s2 + x1 * s2 + x2) * 9 + 8] += Votee[2][2];
+}
+
+void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+    unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug) {
+
+    // Declare GPU arrays
+    float* gpuOutputField;
+    float* gpuV;
+    float* gpuL;
+
+    auto start = std::chrono::high_resolution_clock::now();
+    cudaDeviceProp props;
+    HANDLE_ERROR(cudaGetDeviceProperties(&props, device));
+    auto end = std::chrono::high_resolution_clock::now();
+    float t_deviceprops = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    size_t tensorField_bytes =  sizeof(float) * 9 * s0 * s1 * s2;
+    size_t evals_bytes =        sizeof(float) * 3 * s0 * s1 * s2;
+    size_t evecs_bytes =        sizeof(float) * 4 * s0 * s1 * s2;
+
+    start = std::chrono::high_resolution_clock::now();
+    float* L = cudaEigenvalues3(input_field, s0 * s1 * s2, device);
+    float* V = cudaEigenvectors3DPolar(input_field, L, s0 * s1 * s2, device);
+    end = std::chrono::high_resolution_clock::now();
+    float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // Allocate GPU arrays
+    start = std::chrono::high_resolution_clock::now();
+    HANDLE_ERROR(cudaMalloc(&gpuOutputField, tensorField_bytes));
+    HANDLE_ERROR(cudaMemset(gpuOutputField, 0, tensorField_bytes));
+    HANDLE_ERROR(cudaMalloc(&gpuV, evecs_bytes));
+    HANDLE_ERROR(cudaMalloc(&gpuL, evals_bytes));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    float t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    start = std::chrono::high_resolution_clock::now();
+    // Copy input arrays
+    HANDLE_ERROR(cudaMemcpy(gpuV, V, evecs_bytes, cudaMemcpyHostToDevice));
+    HANDLE_ERROR(cudaMemcpy(gpuL, L, evals_bytes, cudaMemcpyHostToDevice));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    float t_host2device = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // Specify the CUDA block and grid dimensions
+    size_t blockDim = sqrt(props.maxThreadsPerBlock);
+    dim3 threads(blockDim, blockDim, blockDim);
+    dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1, s2 / threads.z + 1);
+
+    float sn = 1.0f;          //1.0 / sticknorm2D(sigma, sigma2, power);      The function hasn't been implemented yet...
+
+    if (debug)
+        std::cout << "Stick Area: " << sn << std::endl;
+
+    start = std::chrono::high_resolution_clock::now();
+    if (STICK)
+        kernelStickVote3D << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1, s2);              // call the CUDA kernel for voting
+    if (PLATE)
+        std::cout << "Not yet implemented." << std::endl;
+        //kernelPlateVote2D << <blocks, threads >> > (gpuOutputField, gpuL, gpuV, sigma, sigma2, power, sn, w, s0, s1);
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    float t_voting = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+
+    start = std::chrono::high_resolution_clock::now();
+    // Copy the final result back from the GPU
+    HANDLE_ERROR(cudaMemcpy(output_field, gpuOutputField, tensorField_bytes, cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    float t_device2host = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // Free all of the GPU arrays
+    start = std::chrono::high_resolution_clock::now();
+    HANDLE_ERROR(cudaFree(gpuOutputField));
+    HANDLE_ERROR(cudaFree(gpuV));
+    HANDLE_ERROR(cudaFree(gpuL));
+    cudaDeviceSynchronize();
+    end = std::chrono::high_resolution_clock::now();
+    float t_devicefree = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    if (debug) {
+        std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
+        std::cout << "Voting: " << t_voting << " ms" << std::endl;
+        std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
+        std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
+        std::cout << "cudaMalloc: " << t_devicealloc << " ms" << std::endl;
+        std::cout << "cudaFree: " << t_devicefree << " ms" << std::endl;
+        std::cout << "cudaDeviceProps: " << t_deviceprops << " ms" << std::endl;
+    }
 }
