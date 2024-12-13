@@ -171,30 +171,32 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     l = np.sqrt(x**2 + y**2 + z**2)
     
-    V = stickfield3(x/l, y/l, z/l, X, Y, Z, sigma1, sigma2, power)
+    #V = stickfield3(x/l, y/l, z/l, X, Y, Z, sigma1, sigma2, power)
     
-    # m = np.zeros((3, 3))
-    # m[0, 0] = x * x
-    # m[0, 1] = x * y
-    # m[0, 2] = x * z
-    # m[1, 0] = x * y
-    # m[1, 1] = y * y
-    # m[1, 2] = y * z
-    # m[2, 0] = x * z
-    # m[2, 1] = z * y
-    # m[2, 2] = z * z
+    m = np.zeros((3, 3))
+    m[0, 0] = x * x
+    m[0, 1] = x * y
+    m[0, 2] = x * z
+    m[1, 0] = x * y
+    m[1, 1] = y * y
+    m[1, 2] = y * z
+    m[2, 0] = x * z
+    m[2, 1] = z * y
+    m[2, 2] = z * z
     
-    # l, v = np.linalg.eigh(m)
+    l, v = np.linalg.eigh(m)
     
-    # l[0] = l0
-    # l[1] = l1
-    # l[2] = l2
+    l[0] = l0
+    l[1] = l1
+    l[2] = l2
     
-    # m = v @ np.diag(l) @ v.transpose()
+    m = v @ np.diag(l) @ v.transpose()
     
-    # T[int(N/2), int(N/2), int(N/2)] = m
+    T = np.zeros((N, N, N, 3, 3)).astype(np.float32)
     
-    return V
+    T[int(N/2), int(N/2), int(N/2)] = m
+    
+    return T
 
 #F = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
 #F = it.addGaussian3T(F, 1)

@@ -449,34 +449,32 @@ __global__ void kernelStickVote3D(float* VT, float* L, float* V, float sigma, fl
         return;
 
     glm::mat3 Votee(0.0f);
-    float scale;
-
     int hw = int(w / 2);
-    int r0, r1, r2;
+    //int r0, r1, r2;
     for (int w0 = -hw; w0 <= hw; w0++) {                                                 // for each pixel in the window
-        r0 = x0 + w0;
+        int r0 = x0 + w0;
         if (r0 >= 0 && r0 < s0) {
             for (int w1 = -hw; w1 <= hw; w1++) {
-                r1 = x1 + w1;
+                int r1 = x1 + w1;
                 if (r1 >= 0 && r1 < s1) {
                     for (int w2 = -hw; w2 <= hw; w2++) {
-                        r2 = x2 + w2;
+                        int r2 = x2 + w2;
                         if (r2 >= 0 && r2 < s2) {
                             // calculate the contribution of (w0, w1, w2) to (x,y,z)
                             float Vcart[3];
-                            float theta = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 2];
-                            float phi = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 3];
+                            const float theta = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 2];
+                            const float phi = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 3];
 
                             Vcart[0] = sinf(theta) * cosf(phi);
                             Vcart[1] = sinf(theta) * sinf(phi);
                             Vcart[2] = cosf(theta);
-                            VoteContribution3D vote = StickVote3D(w2, w1, w0, sigma, sigma2, Vcart, power);
+                            VoteContribution3D vote = StickVote3D((float)w2, (float)w1, (float)w0, sigma, sigma2, Vcart, power);
 
                             //float l0 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 0];
-                            float l1 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 1];
-                            float l2 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 2];
+                            const float l1 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 1];
+                            const float l2 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 2];
 
-                            scale = fabsf(l2) - fabsf(l1);
+                            float scale = fabsf(l2) - fabsf(l1);
                             if (l2 < 0.0f) scale *= -1;
 
                             Votee = Votee + scale * vote.votes * vote.decay;
@@ -528,7 +526,7 @@ void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsign
     HANDLE_ERROR(cudaMemset(gpuOutputField, 0, tensorField_bytes));
     HANDLE_ERROR(cudaMalloc(&gpuV, evecs_bytes));
     HANDLE_ERROR(cudaMalloc(&gpuL, evals_bytes));
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     float t_devicealloc = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
@@ -536,13 +534,13 @@ void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsign
     // Copy input arrays
     HANDLE_ERROR(cudaMemcpy(gpuV, V, evecs_bytes, cudaMemcpyHostToDevice));
     HANDLE_ERROR(cudaMemcpy(gpuL, L, evals_bytes, cudaMemcpyHostToDevice));
-    cudaDeviceSynchronize();
+    //cudaDeviceSynchronize();
     end = std::chrono::high_resolution_clock::now();
     float t_host2device = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     // Specify the CUDA block and grid dimensions
     size_t blockDim = sqrt(props.maxThreadsPerBlock);
-    dim3 threads(blockDim, blockDim, blockDim);
+    dim3 threads(blockDim, blockDim, 1);
     dim3 blocks(s0 / threads.x + 1, s1 / threads.y + 1, s2 / threads.z + 1);
 
     float sn = 1.0f;          //1.0 / sticknorm2D(sigma, sigma2, power);      The function hasn't been implemented yet...

@@ -306,11 +306,13 @@ def genSample3D(shape, noise=0):
     #vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
     return vol
 
-size = 50
+size = 100
 vol = genSample3D((size, size, size), 0.6)
 st = st.structure3d(vol.astype(np.float32), 3)
 #vol = st.addGaussian3T(vol, 2)
-np.save('synthetic_vol_50x50x50.npy', st)
+np.save('synthetic.npy', st)
+
+np.save("impulse.npy", tv3.impulse3(size, 1, 0, 0))
 
 #V = tv3.stickvote3(vol, 3, 0)
 #np.save('synthetic_vote_50x50x50.npy', V)

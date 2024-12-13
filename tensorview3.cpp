@@ -639,10 +639,10 @@ void GaussianFilter(const float sigma) {
 }
 
 void TensorVote(const float sigma, const float sigma2, const unsigned int p, const bool stick, const bool plate) {
-	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());
+	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());				// allocate space for the new field
 
 	std::cout << "Tensor voting in progress...\t";
-	const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
+	const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);	// calculate the window size for the vote field
 	cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()),
 		static_cast<unsigned int>(T0.shape()[0]), static_cast<unsigned int>(T0.shape()[1]), static_cast<unsigned int>(T0.shape()[2]),
 		sigma, sigma2, w, p, in_device, stick, plate, false);
