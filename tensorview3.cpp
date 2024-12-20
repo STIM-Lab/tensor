@@ -23,7 +23,7 @@ glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned in
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height,
 	unsigned int& out_depth, int deviceID = 0);
 void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device);
-void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+void cudaVote3D(float* input_field, float* output_field, float* L, float* V, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
 	unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 
 
@@ -639,15 +639,12 @@ void GaussianFilter(const float sigma) {
 }
 
 void TensorVote(const float sigma, const float sigma2, const unsigned int p, const bool stick, const bool plate) {
-	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());				// allocate space for the new field
+	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());								// allocate space for the new field
 
-	std::cout << "Tensor voting in progress...\t";
 	const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);	// calculate the window size for the vote field
-	cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()),
+	cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()), Ln.data(), Vn.data(),
 		static_cast<unsigned int>(T0.shape()[0]), static_cast<unsigned int>(T0.shape()[1]), static_cast<unsigned int>(T0.shape()[2]),
 		sigma, sigma2, w, p, in_device, stick, plate, false);
-
-	std::cout << "Done." << std::endl;
 }
 
 void UpdateEigens() {
@@ -1078,11 +1075,6 @@ void RenderUI() {
 						UpdateEigens();
 						ScalarRefresh();
 					}
-					else {
-						ResetField();
-						UpdateEigens();
-						ScalarRefresh();
-					}
 				}
 				ImGui::SameLine();
 				if (ImGui::InputFloat("##Sigma", &SIGMA, 0.2f, 1.0f)) {
@@ -1097,7 +1089,8 @@ void RenderUI() {
 				///////////////////////////////////////////////  Tensor Voting  ///////////////////////////////////////////////////
 
 				if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
-					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
+					ResetField();
+					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 					UpdateEigens();
 					ScalarRefresh();
 				}
@@ -1105,7 +1098,7 @@ void RenderUI() {
 				if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f)) {
 					if (TV_SIGMA1 < 0) TV_SIGMA1 = 0.0;
 					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 						UpdateEigens();
 						ScalarRefresh();
 					}
@@ -1113,7 +1106,7 @@ void RenderUI() {
 				if (ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f)) {
 					if (TV_SIGMA2 < 0) TV_SIGMA2 = 0.0;
 					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 						UpdateEigens();
 						ScalarRefresh();
 					}
@@ -1121,7 +1114,7 @@ void RenderUI() {
 				if (ImGui::InputInt("Power", &TV_POWER, 1, 5)) {
 					if (TV_POWER < 1) TV_POWER = 1;
 					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, true, false);
+						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 						UpdateEigens();
 						ScalarRefresh();
 					}
@@ -1131,14 +1124,12 @@ void RenderUI() {
 					UpdateEigens();
 					ScalarRefresh();
 				}
-				ImGui::BeginDisabled();
 				ImGui::SameLine();
 				if (ImGui::Checkbox("Plate", &TV_PLATE)) {
 					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 					UpdateEigens();
 					ScalarRefresh();
 				}
-				ImGui::EndDisabled();
 				ImGui::EndTabItem();
 			}
 
