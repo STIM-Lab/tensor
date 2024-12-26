@@ -6,15 +6,6 @@ import matplotlib.pyplot as plt
 
 
 
-'''
-
-arg1: input file
-arg2: output file
-arg3: sigma for image to tensor conversion
-arg: tensor voting sigma
-
-'''
-
 def eigmag(T):
     
     eigenValues, eigenVectors = np.linalg.eigh(T)
@@ -44,7 +35,6 @@ def eta(sigma1, sigma2, p):
     
     integral =  np.pi * (term1 + term2)
     return 1.0 / integral
-
 
 def decay_integrate(sigma1, sigma2=0, power=1, N=100, L_max=10):
     total = 0
@@ -163,6 +153,113 @@ def stickvote3(T, sigma=3, sigma2=0):
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
+def platefield3(RX, RY, RZ, sigma1, sigma2=0):
+    # calculate the length (distance) value
+    L = np.sqrt(RX**2 + RY**2 + RZ**2)
+    
+    # define required matrices
+    I_tilde = np.eye(3)
+    I_tilde[2, 2] = 0
+    
+    # calculate the direction matrix
+    d = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 1))
+    d[:, :, :, 0, 0] = np.divide(RX, L, where=L!=0)
+    d[:, :, :, 1, 0] = np.divide(RY, L, where=L!=0)
+    d[:, :, :, 2, 0] = np.divide(RZ, L, where=L!=0)
+    dt = np.transpose(d, axes=(0, 1, 2, 4, 3))
+    D = np.matmul(d, dt)
+    D_tilde = np.matmul(I_tilde, D)
+    
+    ALPHA = RX ** 2 + RY ** 2
+    ALPHA = ALPHA[:, :, :, None, None]
+    # define the terms
+    shared_term = D_tilde + np.transpose(D_tilde, axes=(0, 1, 2, 4, 3)) - (2*ALPHA*D)
+    A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
+    A = (np.pi / 2) * ((1-0.25*ALPHA-0.5*D_tilde) * I_tilde - 
+        2*(1 + 3*ALPHA)*shared_term)
+
+    B = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
+    B = (np.pi / 8) * (ALPHA * I_tilde + 2 * D_tilde * I_tilde - (6 * ALPHA) * shared_term)
+    
+    # define exponential values
+    e1 = 0
+    e2 = 0
+    if(sigma1 > 0):
+        e1 = np.exp(- L**2 / sigma1**2)
+        e1 = e1[:, :, :, np.newaxis, np.newaxis]
+    if (sigma2 > 0):
+        e2 = np.exp(- L**2 / sigma2**2)
+        e2[:, :, :, np.newaxis, np.newaxis]
+        
+    return (e1 * A) + (e2 * B)
+
+def platefield3_numerical(RX, RY, RZ, sigma1, sigma2=0, N=10):
+    T = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
+    
+    dbeta = np.pi / N
+    for n in range(N):
+        x = np.cos(n * dbeta)
+        y = np.sin(n * dbeta)
+        z = 0
+        T = T + (1.0 / N) * stickfield3(x, y, z, RX, RY, RZ, sigma1, sigma2)
+        
+    return T
+
+def platevote3_numerical(T, sigma=3, sigma2=0, N=10):
+    # perform eigendecomposition (eigenvalues requireed)
+    evals, _ = eigmag(T)
+    evals_mag = np.abs(evals)
+    
+    # optimal window size
+    sigmax = max(sigma, sigma2)
+    w = int(6 * sigmax + 1)
+    x = np.linspace(-(w-1)/2, (w-1)/2, w)
+    X0, X1, X2 = np.meshgrid(x, x, x)
+    
+    # padded vote field to store the resutls
+    pad = int(3 * sigmax)
+    Z = np.zeros(T.shape, dtype=np.float32)
+    VF = np.pad(Z, ((pad, pad), (pad, pad), (pad, pad), (0, 0), (0, 0)))
+    
+    # for each pixel in the tensor field
+    for x0 in range(T.shape[0]):
+        print('x0: ', end='')
+        for x1 in range(T.shape[1]):
+            for x2 in range(T.shape[2]):
+                scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
+                P = scale * platefield3_numerical(X0, X1, X2, sigma, sigma2)
+                VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
+        print(x0)
+    return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
+
+def platevote3(T, sigma=3, sigma2=0):
+    # perform eigendecomposition (eigenvalues requireed)
+    evals, _ = eigmag(T)
+    evals_mag = np.abs(evals)
+    
+    sigmax = max(sigma, sigma2)
+    
+    # optimal window size
+    w = int(6 * sigmax + 1)
+    x = np.linspace(-(w-1)/2, (w-1)/2, w)
+    X0, X1, X2 = np.meshgrid(x, x, x)
+    
+    # padded vote field to store the resutls
+    pad = int(3 * sigmax)
+    Z = np.zeros(T.shape, dtype=np.float32)
+    VF = np.pad(Z, ((pad, pad), (pad, pad), (pad, pad), (0, 0), (0, 0)))
+    
+    # for each pixel in the tensor field
+    for x0 in range(T.shape[0]):
+        print('x0: ', end='')
+        for x1 in range(T.shape[1]):
+            for x2 in range(T.shape[2]):
+                scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
+                P = scale * platefield3(X0, X1, X2, sigma, sigma2)
+                VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
+        print(x0)
+    return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
+
 # generate an impulse tensor field to test tensor voting
 def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
@@ -198,15 +295,6 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     return T
 
-#F = impulse3(101, 1, 0, 0, sigma1=20, sigma2=0, power=1)
-#F = it.addGaussian3T(F, 1)
-#np.save("stickfield_100.npy", F.astype(np.float32))
 
-#V = stickvote3(F, 3, 0)
-#np.save('stickvote_100.npy', V)
-
-# volume = np.load('synthetic_vol.npy')
-# structure = it.structure3d(volume, sigma=3).astype(np.float32)
-# np.save('../../build/tensor/tensor_synth.npy', structure)
-# V = stickvote3(structure, 3, 0)
-# np.save('../../build/tensor/vote_synth.npy', V)
+#imp = impulse3(51, 1, 0, 0, 1, 1, 0)
+#ehem = platevote3(imp)

@@ -676,6 +676,14 @@ void ScalarRefresh() {
 	}
 }
 
+void UpdateTensorField() {
+	std::cout << std::format("Sigma1: {},\t Sigma2: {}, \t Power: {}, \t Stick: {}, \t Plate: {}\n", 
+		TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
+	TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
+	UpdateEigens();
+	ScalarRefresh();
+}
+
 void UpdateCamera() {
 	Camera.lookat({ Tn.sx() / 2.0f, Tn.sy() / 2.0f, Tn.sz() / 2.0f });
 	Camera.distance(Tn.smax() * 2);
@@ -925,11 +933,7 @@ void RenderUI() {
 				///////////////////////////////////////////////   Cropping   ///////////////////////////////////////////////////
 				ImGui::Dummy(ImVec2(0.0, 5.0f));
 
-				ImGui::Indent();
-				ImGui::Text("Position");
-				ImGui::SameLine();
-				ImGui::Text("Width");
-				ImGui::Unindent();
+				ImGui::LabelText("Position", "Width");
 
 				float child_width = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x * 2;
 
@@ -1061,7 +1065,8 @@ void RenderUI() {
 				ImGui::SeparatorText("Filter");
 				ImGui::Dummy(ImVec2(0.0, 5.0f));
 
-				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing)) {
+				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing) ||
+					(PROCESSINGTYPE == ProcessingType::Vote && !TV_STICK && !TV_PLATE)) {
 					ResetField();
 					UpdateEigens();
 					ScalarRefresh();
@@ -1089,50 +1094,34 @@ void RenderUI() {
 				///////////////////////////////////////////////  Tensor Voting  ///////////////////////////////////////////////////
 
 				if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
-					ResetField();
-					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-					UpdateEigens();
-					ScalarRefresh();
+					UpdateTensorField();
 				}
 
-				if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f)) {
-					if (TV_SIGMA1 < 0) TV_SIGMA1 = 0.0;
-					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-						UpdateEigens();
-						ScalarRefresh();
-					}
+				if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f) && PROCESSINGTYPE == ProcessingType::Vote) {
+					TV_SIGMA1 = std::max(0.0f, TV_SIGMA1);
+					if(ImGui::IsItemEdited()) UpdateTensorField();
 				}
-				if (ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f)) {
-					if (TV_SIGMA2 < 0) TV_SIGMA2 = 0.0;
-					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-						UpdateEigens();
-						ScalarRefresh();
-					}
+				
+				if(ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f) && PROCESSINGTYPE == ProcessingType::Vote) {
+					TV_SIGMA2 = std::max(0.0f, TV_SIGMA2);
+					if (ImGui::IsItemEdited()) UpdateTensorField();
 				}
-				if (ImGui::InputInt("Power", &TV_POWER, 1, 5)) {
-					if (TV_POWER < 1) TV_POWER = 1;
-					if (PROCESSINGTYPE == ProcessingType::Vote) {
-						TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-						UpdateEigens();
-						ScalarRefresh();
-					}
+
+				if (ImGui::InputInt("Power", &TV_POWER, 1, 5) && PROCESSINGTYPE == ProcessingType::Vote) {
+					TV_POWER = std::max(1, TV_POWER);
+					UpdateTensorField();
 				}
-				if (ImGui::Checkbox("Stick", &TV_STICK)) {
-					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-					UpdateEigens();
-					ScalarRefresh();
-				}
+
+				if (ImGui::Checkbox("Stick", &TV_STICK) && PROCESSINGTYPE == ProcessingType::Vote)
+					UpdateTensorField();
 				ImGui::SameLine();
-				if (ImGui::Checkbox("Plate", &TV_PLATE)) {
-					TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
-					UpdateEigens();
-					ScalarRefresh();
-				}
+				if (ImGui::Checkbox("Plate", &TV_PLATE) && PROCESSINGTYPE == ProcessingType::Vote)
+					UpdateTensorField();
+
 				ImGui::EndTabItem();
 			}
 
+			// Third tab
 			if (ImGui::BeginTabItem("Profiling")) {
 				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
 				ImGui::SeparatorText("CUDA Device");
@@ -1172,33 +1161,6 @@ void RenderUI() {
 				ImGui::Text("Gaussian Blur: %f s", t_gaussian);
 			}
 
-			// Third tab
-			if (ImGui::BeginTabItem("Previous"))
-			{
-				ImGui::Text("Implementations from the previous version of tensorview3d");
-
-				// Filter anisotropy using a threshold filter option
-				ImGui::SeparatorText("Anisotropy");
-				ImGui::Combo(" ", &anisotropy, "All\0Linear\0Planar\0Spherical\0\0");
-				ImGui::Spacing();
-				ImGui::SliderFloat("Filter", &filter, 0.1f, 1.0f);
-				ImGui::Spacing(); ImGui::Spacing();
-
-				// Show colormapped image based on shortest/longest eigenvector
-				ImGui::SeparatorText("IDK");
-				ImGui::Combo("\t", &cmap, "LongestVector\0ShortestVector\0\0");
-				ImGui::Spacing(); ImGui::Spacing();
-
-				// Adjust a threshold for eigenvalues corresponding to each tensor
-				ImGui::SeparatorText("Largest Eigenvalue Threshold");
-				static float begin = 0.f, end = 125.f, step = 0.005f;
-				ImGui::DragFloatRange2("Range", &begin, &end, 0.25f, 0.0f, 100, "Min: %.1f", "Max: %.1f");
-				ImGui::DragFloat("Step", &step, 0.00001, 0.0f, 1.0f, "%.6f");
-				ImGui::DragFloat("Threshold", &thresh, step, begin, end, "%.6f");
-				ImGui::Spacing(); ImGui::Spacing();
-
-				ImGui::EndTabItem();
-			}
 			ImGui::EndTabBar();
 		}
 
