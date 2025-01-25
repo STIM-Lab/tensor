@@ -179,6 +179,10 @@ void LoadTensorField(const std::string& filename) {
     FIELD_LOADED = true;
 }
 
+void SaveTensorField(const std::string& filename) {
+    T0.save_npy(filename);
+}
+
 /// <summary>
 /// Function used to access individual elements of a 2D tensor
 /// </summary>
@@ -480,9 +484,9 @@ void RenderUI() {
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
     ImGui::Text("File: %s", FileName == nullptr ? "N/A" : FileName);
 
-    if (ImGui::Button("Load File"))					// create a button for loading the shader
-        ImGuiFileDialog::Instance()->OpenDialog("ChooseNpyFile", "Choose NPY File", ".npy,.npz", ".");
-    if (ImGuiFileDialog::Instance()->Display("ChooseNpyFile")) {				    // if the user opened a file dialog
+    if (ImGui::Button("Load Field"))					// create a button for loading the shader
+        ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz", ".");
+    if (ImGuiFileDialog::Instance()->Display("LoadNpyFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
@@ -499,6 +503,18 @@ void RenderUI() {
         ImGuiFileDialog::Instance()->Close();									// close the file dialog box		
     }
 
+    if (ImGui::Button("Save Field"))
+        ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz", ".");
+    if (ImGuiFileDialog::Instance()->Display("SaveNpyFile")) {				    // if the user opened a file dialog
+        if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+
+            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+                Tn.save_npy<float>(filename);
+            }
+        }
+        ImGuiFileDialog::Instance()->Close();									// close the file dialog box		
+    }
     RenderFieldSpecs();
 
     // select scalar component

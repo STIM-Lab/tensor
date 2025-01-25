@@ -678,7 +678,7 @@ void cudaVote3D(float* input_field, float* output_field, float* L, float* V, uns
     float t_devicefree = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
     if (debug) {
-        std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
+        //std::cout << "Eigendecomposition:  " << t_eigendecomposition << " ms" << std::endl;
         std::cout << "Voting: " << t_voting << " ms" << std::endl;
         std::cout << "cudaMemcpy (H->D):  " << t_host2device << " ms" << std::endl;
         std::cout << "cudaMemcpy (D->H):  " << t_device2host << " ms" << std::endl;
