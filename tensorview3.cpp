@@ -235,11 +235,7 @@ static void cursor_position_callback(GLFWwindow* window, double xpos, double ypo
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-	if (TENSOR_LOADED) {
-		/*scroll_value += yoffset;
-		if (scroll_value < 0) scroll_value = 0;
-		if (scroll_value >= Tn.Z()) scroll_value = Tn.Z() - 1;
-		std::cout << scroll_value << std::endl;*/
+	if (TENSOR_LOADED && window_focused) {
 		zoom += 0.2 * yoffset;
 		zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
 	}
@@ -856,7 +852,7 @@ void RenderUI() {
 
 		ImGui::Begin("Tensor");
 
-		window_focused = (ImGui::IsAnyItemHovered()) ? false : true;
+		window_focused = (ImGui::IsWindowHovered()) ? false : true;
 
 		// Change style 
 		ImGuiStyle& style = ImGui::GetStyle();
@@ -867,7 +863,7 @@ void RenderUI() {
 		if (ImGui::BeginTabBar("MyTabBar"))
 		{
 
-			// First tab
+			// 1st tab
 			if (ImGui::BeginTabItem("Tensor Field"))
 			{
 				////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
@@ -896,7 +892,9 @@ void RenderUI() {
 				ImGui::PushItemWidth(-100);
 				ImGui::SliderFloat("alpha", &alpha, 0.01f, 1.0f, "%.2f");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+
 				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
+
 				ImGui::SeparatorText("Planes");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 
@@ -921,6 +919,7 @@ void RenderUI() {
 				ImGui::SliderFloat("##EFPosition", &EN_FACE_POSITION, -Tn.smax(), Tn.smax() );
 
 				///////////////////////////////////////////////  Render Volume  //////////////////////////////////////////////////
+
 				ImGui::SeparatorText("Volume");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
 
@@ -931,12 +930,12 @@ void RenderUI() {
 				ImGui::Dummy(ImVec2(0.0, 5.0f));
 
 				///////////////////////////////////////////////   Cropping   ///////////////////////////////////////////////////
+				
 				ImGui::Dummy(ImVec2(0.0, 5.0f));
+				ImGui::LabelText("Width", "Position");
 
-				ImGui::LabelText("Position", "Width");
-
-				float child_width = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x * 2;
-
+				float child_width = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 4 - ImGui::GetStyle().ItemInnerSpacing.x * 2;
+				
 				// position control
 				ImGui::BeginChild("position", ImVec2(child_width / 2.0f, 175), ImGuiChildFlags_Border);
 				for (int i = 0; i < 3; i++) {
@@ -971,15 +970,18 @@ void RenderUI() {
 					ImGui::PopID();
 				}
 				ImGui::EndChild();
-
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+
 				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
+
 				ImGui::SeparatorText("Scalar Visualization");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-
-				if (ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal)) {
+				bool eigenvalues = ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal);
+				if (eigenvalues) {
 					ColormapEval(SCALAR_EVAL);
 				}
+				/*float space = ImGui::GetItemRectSize().x;
+				ImGui::PushItemWidth(space);*/
 				if (ImGui::InputInt("Eigenvalue", &SCALAR_EVAL)) {
 					if (SCALAR_EVAL < 0) SCALAR_EVAL = 0;
 					if (SCALAR_EVAL > 2) SCALAR_EVAL = 2;
@@ -1019,9 +1021,11 @@ void RenderUI() {
 					if (SCALAR_EVEC > 2) SCALAR_EVEC = 2;
 					if (SCALAR_TYPE == ScalarType::EVec) ColormapEvec(SCALAR_EVEC);
 				}
-
+				//ImGui::PopItemWidth();
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+
 				//////////////////////////////////////////  Orthogonal / Perspective View  /////////////////////////////////////////
+				
 				// Use perspective view instead of ortho view
 				ImGui::SeparatorText("Projection");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
@@ -1034,6 +1038,7 @@ void RenderUI() {
 				ImGui::Spacing(); ImGui::Spacing();
 
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+
 				//////////////////////////////////////////////////     Zoom      //////////////////////////////////////////////////
 				// Zooming in and out option
 				ImGui::SeparatorText("Zoom");
@@ -1044,21 +1049,21 @@ void RenderUI() {
 				ImGui::SameLine();
 				if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
 				ImGui::Spacing(); ImGui::Spacing();
-
 				ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
 				///////////////////////////////////////////////////   Reset View   //////////////////////////////////////////////////
 				ImGui::SeparatorText("Reset");
 				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-				float avail = ImGui::GetContentRegionAvail().x;
-				float off = (avail - 50) * 0.5f;
-				if (off > 0.0f)
-					ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-				RESET = ImGui::Button("Reset", ImVec2(50, 50));
+				//float avail = ImGui::GetContentRegionAvail().x;
+				//float off = (avail - 50) * 0.5f;
+				//if (off > 0.0f)
+				//	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+				RESET = ImGui::Button("Reset", ImVec2(50, 25));
 
 				ImGui::EndTabItem();
 			}
 
-			// Second tab
+			// 2nd tab
 			if (ImGui::BeginTabItem("Processing"))
 			{
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
@@ -1121,7 +1126,43 @@ void RenderUI() {
 				ImGui::EndTabItem();
 			}
 
-			// Third tab
+			// 3rd tab
+			if (ImGui::BeginTabItem("Data"))
+			{
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::SeparatorText("Eigenvalues");
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
+
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::SeparatorText("Eigenvectors");
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
+
+
+
+				if (ImGui::BeginTable("table1", 3))
+				{
+					ImGui::TableSetupColumn("v1");
+					ImGui::TableSetupColumn("v2");
+					ImGui::TableSetupColumn("v3");
+					ImGui::TableHeadersRow();
+
+					for (int row = 0; row < 5; row++)
+					{
+						ImGui::TableNextRow();
+						for (int column = 0; column < 3; column++)
+						{
+							ImGui::TableSetColumnIndex(column);
+							char buf[32];
+							sprintf(buf, "Eigenvectors");
+							ImGui::TextUnformatted(buf);
+						}
+					}
+					ImGui::EndTable();
+				}
+				ImGui::EndTabItem();
+			}
+
+			// 4th tab
 			if (ImGui::BeginTabItem("Profiling")) {
 				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
 				ImGui::SeparatorText("CUDA Device");
@@ -1365,7 +1406,7 @@ int main(int argc, char** argv) {
 		float aspect = (float)display_w / (float)display_h;
 		glViewport(0, 0, display_w, display_h);								// specifies the area of the window where OpenGL can render
 		glm::mat4 Mproj;													// calculate the projection matrix from the camera
-		if (perspective) Mproj = Camera.perspectivematrix(aspect);
+		if (perspective) Mproj = Camera.perspectivematrix(aspect, 2.0f, zoom);
 		else Mproj = Camera.orthomatrix(aspect, zoom, move[0], move[1]);
 
 		glm::mat4 Mview = Camera.viewmatrix();								// get the view transformation matrix

@@ -286,7 +286,6 @@ __global__ void kernelPlateVote2D(float* VT, float* L, float* V, float sigma1, f
         r0 = x0 + v;
         if (r0 >= 0 && r0 < s0) {
             for (int u = -hw; u < hw; u++) {
-
                 r1 = x1 + u;
                 if (r1 >= 0 && r1 < s1) {
                     float l0 = L[(r0 * s1 + r1) * 2 + 0];
@@ -439,18 +438,19 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     float s22 = sigma2 * sigma2;
     
     // repeated terms
-    glm::mat3 I_tilde(1.0f);
+    glm::mat3 I_tilde(1.0f);                                                // default constructor creates a identity matrix
     I_tilde[2][2] = 0.0f;
     float alpha = (dx * dx + dy * dy);
-    glm::mat3 temp = I_tilde * D + (D * I_tilde) - 2 * alpha * D;
+    glm::mat3 D_tilde = I_tilde * D;
+    glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2 * alpha * D;
 
     // First term
-    glm::mat3 term1_a = (1.0f - (0.25f * alpha) - (0.5f * I_tilde * D)) * I_tilde;
-    glm::mat3 term1_b = (2.0f - (3.0f / 2.0f) * alpha) * temp;
-    glm::mat3 term1 = (term1_a - term1_b); //  * (0.5f * PI)
+    glm::mat3 termA_a = (1.0f - (0.25f * alpha) - (0.5f * D_tilde)) * I_tilde;
+    glm::mat3 termA_b = (2.0f + 6.0f * alpha) * shared_term;
+    glm::mat3 term_A = termA_a - termA_b;
 
     // Second term
-    glm::mat3 term2 = (alpha * I_tilde) + (2.0f * I_tilde * D * I_tilde) - 6.0f * alpha * temp; // * PI/8
+    glm::mat3 term_B = (alpha * I_tilde) + (2.0f * D_tilde * I_tilde) - (6.0f * alpha * shared_term);
 
     float e1 = 0;
     if (sigma1 > 0)
@@ -462,7 +462,7 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     // float norm = something;
     float c1 = PI / 2.0f;
     float c2 = PI / 8.0f;
-    return (e1 * c1 * term1) + (e2 * c2 * term2);
+    return (e1 * c1 * term_A) + (e2 * c2 * term_B);
 }
 
 /// @brief The kernel to perform the 3D stick tensor voting on the GPU

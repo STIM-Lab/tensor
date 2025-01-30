@@ -169,17 +169,20 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     dt = np.transpose(d, axes=(0, 1, 2, 4, 3))
     D = np.matmul(d, dt)
     D_tilde = np.matmul(I_tilde, D)
+    D_tilde_T = np.transpose(D_tilde, axes=(0, 1, 2, 4, 3))
+    ALPHA = (d[:, :, :, 0, 0]**2) + (d[:, :, :, 1, 0]**2)
+    ALPHA = ALPHA[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
+    print('shape D: ', D_tilde.shape)
+    print('shape alpha: ', ALPHA.shape) 
     
-    ALPHA = RX ** 2 + RY ** 2
-    ALPHA = ALPHA[:, :, :, None, None]
     # define the terms
-    shared_term = D_tilde + np.transpose(D_tilde, axes=(0, 1, 2, 4, 3)) - (2*ALPHA*D)
+    shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
     A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
-    A = (np.pi / 2) * ((1-0.25*ALPHA-0.5*D_tilde) * I_tilde - 
-        2*(1 + 3*ALPHA)*shared_term)
+    A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde - 
+        2 * (1 + 3*ALPHA) * shared_term)
 
-    B = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
-    B = (np.pi / 8) * (ALPHA * I_tilde + 2 * D_tilde * I_tilde - (6 * ALPHA) * shared_term)
+    B = np.zeros(A.shape)
+    B = (np.pi / 8) * (ALPHA * I_tilde + 2 * np.matmul(D_tilde, I_tilde) - (6 * ALPHA * shared_term))
     
     # define exponential values
     e1 = 0
@@ -269,32 +272,34 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     l = np.sqrt(x**2 + y**2 + z**2)
     
     #V = stickfield3(x/l, y/l, z/l, X, Y, Z, sigma1, sigma2, power)
+    P = platefield3(X, Y, Z, sigma1, sigma2)
     
-    m = np.zeros((3, 3))
-    m[0, 0] = x * x
-    m[0, 1] = x * y
-    m[0, 2] = x * z
-    m[1, 0] = x * y
-    m[1, 1] = y * y
-    m[1, 2] = y * z
-    m[2, 0] = x * z
-    m[2, 1] = z * y
-    m[2, 2] = z * z
+    # m = np.zeros((3, 3))
+    # m[0, 0] = x * x
+    # m[0, 1] = x * y
+    # m[0, 2] = x * z
+    # m[1, 0] = x * y
+    # m[1, 1] = y * y
+    # m[1, 2] = y * z
+    # m[2, 0] = x * z
+    # m[2, 1] = z * y
+    # m[2, 2] = z * z
     
-    l, v = np.linalg.eigh(m)
+    # l, v = np.linalg.eigh(m)
     
-    l[0] = l0
-    l[1] = l1
-    l[2] = l2
+    # l[0] = l0
+    # l[1] = l1
+    # l[2] = l2
     
-    m = v @ np.diag(l) @ v.transpose()
+    # m = v @ np.diag(l) @ v.transpose()
     
-    T = np.zeros((N, N, N, 3, 3)).astype(np.float32)
+    # T = np.zeros((N, N, N, 3, 3)).astype(np.float32)
     
-    T[int(N/2), int(N/2), int(N/2)] = m
+    # T[int(N/2), int(N/2), int(N/2)] = m
     
-    return T
+    # return T
+    return P
 
 
-#imp = impulse3(51, 1, 0, 0, 1, 1, 0)
-#ehem = platevote3(imp)
+imp = impulse3(101, 1, 0, 0, 1, 1, 0)
+np.save('../../build/tensor/impulse_plate_field.npy', imp.astype(np.float32))

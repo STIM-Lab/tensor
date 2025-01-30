@@ -14,6 +14,8 @@ void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
+void cudaVote3D(float* input_field, float* output_field, float* L, float* V, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+    unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
 float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
@@ -117,7 +119,6 @@ void cpuVote2D(float *input_field, float *output_field, unsigned int s0, unsigne
                             receiver = receiver + scale * vote.votes * vote.decay;
 
                             if (PLATE) {                        // apply the plate vote
-                                
                                 scale = L[(r0 * s1 + r1) * 2 + 0];
                                 //receiver = receiver + scale * vote.votes * vote.decay;
                                 receiver = receiver + PlateVote2D(u, v, sigma, sigma2);
@@ -350,8 +351,7 @@ int main(int argc, char *argv[]) {
     }
     // GPU implementation for 3D
     else if (in_device >= 0 && dim == 5) {
-        std::cout << "Not yet implemented" << std::endl;
-        return 0;
+        cudaVote3D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], T.shape()[2], in_sigma, in_sigma2, in_window, in_power, in_device, STICK, PLATE, debug);
     }
     else {
         std::cout << "Invalid cuda device or volume input. Selected device: " << in_device << "\t, Dimension: " << dim << std::endl;
