@@ -35,6 +35,11 @@ def eta(sigma1, sigma2, p):
     integral = (num / den) * s
     return 1.0 / integral
     
+# calculates the voting field for a stick tensor using refined tensor voting (Goharbavang, et al., 2025)
+# qx, qy is the eigenvector direction
+# RX, RY are the x and y coordinates for the field
+# sigma1, sigma2 are the standard deviations for the refined tensor voting algorithm
+# power is the refinement term
 def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     
     q = np.zeros((2, 1))
@@ -77,8 +82,7 @@ def stickfield2(qx, qy, RX, RY, sigma1, sigma2=0, power=1):
     V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
     return V
 
-# calculate the vote result of the tensor field T
-# k is the eigenvector used as the voting direction
+# calculate the vote result of the tensor field T using refined tensor voting (Goharbavang, et al., 2025)
 # sigma is the standard deviation of the vote field
 def stickvote2(T, sigma=3, sigma2=0):
     
@@ -107,6 +111,9 @@ def stickvote2(T, sigma=3, sigma2=0):
             VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] = VF[x0:x0 + S.shape[0], x1:x1 + S.shape[1]] + S
     return VF[pad:-pad, pad:-pad, :, :]
 
+# calculates the voting field for a plate tensor using refined tensor voting (Goharbavang, et al., 2025)
+# RX, RY are the x and y coordinates for the field
+# sigma1, sigma2 are the standard deviations for the refined tensor voting algorithm
 def platefield2(RX, RY, sigma1, sigma2=0):
     
     ALPHA = np.arctan2(RY, RX)

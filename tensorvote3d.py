@@ -67,7 +67,8 @@ def decay_integrate(sigma1, sigma2=0, power=1, N=100, L_max=10):
     
     return total
     
-# calculates the 3D stick field
+# calculates the voting field for a stick tensor using refined tensor voting
+# qx, qy, qz is the orientation of the stick field (largest eigenvector)
 def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     q = np.zeros((3, 1))
@@ -153,7 +154,12 @@ def stickvote3(T, sigma=3, sigma2=0):
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
-def platefield3(RX, RY, RZ, sigma1, sigma2=0):
+# calculates the voting field for a stick tensor using refined tensor voting
+# qx, qy, qz is the orientation of the plate field (smallest eigenvector)
+def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
+    
+    
+def platefield3_old(RX, RY, RZ, sigma1, sigma2=0):
     # calculate the length (distance) value
     L = np.sqrt(RX**2 + RY**2 + RZ**2)
     
@@ -264,6 +270,10 @@ def platevote3(T, sigma=3, sigma2=0):
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
 # generate an impulse tensor field to test tensor voting
+# N is the size of the field (it will be a cube)
+# x, y, z is the orientation of the largest eigenvector
+# l2, l1, l0 are the eigenvalues, where l2 >= l1 >= l0
+# sigma1 and sigma2
 def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     
     r = np.linspace(-N/2, N/2, N)
@@ -302,4 +312,4 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
 
 
 imp = impulse3(101, 1, 0, 0, 1, 1, 0)
-np.save('../../build/tensor/impulse_plate_field.npy', imp.astype(np.float32))
+np.save('impulse_plate_field.npy', imp.astype(np.float32))
