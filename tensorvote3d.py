@@ -154,12 +154,8 @@ def stickvote3(T, sigma=3, sigma2=0):
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
-# calculates the voting field for a stick tensor using refined tensor voting
-# qx, qy, qz is the orientation of the plate field (smallest eigenvector)
-def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
-    
-    
-def platefield3_old(RX, RY, RZ, sigma1, sigma2=0):
+   
+def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     # calculate the length (distance) value
     L = np.sqrt(RX**2 + RY**2 + RZ**2)
     
@@ -269,6 +265,7 @@ def platevote3(T, sigma=3, sigma2=0):
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
+
 # generate an impulse tensor field to test tensor voting
 # N is the size of the field (it will be a cube)
 # x, y, z is the orientation of the largest eigenvector
@@ -310,6 +307,73 @@ def impulse3(N, x, y, z, l2=1, l1=0, l0=0, sigma1=5, sigma2=0, power=1):
     # return T
     return P
 
+def sanityfield3(N):
+    x = np.linspace(0, 1, N)
+    X, Y, Z = np.meshgrid(x, x, x)
+    
+    T = np.zeros((N, N, N, 3, 3))
+    T[:, :, :, 0, 0] = X * X
+    T[:, :, :, 0, 1] = X * Y
+    T[:, :, :, 0, 2] = X * Z
+    
+    T[:, :, :, 1, 0] = Y * X
+    T[:, :, :, 1, 1] = Y * Y
+    T[:, :, :, 1, 2] = Y * Z
+    
+    T[:, :, :, 2, 0] = Z * X
+    T[:, :, :, 2, 1] = Z * Y
+    T[:, :, :, 2, 2] = Z * Z
+    
+    return T
 
-imp = impulse3(101, 1, 0, 0, 1, 1, 0)
-np.save('impulse_plate_field.npy', imp.astype(np.float32))
+def visualize3(P):
+    vals, vecs = np.linalg.eigh(P)
+    l0 = vals[:, :, 0]
+    l1 = vals[:, :, 1]
+    l2 = vals[:, :, 2]
+    
+    plt.subplot(2, 3, 1)
+    plt.imshow(l0)
+    plt.subplot(2, 3, 2)
+    plt.imshow(l1)
+    plt.subplot(2, 3, 3)
+    plt.imshow(l2)
+    
+    plt.subplot(2, 3, 4)
+    l2_l1 = l2 - l1
+    l0l1l2 = l0 + l1 + l2
+    Cl = np.divide(l2_l1, l0l1l2, out=np.zeros_like(l0), where=l0l1l2!=0)
+    plt.imshow(Cl, vmin=0, vmax=1)
+    plt.title("Linear Anisotropy")
+    
+    plt.subplot(2, 3, 5)
+    twol1_l0 = 2 * (l1 - l0)
+    l0l1l2 = l0 + l1 + l2
+    Cp = np.divide(twol1_l0, l0l1l2, out=np.zeros_like(l0), where=l0l1l2!=0)    
+    plt.imshow(Cp, vmin=0, vmax=1)
+    plt.title("Plate Anisotropy")
+    
+    plt.subplot(2, 3, 6)
+    threel0 = 3 * l0
+    l0l1l2 = l0 + l1 + l2
+    Cs = np.divide(threel0, l0l1l2, out=np.zeros_like(l0), where=l0l1l2!=0)    
+    plt.imshow(Cs, vmin=0, vmax=1)
+    plt.title("Spherical Anisotropy")
+    
+
+
+N = 101
+sigma = 2
+x = np.linspace(-10, 10, N)
+X, Y, Z = np.meshgrid(x, x, x)
+
+S = stickfield3(1, 0, 0, X, Y, Z, 2)
+np.save('stick_field3.npy', S.astype(np.float32))
+
+P = platefield3_numerical(X, Y, Z, 2, 0, 20)
+np.save('plate_field3.npy', P.astype(np.float32))
+
+T = sanityfield3(N)
+np.save('sanity_field3.npy', T.astype(np.float32))
+
+visualize3(P[:, 50, :, :, :])
