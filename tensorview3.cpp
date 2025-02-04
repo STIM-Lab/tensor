@@ -313,6 +313,27 @@ void InitGLEW() {
 	}
 }
 
+std::vector<std::vector<float>> GetEigenVectors(float theta1, float theta2, float phi1, float phi2) {
+	std::vector<std::vector<float>> eigenvecs;
+	float x, y, z;
+	// V1
+	x = sin(theta1) * cos(phi1);
+	y = sin(theta1) * sin(phi1);
+	z = cos(theta1);
+	eigenvecs[1] = { x, y, z };
+	// V2
+	x = sin(theta2) * cos(phi2);
+	y = sin(theta2) * sin(phi2);
+	z = cos(theta2);
+	eigenvecs[2] = { x, y, z };
+	// V0 - obtained using cross product of the other two eigenvectors
+	x = eigenvecs[1][1] * eigenvecs[2][2] - eigenvecs[1][2] * eigenvecs[2][1];
+	y = eigenvecs[1][2] * eigenvecs[2][0] - eigenvecs[1][0] * eigenvecs[2][2];
+	z = eigenvecs[1][0] * eigenvecs[2][1] - eigenvecs[1][1] * eigenvecs[2][0];
+	eigenvecs[0] = { x, y, z };
+	return eigenvecs;
+}
+
 tira::volume<float> GetDiagValues(tira::volume<glm::mat3> T) {
 	tira::volume<float> diagonal_elem(T.X(), T.Y(), T.Z(), 3);
 	glm::mat3 tensor;
@@ -1132,33 +1153,60 @@ void RenderUI() {
 				ImGui::Dummy(ImVec2(0.0f, 7.5f));
 				ImGui::SeparatorText("Eigenvalues");
 				ImGui::Dummy(ImVec2(0.0, 5.0f));
-
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::SeparatorText("Eigenvectors");
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-
-
-
-				if (ImGui::BeginTable("table1", 3))
+				static ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
+				if (ImGui::BeginTable("table_eigenvalues", 3, flags))
 				{
-					ImGui::TableSetupColumn("v1");
-					ImGui::TableSetupColumn("v2");
-					ImGui::TableSetupColumn("v3");
+					ImGui::TableSetupColumn("Eigenvalues");
+					ImGui::TableSetupColumn("min");
+					ImGui::TableSetupColumn("max");
 					ImGui::TableHeadersRow();
 
-					for (int row = 0; row < 5; row++)
+					for (int row = 0; row < 3; row++)
 					{
 						ImGui::TableNextRow();
-						for (int column = 0; column < 3; column++)
-						{
-							ImGui::TableSetColumnIndex(column);
-							char buf[32];
-							sprintf(buf, "Eigenvectors");
-							ImGui::TextUnformatted(buf);
-						}
+						ImGui::TableNextColumn();
+						ImGui::Text("L%d", row);
+						ImGui::TableNextColumn();
+						ImGui::Text("%.3f", Ln.channel(row).minv());
+						ImGui::TableNextColumn();
+						ImGui::Text("%.3f", Ln.channel(row).maxv());
 					}
 					ImGui::EndTable();
 				}
+				// we are only interested in the x,y,z coordinates
+				//std::vector<size_t> smallest_loc = Ln.index_of(Ln.channel(0).minv());						// location of the minimum value of the smallest eigenvalue
+				//std::vector<size_t> largest_loc = Ln.index_of(Ln.channel(2).maxv());						// location of the maximum value of the largest eigenvalue
+
+				//// corresponding eigenvectors of the minimum of the smallest eigenvalue
+				//float theta1 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 0);
+				//float phi1 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 1);
+				//float theta2 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 2);
+				//float phi2 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 3);
+				//std::vector<std::vector<float>> smallest_eigenvector = GetEigenVectors(theta1, theta2, phi1, phi2);
+
+				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::SeparatorText("Eigenvectors of L0 (smallest L)");
+				ImGui::Dummy(ImVec2(0.0, 5.0f));
+
+				if (ImGui::BeginTable("table_eigenvector_L0", 4, flags))
+				{
+					const char* row_labels[3] = { "V1", "V2", "V3" };
+					for (int row = 0; row < 3; row++)
+					{
+						ImGui::TableNextRow();
+						ImGui::TableNextColumn();
+						ImGui::Text("%s", row_labels[row]);
+
+						for (int col = 0; col < 3; col++)
+						{
+							ImGui::TableNextColumn();
+							ImGui::Text("%.3f", Vn.channel(row).minv());
+						}
+					}
+
+					ImGui::EndTable();
+				}
+
 				ImGui::EndTabItem();
 			}
 
