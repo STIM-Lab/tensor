@@ -180,8 +180,8 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     # define the terms
     shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
     A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
-    A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde - 
-        2 * (1 + 3*ALPHA) * shared_term)
+    A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde + 
+        (1.5*ALPHA - 2) * shared_term)
 
     B = np.zeros(A.shape)
     B = (np.pi / 8) * (ALPHA * I_tilde + 2 * np.matmul(D_tilde, I_tilde) - (6 * ALPHA * shared_term))
@@ -191,10 +191,10 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     e2 = 0
     if(sigma1 > 0):
         e1 = np.exp(- L**2 / sigma1**2)
-        e1 = e1[:, :, :, np.newaxis, np.newaxis]
+        e1 = e1[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
     if (sigma2 > 0):
         e2 = np.exp(- L**2 / sigma2**2)
-        e2[:, :, :, np.newaxis, np.newaxis]
+        e2 = e2[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
         
     return (e1 * A) + (e2 * B)
 
