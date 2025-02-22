@@ -174,15 +174,14 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     D_tilde_T = np.transpose(D_tilde, axes=(0, 1, 2, 4, 3))
     ALPHA = (d[:, :, :, 0, 0]**2) + (d[:, :, :, 1, 0]**2)
     ALPHA = ALPHA[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
-    print('shape D: ', D_tilde.shape)
-    print('shape alpha: ', ALPHA.shape) 
+    
     
     # define the terms
     shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
     A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
-    A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde + 
-        (1.5*ALPHA - 2) * shared_term)
-
+    #A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde + 
+    #    (1.5*ALPHA - 2) * shared_term)
+    A = (np.pi / 2) * (I_tilde - 2*shared_term)
     B = np.zeros(A.shape)
     B = (np.pi / 8) * (ALPHA * I_tilde + 2 * np.matmul(D_tilde, I_tilde) - (6 * ALPHA * shared_term))
     
@@ -196,7 +195,7 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
         e2 = np.exp(- L**2 / sigma2**2)
         e2 = e2[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
         
-    return (e1 * A) + (e2 * B)
+    return (e1 * (A - B)) + (e2 * B)
 
 def platefield3_numerical(RX, RY, RZ, sigma1, sigma2=0, N=10):
     T = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
@@ -363,17 +362,20 @@ def visualize3(P):
 
 
 N = 101
-sigma = 2
+sigma = 3
 x = np.linspace(-10, 10, N)
 X, Y, Z = np.meshgrid(x, x, x)
 
-S = stickfield3(1, 0, 0, X, Y, Z, 2)
-np.save('stick_field3.npy', S.astype(np.float32))
+#S = stickfield3(1, 0, 0, X, Y, Z, sigma)
+#np.save('../../build/tensor/stick_field.npy', S.astype(np.float32))
 
-P = platefield3_numerical(X, Y, Z, 2, 0, 20)
-np.save('plate_field3.npy', P.astype(np.float32))
+P = platefield3(X, Y, Z, sigma, 1)
+np.save('../../build/tensor/plate_field.npy', P.astype(np.float32))
+print('calculating numerical...')
+P_num = platefield3_numerical(X, Y, Z, sigma, 1, 10)
+np.save('../../build/tensor/plate_field_num.npy', P_num.astype(np.float32))
 
-T = sanityfield3(N)
-np.save('sanity_field3.npy', T.astype(np.float32))
+# T = sanityfield3(N)
+# np.save('../../build/tensor/sanity_field3.npy', T.astype(np.float32))
 
-visualize3(P[:, 50, :, :, :])
+#visualize3(P[:, 50, :, :, :])
