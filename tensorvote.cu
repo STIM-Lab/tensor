@@ -432,7 +432,7 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     
     glm::vec3 d = glm::vec3(dx, dy, dz);
     glm::mat3 D = glm::outerProduct(d, d);
-    float length = sqrt(dx * dx + dy * dy + dz * dz);                     // calculate the distance between voter and votee
+    float length = sqrt(dx * dx + dy * dy + dz * dz);                       // calculate the distance between voter and votee
     float l2 = length * length;
     float s12 = sigma1 * sigma1;
     float s22 = sigma2 * sigma2;
@@ -442,12 +442,10 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     I_tilde[2][2] = 0.0f;
     float alpha = (dx * dx + dy * dy);
     glm::mat3 D_tilde = I_tilde * D;
-    glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2 * alpha * D;
+    glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2.0f * alpha * D;
 
     // First term
-    glm::mat3 termA_a = (1.0f - (0.25f * alpha) - (0.5f * D_tilde)) * I_tilde;
-    glm::mat3 termA_b = (2.0f + 6.0f * alpha) * shared_term;
-    glm::mat3 term_A = termA_a - termA_b;
+    glm::mat3 term_A = I_tilde - (2.0f * shared_term);
 
     // Second term
     glm::mat3 term_B = (alpha * I_tilde) + (2.0f * D_tilde * I_tilde) - (6.0f * alpha * shared_term);
@@ -462,7 +460,7 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     // float norm = something;
     float c1 = PI / 2.0f;
     float c2 = PI / 8.0f;
-    return (e1 * c1 * term_A) + (e2 * c2 * term_B);
+    return (e1 * (c1 * term_A - c2 * term_B)) + (e2 * c2 * term_B);
 }
 
 /// @brief The kernel to perform the 3D stick tensor voting on the GPU
@@ -601,13 +599,8 @@ __global__ void kernelPlateVote3D(float* VT, float* L, float sigma, float sigma2
 }
 
 
-void cudaVote3D(float* input_field, float* output_field, float* L, float* V, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug) {
-
-    // Declare GPU arrays
-    float* gpuOutputField;
-    float* gpuV;
-    float* gpuL;
 
     auto start = std::chrono::high_resolution_clock::now();
     cudaDeviceProp props;
@@ -619,11 +612,16 @@ void cudaVote3D(float* input_field, float* output_field, float* L, float* V, uns
     size_t evals_bytes =        sizeof(float) * 3 * s0 * s1 * s2;
     size_t evecs_bytes =        sizeof(float) * 4 * s0 * s1 * s2;
 
-    /*start = std::chrono::high_resolution_clock::now();
+    start = std::chrono::high_resolution_clock::now();
     float* L = cudaEigenvalues3(input_field, s0 * s1 * s2, device);
     float* V = cudaEigenvectors3DPolar(input_field, L, s0 * s1 * s2, device);
     end = std::chrono::high_resolution_clock::now();
-    float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();*/
+    float t_eigendecomposition = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    // Declare GPU arrays
+    float* gpuOutputField;
+    float* gpuV;
+    float* gpuL;
 
     // Allocate GPU arrays
     start = std::chrono::high_resolution_clock::now();

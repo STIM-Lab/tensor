@@ -14,12 +14,11 @@ def eigmag(T):
     idx = np.argsort(magValues, -1)
     
     sortedValues = np.take_along_axis(eigenValues, idx, -1)
-    #sortedValues = eigenValues
+    
     sortedVectors = np.zeros_like(eigenVectors)
     sortedVectors[..., 0, :] = np.take_along_axis(eigenVectors[..., 0, :], idx, -1)
     sortedVectors[..., 1, :] = np.take_along_axis(eigenVectors[..., 1, :], idx, -1)
     sortedVectors[..., 2, :] = np.take_along_axis(eigenVectors[..., 2, :], idx, -1)
-    #eigenVectors = np.take_along_axis(eigenVectors, idx, -1)
     
     return sortedValues, sortedVectors
 
@@ -81,10 +80,6 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     # calculate the normalized direction vector
     D = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 1))
-       
-    # if L == 0, assume that D is zero (and 1-qTd = 1)
-    #D[:, :, 0, 0] = np.divide(RX, L, out=np.zeros_like(RX), where=L!=0)
-    #D[:, :, 1, 0] = np.divide(RY, L, out=np.zeros_like(RY), where=L!=0)
     
     # if L == 0, assume that D is zero (and 1-qTd = 1)
     D[:, :, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
@@ -252,15 +247,16 @@ def platevote3(T, sigma=3, sigma2=0):
     pad = int(3 * sigmax)
     Z = np.zeros(T.shape, dtype=np.float32)
     VF = np.pad(Z, ((pad, pad), (pad, pad), (pad, pad), (0, 0), (0, 0)))
-    
+    scale, P = 0, 0
     # for each pixel in the tensor field
     for x0 in range(T.shape[0]):
         print('x0: ', end='')
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
-                scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
-                P = scale * platefield3(X0, X1, X2, sigma, sigma2)
-                VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
+                if  np.any(T[x0, x1, x2]):
+                    scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
+                    P = scale * platefield3(X0, X1, X2, sigma, sigma2)
+                    VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
@@ -361,19 +357,35 @@ def visualize3(P):
     
 
 
-N = 101
-sigma = 3
-x = np.linspace(-10, 10, N)
-X, Y, Z = np.meshgrid(x, x, x)
+N = 50
+#N = 100
+# sigma = 3
+# x = np.linspace(-10, 10, N)
+# X, Y, Z = np.meshgrid(x, x, x)
 
-#S = stickfield3(1, 0, 0, X, Y, Z, sigma)
-#np.save('../../build/tensor/stick_field.npy', S.astype(np.float32))
+# S = stickfield3(1, 0, 0, X, Y, Z, sigma)
+# P = platefield3(X, Y, Z, sigma)
 
-P = platefield3(X, Y, Z, sigma, 1)
-np.save('../../build/tensor/plate_field.npy', P.astype(np.float32))
-print('calculating numerical...')
-P_num = platefield3_numerical(X, Y, Z, sigma, 1, 10)
-np.save('../../build/tensor/plate_field_num.npy', P_num.astype(np.float32))
+T = np.zeros((N, N, N, 3, 3))
+S = np.zeros((3,3))
+S[0, 0] = 1
+P = np.zeros((3,3))
+P[0, 0] = 1
+P[1, 1] = 1
+
+T[25, 25, 25] = S
+T[35, 35, 35] = P
+# T[50, 50, 50] = S
+# T[70, 70, 70] = P
+
+T_vote = stickvote3(T, 3)# + platevote3(T, 3)
+# np.save('../../build/tensor/field.npy', T.astype(np.float32))
+# np.save('../../build/tensor/field_vote.npy', T_vote.astype(np.float32))
+
+# np.save('../../build/tensor/plate_field.npy', P.astype(np.float32))
+# print('calculating numerical...')
+# P_num = platefield3_numerical(X, Y, Z, sigma, 1, 10)
+# np.save('../../build/tensor/plate_field_num.npy', P_num.astype(np.float32))
 
 # T = sanityfield3(N)
 # np.save('../../build/tensor/sanity_field3.npy', T.astype(np.float32))

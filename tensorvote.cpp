@@ -10,11 +10,12 @@
 VoteContribution2D StickVote2D(float u, float v, float sigma, float sigma2, float* eigenvectors, unsigned int power);
 VoteContribution3D StickVote3D(float u, float v, float w, float sigma, float sigma2, float* eigenvectors, unsigned int power);
 glm::mat2 PlateVote2D(float u, float v, float sigma, float sigma2);
+glm::mat3 PlateVote3D(float dx, float dy, float dz, float sigma1, float sigma2);
 void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
-void cudaVote3D(float* input_field, float* output_field, float* L, float* V, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+void cudaVote3D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
     unsigned int w, unsigned int power, unsigned int device, bool STICK, bool PLATE, bool debug);
 float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device);
@@ -212,19 +213,21 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
     }
 
     float scale;
-    int r0, r1, r2;                                                         // x, y and z coordinates within the window
-    for (unsigned int x0 = 0; x0 < s0; x0++) {                              // for each pixel in the image
+    int r0, r1, r2;                                                                                         // x, y and z coordinates within the window
+    for (unsigned int x0 = 0; x0 < s0; x0++) {                                                              // for each pixel in the image
+		std::cout << "x0: ";
         for (unsigned int x1 = 0; x1 < s1; x1++) {
             for (unsigned int x2 = 0; x2 < s2; x2++) {
-                glm::mat3 receiver(0.0f);                                   // initialize a receiver tensor to zero
+                glm::mat3 receiver(0.0f);                                                                   // initialize a receiver tensor to zero
                 float total_decay = 0.0f;
-
-                for (int w0 = -hw; w0 < hw; w0++) {                         // for each pixel in the window
+                if (x0 == 0 && x1 == 0 && x2 == 0)
+                    continue;
+                for (int w0 = -hw; w0 < hw; w0++) {                                                         // for each pixel in the window
                     r0 = x0 + w0;
-                    if (r0 >= 0 && r0 < s0) {                               // if the pixel is inside the image (along the y axis)
+                    if (r0 >= 0 && r0 < s0) {                                                               // if the pixel is inside the image (along the y axis)
                         for (int w1 = -hw; w1 < hw; w1++) {
                             r1 = x1 + w1;
-                            if (r1 >= 0 && r1 < s1) {                       // if the pixel is inside the image (along the x axis)
+                            if (r1 >= 0 && r1 < s1) {                                                       // if the pixel is inside the image (along the x axis)
                                 for (int w2 = -hw; w2 < hw; w2++) {
                                     r2 = x2 + w2;
                                     if (r2 >= 0 && r2 < s2) {
@@ -233,25 +236,22 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
                                         float l1 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 1];
                                         float l2 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 2];
 
-                                        glm::vec3 Vcart;                    // calculate the largest eigenvector in cartesian coordinates
+                                        glm::vec3 Vcart;                                                    // calculate the largest eigenvector in cartesian coordinates
                                         float theta = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 2];
-                                        float phi = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 3];
+                                        float phi   = V[(r0 * s1 * s2 + r1 * s2 + r2) * 4 + 3];
 
                                         Vcart.x = sin(theta) * cos(phi);
                                         Vcart.y = sin(theta) * sin(phi);
                                         Vcart.z = cos(theta);
-                                        VoteContribution3D vote = StickVote3D(w2, w1, w0, sigma, sigma2, (float*)&Vcart, power);
+                                        VoteContribution3D vote = StickVote3D(w0, w1, w2, sigma, sigma2, (float*)&Vcart, power);
 
-                                        scale = std::abs(l2) - std::abs(l1);
-                                        if (l2 < 0.0f) scale = scale * (-1);
+                                        scale = std::copysign(std::abs(l2) - std::abs(l1), l2);
                                         receiver = receiver + scale * vote.votes * vote.decay;
 
-                                        //if (PLATE) {                        // apply the plate vote
-
-                                        //    scale = L[(r0 * s1 + r1) * 2 + 0];
-                                        //    //receiver = receiver + scale * vote.votes * vote.decay;
-                                        //    receiver = receiver + PlateVote(u, v, sigma, sigma2);
-                                        //}
+                                        if (PLATE) {                                                        // apply the plate vote
+											scale = std::copysign(std::abs(l1) - std::abs(l0), l1);
+                                            receiver = receiver + scale * PlateVote3D(w2, w1, w0, sigma, sigma2);
+                                        }
 
                                         if (debug) {
                                             total_decay += vote.decay;
@@ -275,6 +275,7 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
                 if (debug) debug_decay[x0 * s1 * s2 + x1 * s2 + x2] = total_decay;
             }
         }
+        std::cout << x0 << std::endl;
     }
     end = std::chrono::high_resolution_clock::now();
 
@@ -347,10 +348,12 @@ int main(int argc, char *argv[]) {
     }
     // CPU implementation for 3D
     else if (in_device < 0 && dim == 5) {
+        std::cout << "CPU 3D VOTE ACTIVATED." << std::endl;
         cpuVote3D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], T.shape()[2], in_sigma, in_sigma2, in_window, in_power, PLATE, debug);
     }
     // GPU implementation for 3D
     else if (in_device >= 0 && dim == 5) {
+        std::cout << "CUDA 3D VOTE ACTIVATED." << std::endl;
         cudaVote3D(T.data(), Tr.data(), T.shape()[0], T.shape()[1], T.shape()[2], in_sigma, in_sigma2, in_window, in_power, in_device, STICK, PLATE, debug);
     }
     else {
