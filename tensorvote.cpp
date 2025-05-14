@@ -220,8 +220,6 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
             for (unsigned int x2 = 0; x2 < s2; x2++) {
                 glm::mat3 receiver(0.0f);                                                                   // initialize a receiver tensor to zero
                 float total_decay = 0.0f;
-                if (x0 == 0 && x1 == 0 && x2 == 0)
-                    continue;
                 for (int w0 = -hw; w0 < hw; w0++) {                                                         // for each pixel in the window
                     r0 = x0 + w0;
                     if (r0 >= 0 && r0 < s0) {                                                               // if the pixel is inside the image (along the y axis)

@@ -69,7 +69,6 @@ def decay_integrate(sigma1, sigma2=0, power=1, N=100, L_max=10):
 # calculates the voting field for a stick tensor using refined tensor voting
 # qx, qy, qz is the orientation of the stick field (largest eigenvector)
 def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
-    
     q = np.zeros((3, 1))
     q[0] = qx
     q[1] = qy
@@ -81,7 +80,7 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     # calculate the normalized direction vector
     D = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 1))
     
-    # if L == 0, assume that D is zero (and 1-qTd = 1)
+    # if L == 0, assume that D is zero (and 1-qTd = 1) and it contributes to itself
     D[:, :, :, 0, 0] = np.divide(RX, L, out=np.ones_like(RX)*qx, where=L!=0)
     D[:, :, :, 1, 0] = np.divide(RY, L, out=np.ones_like(RY)*qy, where=L!=0)
     D[:, :, :, 2, 0] = np.divide(RZ, L, out=np.ones_like(RZ)*qz, where=L!=0)
@@ -253,12 +252,12 @@ def platevote3(T, sigma=3, sigma2=0):
         print('x0: ', end='')
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
-                if  np.any(T[x0, x1, x2]):
-                    scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
-                    P = scale * platefield3(X0, X1, X2, sigma, sigma2)
-                    VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
+                scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
+                P = scale * platefield3(X0, X1, X2, sigma, sigma2)
+                VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
         print(x0)
-    return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
+    VOTE = VF[pad:-pad, pad:-pad, pad:-pad, :, :]
+    return VOTE
 
 
 # generate an impulse tensor field to test tensor voting
@@ -357,7 +356,7 @@ def visualize3(P):
     
 
 
-N = 50
+N = 10
 #N = 100
 # sigma = 3
 # x = np.linspace(-10, 10, N)
@@ -373,14 +372,13 @@ P = np.zeros((3,3))
 P[0, 0] = 1
 P[1, 1] = 1
 
-T[25, 25, 25] = S
-T[35, 35, 35] = P
-# T[50, 50, 50] = S
-# T[70, 70, 70] = P
+#T[15, 15, 15] = S
+T[5, 5, 5] = P
 
-T_vote = stickvote3(T, 3)# + platevote3(T, 3)
-# np.save('../../build/tensor/field.npy', T.astype(np.float32))
-# np.save('../../build/tensor/field_vote.npy', T_vote.astype(np.float32))
+
+T_vote = platevote3(T, 3)
+np.save('../../build/tensor/plate_field.npy', T.astype(np.float32))
+np.save('../../build/tensor/plate_vote.npy', T_vote.astype(np.float32))
 
 # np.save('../../build/tensor/plate_field.npy', P.astype(np.float32))
 # print('calculating numerical...')

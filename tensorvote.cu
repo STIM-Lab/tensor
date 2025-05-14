@@ -1,4 +1,3 @@
-
 #include <glm/glm.hpp>
 #define GLM_FORCE_CUDA
 
@@ -406,7 +405,7 @@ __host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, f
 
     glm::vec3 d = glm::vec3(u, v, w);                                           // normalize the direction vector
     float l = sqrt(u * u + v * v + w * w);                                      // calculate ell (distance between voter/votee)
-    if (l == 0) d = glm::vec3(0, 0, 0);                                         // assumes that the voter DOES contribute to itself
+    if (l == 0) d = glm::vec3(q[0], q[1], q[2]);                                // assumes that the voter DOES contribute to itself
     else d = glm::normalize(d);
 
     float qTd = glm::dot(q, d);
@@ -428,19 +427,19 @@ __host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, f
     return S;
 }
 
-__host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float sigma1, float sigma2) {
+__host__ __device__  glm::mat3 PlateVote3D(float u, float v, float w, float sigma1, float sigma2) {
     
-    glm::vec3 d = glm::vec3(dx, dy, dz);
+    glm::vec3 d = glm::vec3(u, v, w);                                   // direction vector (referred in paper as [dx, dy, dz])
+    float l = sqrt(u * u + v * v + w * w);                              // calculate the distance between voter and votee
+    float l2 = l * l;
+    if (l != 0) d = glm::normalize(d);
     glm::mat3 D = glm::outerProduct(d, d);
-    float length = sqrt(dx * dx + dy * dy + dz * dz);                       // calculate the distance between voter and votee
-    float l2 = length * length;
-    float s12 = sigma1 * sigma1;
-    float s22 = sigma2 * sigma2;
+    
     
     // repeated terms
-    glm::mat3 I_tilde(1.0f);                                                // default constructor creates a identity matrix
+    glm::mat3 I_tilde(glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f));                                            // default constructor creates a identity matrix
     I_tilde[2][2] = 0.0f;
-    float alpha = (dx * dx + dy * dy);
+    float alpha = (u * u + v * v);
     glm::mat3 D_tilde = I_tilde * D;
     glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2.0f * alpha * D;
 
@@ -450,17 +449,22 @@ __host__ __device__  glm::mat3 PlateVote3D(float dx, float dy, float dz, float s
     // Second term
     glm::mat3 term_B = (alpha * I_tilde) + (2.0f * D_tilde * I_tilde) - (6.0f * alpha * shared_term);
 
+    float s12 = sigma1 * sigma1;
+    float s22 = sigma2 * sigma2;
     float e1 = 0;
     if (sigma1 > 0)
         e1 = std::exp(-l2 / s12);
     float e2 = 0;
     if (sigma2 > 0)
         e2 = std::exp(-l2 / s22);
-
+    
     // float norm = something;
     float c1 = PI / 2.0f;
     float c2 = PI / 8.0f;
-    return (e1 * (c1 * term_A - c2 * term_B)) + (e2 * c2 * term_B);
+    term_A *= c1;
+	term_B *= c2;
+	glm::mat3 VOTE = e1 * (term_A - term_B) + e2 * term_B;
+    return VOTE;
 }
 
 /// @brief The kernel to perform the 3D stick tensor voting on the GPU
