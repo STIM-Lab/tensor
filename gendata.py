@@ -306,13 +306,50 @@ def genSample3D(shape, noise=0):
     #vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
     return vol
 
-size = 100
-vol = genSample3D((size, size, size), 0.6)
-st = st.structure3d(vol.astype(np.float32), 3)
+# generates an empty field with a plate "impulse" tensor at the center
+def gen_plate_impulse(N, impulsefile, votefile, numericalfile, normalize=True):
+    # generate an empty tensor field
+    T = np.zeros(N + (3, 3))
+
+    # generate a plate tensor
+    P = np.zeros((3,3))
+    P[0, 0] = 1
+    P[1, 1] = 1
+
+    # set the center pixel to a plate tensor
+    C = tuple(int(n/2) for n in N)
+    T[C] = P
+
+    # save the plate tensor "impulse"
+    np.save(impulsefile, T.astype(np.float32))
+
+    # perform tensor voting
+    T_vote = tv3.platevote3(T, 3, 0, normalize)
+    # save the result of tensor voting
+    np.save(votefile, T_vote.astype(np.float32))
+    
+    T_numerical = tv3.platevote3_numerical(T, 3, 0, 1, 3, normalize)
+    np.save(numericalfile, T_numerical.astype(np.float32))
+    
+    return T, T_vote, T_numerical
+
+
+# generate an impulse plate field
+print("Generating plate impulse response:")
+T, Ta, Tn = gen_plate_impulse((1, 1, 1), "plate_field.npy", "plate_python.npy", "plate_python_numerical.npy", normalize=False)
+
+#%%
+#plt.subplot(1, 2, 1)
+#plt.imshow(Tv[:, :, 5, 0, 0])
+#plt.subplot(1, 2, 2)
+#plt.imshow(Tn[:, :, 5, 0, 0])
+
+#size = 100
+#vol = genSample3D((size, size, size), 0.6)
+#st = st.structure3d(vol.astype(np.float32), 3)
 #vol = st.addGaussian3T(vol, 2)
-np.save('synthetic.npy', st)
+#np.save('synthetic.npy', st)
 
-np.save("impulse.npy", tv3.impulse3(size, 1, 0, 0))
+#np.save("impulse.npy", tv3.impulse3(size, 1, 0, 0))
 
-#V = tv3.stickvote3(vol, 3, 0)
-#np.save('synthetic_vote_50x50x50.npy', V)
+

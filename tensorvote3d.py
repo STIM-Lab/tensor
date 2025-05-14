@@ -24,6 +24,9 @@ def eigmag(T):
 
 # calculates the normalization factor for a stick tensor field
 def eta(sigma1, sigma2, p):
+    
+    if sigma1 == 0 and sigma2 == 0:
+        return 1.0
     num1 = 2
     den1 = (2*p) + 1
     term1 = sigma1**2 * (num1/den1)
@@ -68,7 +71,7 @@ def decay_integrate(sigma1, sigma2=0, power=1, N=100, L_max=10):
     
 # calculates the voting field for a stick tensor using refined tensor voting
 # qx, qy, qz is the orientation of the stick field (largest eigenvector)
-def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
+def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1, normalize=True):
     q = np.zeros((3, 1))
     q[0] = qx
     q[1] = qy
@@ -94,12 +97,16 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     
     # calculate the decay based on the desired properties
     if sigma1 == 0:
-        d1 = 0
+        d1 = np.zeros_like(L)
+        d1[L == 0] = 1
+        #d1 = 0
     else:
         d1 = np.exp(- L**2 / sigma1**2)
         
     if sigma2 == 0:
-        d2 = 0
+        d2 = np.zeros_like(L)
+        d2[L == 0] = 1
+        #d2 = 0
     else:
         d2 = np.exp(- L**2 / sigma2**2)
     
@@ -110,10 +117,12 @@ def stickfield3(qx, qy, qz, RX, RY, RZ, sigma1, sigma2=0, power=1):
     DECAY = (d1 * sin_2p_theta + d2 * cos_2p_theta)[..., np.newaxis, np.newaxis]
     
     #decay = g1 * sin_2_theta + g2 * cos_2_theta
-    
-    #V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
-    V = DECAY * np.matmul(Rq, Rqt)
-    return V.astype(np.float32)
+    if normalize:
+        V = eta(sigma1, sigma2, power) * DECAY * np.matmul(Rq, Rqt)
+        return V.astype(np.float32)
+    else:
+        V = DECAY * np.matmul(Rq, Rqt)
+        return V.astype(np.float32)
 
 # calculate the vote result of the tensor field T
 # k is the eigenvector used as the voting direction
@@ -149,7 +158,7 @@ def stickvote3(T, sigma=3, sigma2=0):
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
    
-def platefield3(RX, RY, RZ, sigma1, sigma2=0):
+def platefield3(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
     # calculate the length (distance) value
     L = np.sqrt(RX**2 + RY**2 + RZ**2)
     
@@ -188,22 +197,29 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0):
     if (sigma2 > 0):
         e2 = np.exp(- L**2 / sigma2**2)
         e2 = e2[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
-        
-    return (e1 * (A - B)) + (e2 * B)
+    
+    PlateIntegral = (e1 * (A - B)) + (e2 * B)
 
-def platefield3_numerical(RX, RY, RZ, sigma1, sigma2=0, N=10):
+    if normalize == True:
+        return eta(sigma1, sigma2, 1) * PlateIntegral
+    else:
+        return PlateIntegral
+
+def platefield3_numerical(RX, RY, RZ, sigma1, sigma2=0, p=1, N=10, normalize=True):
     T = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
     
     dbeta = np.pi / N
+    # since the integration is symmetric, we integrate across HALF the unit circle and multiply by 2
     for n in range(N):
         x = np.cos(n * dbeta)
         y = np.sin(n * dbeta)
         z = 0
-        T = T + (1.0 / N) * stickfield3(x, y, z, RX, RY, RZ, sigma1, sigma2)
+        Tn = stickfield3(x, y, z, RX, RY, RZ, sigma1, sigma2, p, normalize)
+        T = T + (2.0 / N) * Tn
         
     return T
 
-def platevote3_numerical(T, sigma=3, sigma2=0, N=10):
+def platevote3_numerical(T, sigma=3, sigma2=0, p=1, N=10, normalize=True):
     # perform eigendecomposition (eigenvalues requireed)
     evals, _ = eigmag(T)
     evals_mag = np.abs(evals)
@@ -225,12 +241,14 @@ def platevote3_numerical(T, sigma=3, sigma2=0, N=10):
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
                 scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
-                P = scale * platefield3_numerical(X0, X1, X2, sigma, sigma2)
+                P = scale * platefield3_numerical(X0, X1, X2, sigma, sigma2, p, N, normalize)
                 VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
         print(x0)
+    if pad == 0:
+        return VF
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
-def platevote3(T, sigma=3, sigma2=0):
+def platevote3(T, sigma=3, sigma2=0, normalize=True):
     # perform eigendecomposition (eigenvalues requireed)
     evals, _ = eigmag(T)
     evals_mag = np.abs(evals)
@@ -253,9 +271,13 @@ def platevote3(T, sigma=3, sigma2=0):
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
                 scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
-                P = scale * platefield3(X0, X1, X2, sigma, sigma2)
+                P = scale * platefield3(X0, X1, X2, sigma, sigma2, normalize)
                 VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
         print(x0)
+        
+    if pad == 0:
+        return VF
+    
     VOTE = VF[pad:-pad, pad:-pad, pad:-pad, :, :]
     return VOTE
 
@@ -354,38 +376,3 @@ def visualize3(P):
     plt.imshow(Cs, vmin=0, vmax=1)
     plt.title("Spherical Anisotropy")
     
-
-
-N = 10
-#N = 100
-# sigma = 3
-# x = np.linspace(-10, 10, N)
-# X, Y, Z = np.meshgrid(x, x, x)
-
-# S = stickfield3(1, 0, 0, X, Y, Z, sigma)
-# P = platefield3(X, Y, Z, sigma)
-
-T = np.zeros((N, N, N, 3, 3))
-S = np.zeros((3,3))
-S[0, 0] = 1
-P = np.zeros((3,3))
-P[0, 0] = 1
-P[1, 1] = 1
-
-#T[15, 15, 15] = S
-T[5, 5, 5] = P
-
-
-T_vote = platevote3(T, 3)
-np.save('../../build/tensor/plate_field.npy', T.astype(np.float32))
-np.save('../../build/tensor/plate_vote.npy', T_vote.astype(np.float32))
-
-# np.save('../../build/tensor/plate_field.npy', P.astype(np.float32))
-# print('calculating numerical...')
-# P_num = platefield3_numerical(X, Y, Z, sigma, 1, 10)
-# np.save('../../build/tensor/plate_field_num.npy', P_num.astype(np.float32))
-
-# T = sanityfield3(N)
-# np.save('../../build/tensor/sanity_field3.npy', T.astype(np.float32))
-
-#visualize3(P[:, 50, :, :, :])
