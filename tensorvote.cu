@@ -435,11 +435,10 @@ __host__ __device__  glm::mat3 PlateVote3D(float u, float v, float w, float sigm
     if (l != 0) d = glm::normalize(d);
     glm::mat3 D = glm::outerProduct(d, d);
     
-    
     // repeated terms
-    glm::mat3 I_tilde(glm::vec3(1.0f), glm::vec3(1.0f), glm::vec3(1.0f));                                            // default constructor creates a identity matrix
+    glm::mat3 I_tilde(1.0f);                                            // default constructor creates a identity matrix
     I_tilde[2][2] = 0.0f;
-    float alpha = (u * u + v * v);
+    float alpha = (d.x * d.x + d.y * d.y);
     glm::mat3 D_tilde = I_tilde * D;
     glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2.0f * alpha * D;
 
@@ -516,7 +515,7 @@ __global__ void kernelStickVote3D(float* VT, float* L, float* V, float sigma, fl
                         Vcart.z = cosf(theta);
                         if (Vcart.x == 0 && Vcart.y == 0 && Vcart.z == 0) Votee = 0;
                         else {
-                            VoteContribution3D vote = StickVote3D((float)w2, (float)w1, (float)w0, sigma, sigma2, (float*)&Vcart, power);
+                            VoteContribution3D vote = StickVote3D((float)w0, (float)w1, (float)w2, sigma, sigma2, (float*)&Vcart, power);
 
                             //float l0 = L[(r0 * s1 * s2 + r1 * s2 + r2) * 3 + 0];
                             const float l1 = L[location_thread * 3 + 1];
@@ -586,7 +585,7 @@ __global__ void kernelPlateVote3D(float* VT, float* L, float sigma, float sigma2
 
                 float scale = fabsf(l1) - fabsf(l0);
                 if (l1 < 0.0f) scale *= -1;
-                Votee = Votee + scale * PlateVote3D((float)w2, (float)w1, (float)w0, sigma, sigma2);
+                Votee = Votee + scale * PlateVote3D((float)w0, (float)w1, (float)w2, sigma, sigma2);
             }
         }
     }

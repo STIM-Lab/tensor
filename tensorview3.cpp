@@ -38,7 +38,7 @@ size_t axes[] = { 0, 0, 0 };
 int scroll_value = 0;
 
 tira::volume<glm::mat3> T0;								// 3D tensor field (3x3 voxels)
-tira::volume<glm::mat3> Tn(0, 0, 0);					// processed tensor field
+tira::volume<glm::mat3> Tn;								// processed tensor field
 tira::volume<float> Ln;									// eigenvalues of the processed tensor field (smallest to largest magnitude)
 tira::volume<float> Vn;									// eigenvectors of the processed tensor field in polar coordinates (medium and large eigenvectors)
 
@@ -657,8 +657,9 @@ void GaussianFilter(const float sigma) {
 
 void TensorVote(const float sigma, const float sigma2, const unsigned int p, const bool stick, const bool plate) {
 	Tn = tira::volume<glm::mat3>(T0.X(), T0.Y(), T0.Z());								// allocate space for the new field
+	Tn.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
 
-	const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);	// calculate the window size for the vote field
+	const auto w = static_cast<unsigned int>(6 * std::max(sigma, sigma2) + 1);			// calculate the window size for the vote field
 	cudaVote3D(reinterpret_cast<float*>(T0.data()), reinterpret_cast<float*>(Tn.data()),
 		static_cast<unsigned int>(T0.shape()[0]), static_cast<unsigned int>(T0.shape()[1]), static_cast<unsigned int>(T0.shape()[2]),
 		sigma, sigma2, w, p, in_device, stick, plate, false);
@@ -668,7 +669,7 @@ void UpdateEigens() {
 	auto t0 = tic();
 	float* eigenvalues_raw;
 	float* eigenvectors_raw;
-	cudaEigendecomposition3D((float*)Tn.data(), eigenvalues_raw, eigenvectors_raw, Tn.size(), in_device);
+	cudaEigendecomposition3D(reinterpret_cast<float*>(Tn.data()), eigenvalues_raw, eigenvectors_raw, Tn.size(), in_device);
 	Ln = tira::volume<float>(eigenvalues_raw, Tn.X(), Tn.Y(), Tn.Z(), 3);
 	Vn = tira::volume<float>(eigenvectors_raw, Tn.X(), Tn.Y(), Tn.Z(), 4);
 	free(eigenvalues_raw);
@@ -694,7 +695,7 @@ void ScalarRefresh() {
 }
 
 void UpdateTensorField() {
-	std::cout << std::format("Sigma1: {},\t Sigma2: {}, \t Power: {}, \t Stick: {}, \t Plate: {}\n", 
+	std::cout << std::format("Sigma1: {},\t Sigma2: {}, \t Power: {}, \t Stick: {}, \t Plate: {}\n",
 		TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 	TensorVote(TV_SIGMA1, TV_SIGMA2, TV_POWER, TV_STICK, TV_PLATE);
 	UpdateEigens();
@@ -754,15 +755,15 @@ void LoadDefaultField() {
 
 // Load a tensor field from a NumPy file
 void LoadTensorField(std::string npy_filename) {
-	// Load the tensor field
 	auto t0 = tic();
 	T0.load_npy<float>(npy_filename);
 	auto t1 = tic();
 	t_loading = duration(t0, t1);
 
 	T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
+	Tn = T0;																// copy the tensor field to the new field
+	
 	ResetField();
-
 	ResetPlanes();
 
 	TENSOR_LOADED = true;													// mark a tensor field as loaded
@@ -1212,6 +1213,7 @@ void RenderUI() {
 
 			// 4th tab
 			if (ImGui::BeginTabItem("Profiling")) {
+
 				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
 				ImGui::SeparatorText("CUDA Device");
 				ImGui::Text("Device ID: %d", in_device);

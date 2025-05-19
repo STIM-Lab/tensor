@@ -1,3 +1,4 @@
 Python/
 *.db
 .ipynb_checkpoints/VotingMath3-checkpoint.ipynb
+*.npy

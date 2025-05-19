@@ -182,8 +182,6 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
     # define the terms
     shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
     A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
-    #A = (np.pi / 2) * ((1 - (0.25*ALPHA) - (0.5*D_tilde)) * I_tilde + 
-    #    (1.5*ALPHA - 2) * shared_term)
     A = (np.pi / 2) * (I_tilde - 2*shared_term)
     B = np.zeros(A.shape)
     B = (np.pi / 8) * (ALPHA * I_tilde + 2 * np.matmul(D_tilde, I_tilde) - (6 * ALPHA * shared_term))
@@ -215,7 +213,7 @@ def platefield3_numerical(RX, RY, RZ, sigma1, sigma2=0, p=1, N=10, normalize=Tru
         y = np.sin(n * dbeta)
         z = 0
         Tn = stickfield3(x, y, z, RX, RY, RZ, sigma1, sigma2, p, normalize)
-        T = T + (2.0 / N) * Tn
+        T = T + (np.pi / N) * Tn
         
     return T
 

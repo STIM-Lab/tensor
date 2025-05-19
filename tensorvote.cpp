@@ -220,13 +220,13 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
             for (unsigned int x2 = 0; x2 < s2; x2++) {
                 glm::mat3 receiver(0.0f);                                                                   // initialize a receiver tensor to zero
                 float total_decay = 0.0f;
-                for (int w0 = -hw; w0 < hw; w0++) {                                                         // for each pixel in the window
+                for (int w0 = -hw; w0 <= hw; w0++) {                                                         // for each pixel in the window
                     r0 = x0 + w0;
                     if (r0 >= 0 && r0 < s0) {                                                               // if the pixel is inside the image (along the y axis)
-                        for (int w1 = -hw; w1 < hw; w1++) {
+                        for (int w1 = -hw; w1 <= hw; w1++) {
                             r1 = x1 + w1;
                             if (r1 >= 0 && r1 < s1) {                                                       // if the pixel is inside the image (along the x axis)
-                                for (int w2 = -hw; w2 < hw; w2++) {
+                                for (int w2 = -hw; w2 <= hw; w2++) {
                                     r2 = x2 + w2;
                                     if (r2 >= 0 && r2 < s2) {
                                         // calculate the saliency (vote contribution)
@@ -248,7 +248,7 @@ void cpuVote3D(float* input_field, float* output_field, unsigned int s0, unsigne
 
                                         if (PLATE) {                                                        // apply the plate vote
 											scale = std::copysign(std::abs(l1) - std::abs(l0), l1);
-                                            receiver = receiver + scale * PlateVote3D(w2, w1, w0, sigma, sigma2);
+                                            receiver = receiver + scale * PlateVote3D(w0, w1, w2, sigma, sigma2);
                                         }
 
                                         if (debug) {
