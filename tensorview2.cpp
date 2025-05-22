@@ -464,10 +464,10 @@ void RenderFieldSpecs() {
 void RegenerateGlyphs() {
     if (!RENDER_GLYPHS) return;                     // don't update if they aren't being displayed
 
-    tira::geometry<float> circle = tira::circle<float>(GLYPH_TESSELATION).scale({ 0.0f, 0.0f });
+    tira::trimesh<float> circle = tira::circle<float>(GLYPH_TESSELATION).scale({ 0.0f, 0.0f });
 
-    const tira::geometry<float> glyph_row = circle.tile({ 1.0f, 0.0f, 0.0f }, Tn.width());
-    const tira::geometry<float> glyph_grid = glyph_row.tile({ 0.0f, 1.0f, 0.0f }, Tn.height());
+    const tira::trimesh<float> glyph_row = circle.tile({ 1.0f, 0.0f, 0.0f }, Tn.width());
+    const tira::trimesh<float> glyph_grid = glyph_row.tile({ 0.0f, 1.0f, 0.0f }, Tn.height());
 
     GLYPH_GEOMETRY = tira::glGeometry(glyph_grid);
     GLYPH_MATERIAL->SetTexture("lambda", Ln, GL_RG32F, GL_NEAREST);
