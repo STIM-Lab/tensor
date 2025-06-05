@@ -1,9 +1,8 @@
 import math
 import matplotlib
 import numpy as np
-import image2tensor as it
 import matplotlib.pyplot as plt
-
+from scipy import special as sp
 
 
 def eigmag(T):
@@ -157,8 +156,78 @@ def stickvote3(T, sigma=3, sigma2=0):
         print(x0)
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
-   
-def platefield3(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
+def platefield3(RX, RY, RZ, sigma1=3, sigma2=0, p=1, normalize=False):
+    # calculate the length (distance) value
+    L = np.sqrt(RX**2 + RY**2 + RZ**2)
+    
+    # calculate the direction matrix d
+    d = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 1))
+    d[:, :, :, 0, 0] = np.divide(RX, L, where=L!=0)
+    d[:, :, :, 1, 0] = np.divide(RY, L, where=L!=0)
+    d[:, :, :, 2, 0] = np.divide(RZ, L, where=L!=0)
+    
+    # calculate the length and the angle of the reflected direction matrix d
+    alpha = np.sqrt(np.square(d[:, :, :, 0, 0]) + np.square(d[:, :, :, 1, 0]))
+    a2 = alpha * alpha
+    phi = 0
+    phi = np.arctan2(d[:, :, :, 1, 0], d[:, :, :, 0, 0])
+    
+    # calculate the rotation matrix
+    R_z = np.zeros(phi.shape + (3, 3))
+    R_z[:, :, :, 0, 0] = np.cos(phi)
+    R_z[:, :, :, 0, 1] = -np.sin(phi)
+    R_z[:, :, :, 1, 0] = np.sin(phi)
+    R_z[:, :, :, 1, 1] = np.cos(phi)
+    R_z[:, :, :, 2, 2] = 1
+    
+    R_z_rev = np.copy(R_z)          # for -phi
+    R_z_rev[:, :, :, 0, 1] = R_z[:, :, :, 1, 0]
+    R_z_rev[:, :, :, 1, 0] = R_z[:, :, :, 0, 1]
+    
+    # calculate the pre-defined integrals
+    J_0 = (np.pi/2) * sp.hyp2f1(-p, 1.5, 2, a2)
+    J_1 = np.pi * sp.hyp2f1(-p, 0.5, 1, a2)
+    K_0 = sp.beta(0.5, p + 1.5)
+    K_1 = sp.beta(0.5, p + 0.5)
+    
+    # calculate each term
+    A = np.zeros(a2.shape + (3, 3))
+    A[:, :, :, 0, 0] = ((1-2*a2)**2) * J_0
+    A[:, :, :, 0, 2] = -2*alpha*d[:, :, :, 2, 0]*(1-2*a2)*J_0
+    A[:, :, :, 1, 1] = J_1 - J_0
+    A[:, :, :, 2, 0] = A[:, :, :, 0, 2]
+    A[:, :, :, 2, 2] = 4*a2*np.square(d[:, :, :, 2, 0]) * J_0
+    
+    a2_p = np.power(a2, p)
+    B = np.zeros(A.shape)
+    B[:, :, :, 0, 0] = a2_p*((1-2*a2)**2)*K_0
+    B[:, :, :, 0, 2] = -2*alpha*a2_p*d[:, :, :, 2, 0]*(1-2*a2)*K_0
+    B[:, :, :, 1, 1] = a2_p*(K_1 - K_0)
+    B[:, :, :, 2, 0] = B[:, :, :, 0, 2]
+    B[:, :, :, 2, 2] = 4*a2_p*a2*np.square(d[:, :, :, 2, 0])*K_0
+    
+    # rotate back to the original axis
+    term_a = np.matmul(np.matmul(R_z, A), R_z_rev)
+    term_b = np.matmul(np.matmul(R_z, B), R_z_rev)
+    
+    # define the exponential values
+    e1 = 0
+    e2 = 0
+    if(sigma1 > 0):
+        e1 = np.exp(- L**2 / sigma1**2)
+        e1 = e1[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
+    if (sigma2 > 0):
+        e2 = np.exp(- L**2 / sigma2**2)
+        e2 = e2[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
+    
+    PlateIntegral = e1 * term_a + e2 * term_b  
+    
+    if normalize == True:
+        return eta(sigma1, sigma2, 1) * PlateIntegral
+    else:
+        return PlateIntegral
+    
+def platefield3_previous(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
     # calculate the length (distance) value
     L = np.sqrt(RX**2 + RY**2 + RZ**2)
     
@@ -177,7 +246,6 @@ def platefield3(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
     D_tilde_T = np.transpose(D_tilde, axes=(0, 1, 2, 4, 3))
     ALPHA = (d[:, :, :, 0, 0]**2) + (d[:, :, :, 1, 0]**2)
     ALPHA = ALPHA[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
-    
     
     # define the terms
     shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
@@ -246,7 +314,7 @@ def platevote3_numerical(T, sigma=3, sigma2=0, p=1, N=10, normalize=True):
         return VF
     return VF[pad:-pad, pad:-pad, pad:-pad, :, :]
 
-def platevote3(T, sigma=3, sigma2=0, normalize=True):
+def platevote3(T, sigma=3, sigma2=0, p=1, normalize=True):
     # perform eigendecomposition (eigenvalues requireed)
     evals, _ = eigmag(T)
     evals_mag = np.abs(evals)
@@ -269,7 +337,7 @@ def platevote3(T, sigma=3, sigma2=0, normalize=True):
         for x1 in range(T.shape[1]):
             for x2 in range(T.shape[2]):
                 scale = (evals_mag[x0, x1, x2, 1] - evals_mag[x0, x1, x2, 0]) * np.sign(evals[x0, x1, x2, 1])
-                P = scale * platefield3(X0, X1, X2, sigma, sigma2, normalize)
+                P = scale * platefield3(X0, X1, X2, sigma, sigma2, p, normalize)
                 VF[x0:x0 + P.shape[0], x1:x1 + P.shape[1], x2:x2 + P.shape[2]] += P
         print(x0)
         
@@ -278,7 +346,6 @@ def platevote3(T, sigma=3, sigma2=0, normalize=True):
     
     VOTE = VF[pad:-pad, pad:-pad, pad:-pad, :, :]
     return VOTE
-
 
 # generate an impulse tensor field to test tensor voting
 # N is the size of the field (it will be a cube)
@@ -373,4 +440,3 @@ def visualize3(P):
     Cs = np.divide(threel0, l0l1l2, out=np.zeros_like(l0), where=l0l1l2!=0)    
     plt.imshow(Cs, vmin=0, vmax=1)
     plt.title("Spherical Anisotropy")
-    
