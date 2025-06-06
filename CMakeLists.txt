@@ -21,7 +21,7 @@ find_package(imgui CONFIG REQUIRED core glfw-binding opengl3-binding)
 find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Boost REQUIRED COMPONENTS program_options)
+find_package(Boost REQUIRED COMPONENTS program_options math)
 #find_package(Boost CONFIG)
 find_package(PNG REQUIRED)
 find_package (JPEG REQUIRED)
@@ -138,6 +138,7 @@ add_executable(tensorvote
 target_link_libraries(tensorvote
 				PRIVATE glm::glm
 				Boost::program_options
+				Boost::math
 )
 
 target_compile_options(tensorview3 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:

@@ -427,43 +427,78 @@ __host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, f
     return S;
 }
 
-__host__ __device__  glm::mat3 PlateVote3D(float u, float v, float w, float sigma1, float sigma2) {
+__host__ __device__  glm::mat3 PlateVote3D(float u, float v, float w, float sigma1, float sigma2, unsigned int power) {
     
-    glm::vec3 d = glm::vec3(u, v, w);                                   // direction vector (referred in paper as [dx, dy, dz])
     float l = sqrt(u * u + v * v + w * w);                              // calculate the distance between voter and votee
-    float l2 = l * l;
-    if (l != 0) d = glm::normalize(d);
-    glm::mat3 D = glm::outerProduct(d, d);
+    glm::vec3 d(0.0f);
+    if (l != 0) d = glm::normalize(glm::vec3(u, v, w));                 // normalize direction vector
     
-    // repeated terms
-    glm::mat3 I_tilde(1.0f);                                            // default constructor creates a identity matrix
-    I_tilde[2][2] = 0.0f;
-    float alpha = (d.x * d.x + d.y * d.y);
-    glm::mat3 D_tilde = I_tilde * D;
-    glm::mat3 shared_term = D_tilde + glm::transpose(D_tilde) - 2.0f * alpha * D;
+    float dx = d.x;
+    float dy = d.y;
+    float dz = d.z;
 
-    // First term
-    glm::mat3 term_A = I_tilde - (2.0f * shared_term);
+    // calculate the length and angle of the reflected direction matrix on xy-plane 
+    float alpha = sqrt(dx*dx + dy*dy);
+    float a2 = alpha * alpha;
+    float phi = std::atan2(dy, dx);
 
-    // Second term
-    glm::mat3 term_B = (alpha * I_tilde) + (2.0f * D_tilde * I_tilde) - (6.0f * alpha * shared_term);
+    // build the rotation matrix about the z-axis by phi degrees
+    glm::mat3 Rz(0.0f);
+    Rz[0][0] = std::cos(phi);   Rz[0][1] = -std::sin(phi);
+    Rz[1][0] = std::sin(phi);   Rz[1][1] = std::cos(phi);
+    Rz[2][2] = 1.0f;
 
+    // build the rotation matrix about the z-axis by -phi degrees
+    glm::mat3 Rz_rev = glm::transpose(Rz);
+
+    // compute beta and hypergeometric integrals
+    double p_d = static_cast<double>(power);
+    double a2_d = static_cast<double>(a2);
+    double J0 = 0.5 * PI * boost::math::hypergeometric_pFq(std::vector<double>{ -p_d, 1.5 },
+        std::vector<double>{ 2.0 }, a2_d);
+    double J1 = PI * boost::math::hypergeometric_pFq(std::vector<double>{ -p_d, 0.5 },
+        std::vector<double>{ 1.0 }, a2_d);
+    double K0 = boost::math::beta(0.5, p_d + 1.5);
+    double K1 = boost::math::beta(0.5, p_d + 0.5);
+
+    // calcualte each term
+    glm::mat3 A(0.0f);
+    glm::mat3 B(0.0f);
+
+    float tmp_a2 = 1.0f - 2.0f * a2;
+
+    A[0][0] = (tmp_a2 * tmp_a2) * static_cast<float>(J0);
+    A[0][2] = -2.0f * alpha * dz * tmp_a2 * static_cast<float>(J0);
+    A[2][0] = -2.0f * alpha * dz * tmp_a2 * static_cast<float>(J0);
+    A[1][1] = static_cast<float>(J1 - J0);
+    A[2][2] = 4.0f * a2 * (dz * dz) * static_cast<float>(J0);
+
+    float a2p = std::pow(a2, static_cast<float>(power));
+
+    B[0][0] = a2p * (tmp_a2 * tmp_a2) * static_cast<float>(K0);
+    B[0][2] = -2.0f * alpha * a2p * dz * tmp_a2 * static_cast<float>(K0);
+    B[2][0] = -2.0f * alpha * a2p * dz * tmp_a2 * static_cast<float>(K0);
+    B[1][1] = a2p * static_cast<float>(K1 - K0);
+    B[2][2] = 4.0f * a2p * a2 * (dz * dz) * static_cast<float>(K0);
+
+    // rotate back to original coordinates
+    glm::mat3 term_a = Rz * A * Rz_rev;
+    glm::mat3 term_b = Rz * B * Rz_rev;
+
+    // calculate exponential terms
+    float e1 = 0.0f, e2 = 0.0f;
+    float l2 = l * l;
     float s12 = sigma1 * sigma1;
     float s22 = sigma2 * sigma2;
-    float e1 = 0;
     if (sigma1 > 0)
         e1 = std::exp(-l2 / s12);
-    float e2 = 0;
     if (sigma2 > 0)
         e2 = std::exp(-l2 / s22);
-    
-    // float norm = something;
-    float c1 = PI / 2.0f;
-    float c2 = PI / 8.0f;
-    term_A *= c1;
-	term_B *= c2;
-	glm::mat3 VOTE = e1 * (term_A - term_B) + e2 * term_B;
-    return VOTE;
+
+    // final integral
+    glm::mat3 PlateVote = (e1 * term_a) + (e2 * term_b);
+
+    return PlateVote;
 }
 
 /// @brief The kernel to perform the 3D stick tensor voting on the GPU
@@ -585,7 +620,7 @@ __global__ void kernelPlateVote3D(float* VT, float* L, float sigma, float sigma2
 
                 float scale = fabsf(l1) - fabsf(l0);
                 if (l1 < 0.0f) scale *= -1;
-                Votee = Votee + scale * PlateVote3D((float)w0, (float)w1, (float)w2, sigma, sigma2);
+                Votee = Votee + scale * PlateVote3D((float)w0, (float)w1, (float)w2, sigma, sigma2, power);
             }
         }
     }
