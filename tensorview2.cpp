@@ -229,19 +229,34 @@ int main(int argc, char** argv) {
     }
 
     // make sure there the specified CUDA device is available (otherwise switch to CPU)
-    int ndevices;
-    cudaError_t error = cudaGetDeviceCount(&ndevices);
-    if (error != cudaSuccess) ndevices = 0;
-    if (ndevices <= in_device) {
-        std::cout << "WARNING: Specified CUDA device " << in_device << " is unavailable (" << ndevices << " compatible devices found), defaulting to CPU" << std::endl;
-        in_device = -1;
+    UI.device_names.push_back("CPU");
+    if (in_device >= 0) {
+        cudaError_t error = cudaGetDeviceCount(&UI.num_devices);
+        if (error != cudaSuccess) UI.num_devices = 0;
+        if (UI.num_devices <= in_device) {
+            std::stringstream ss;
+            ss << "WARNING: Specified CUDA device %d" << in_device << " is unavailable (" + UI.num_devices << " compatible devices found)";
+            throw std::runtime_error(ss.str());
+        }
+        else
+            UI.cuda_device = in_device;
+
+        // fill the main structure with a list of the names of every CUDA device
+        for (int di = 0; di < UI.num_devices; di++) {
+            cudaDeviceProp prop;
+            cudaGetDeviceProperties(&prop, di);
+            UI.device_names.push_back(prop.name);
+        }
     }
+    else UI.cuda_device = -1;
 
     // Load the tensor field if it is provided as a command-line argument
     if (vm.count("input")) {
         LoadTensorField(in_inputname, &T0);
-        UI.loaded_filename = in_inputname.c_str();
-        UI.glyph_rows = static_cast<int>(Tn.shape()[0]);
+        Tn = T0;
+        UI.loaded_filename = in_inputname;
+        UI.field_loaded = true;
+        //UI.glyph_rows = static_cast<int>(Tn.shape()[0]);
     }
     else {
     }
@@ -261,19 +276,20 @@ int main(int argc, char** argv) {
     }*/
 
     // create a GLSL window, initialize the OpenGL context, and assign callback functions
-    window = InitWindow(1600, 1200);
-
-    // initialize everything that will be rendered to the OpenGL context
-    InitActors();
+    window = InitWindow(1600, 1200);    
 
 
-
+    InitShaders();
+    InitCmapGeometry();
 
     if (UI.field_loaded) {
         Tn = T0;
         EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
-        UI.camera_position = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
+        RefreshScalarField();
+        RefreshVisualization();
+        //UI.camera_position = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
     }
+    
 
 
     // Main loop

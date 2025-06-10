@@ -10,7 +10,7 @@
 
 #include <tira/image.h>
 
-enum ScalarType { NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity };
+enum ScalarType { NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity, LinearEccentricity };
 enum ProcessingType { NoProcessing, Gaussian, Vote };
 enum AdjustColorType { NoAdjustment, Darken, Lighten };
 
@@ -20,6 +20,7 @@ struct TV2_UI {
     // if the current tensor field is from a file, store the name
     std::string loaded_filename = "";
     bool field_loaded = false;
+    bool field_impulse = false;
 
     // GUI variables for controlling the impulse function parameters
     int impulse_resolution = 31;
@@ -57,10 +58,11 @@ struct TV2_UI {
 
     // glyph display settings
     bool render_glyphs = false;
-    int glyph_rows = 100;
+    //int glyph_rows = 100;
+    //int glyph_cols = 100;
     float glyph_scale = 0.8;
     bool glyph_normalize = false;
-    int glyph_tesselation = 20;
+    int glyph_tesselation = 100;
 
     // human-computer interface variables
     float raw_mouse_position[2];
@@ -70,7 +72,9 @@ struct TV2_UI {
     float camera_zoom = 1.0f;
 
     // CUDA device information
+    int num_devices;
     int cuda_device = -1;
+    std::vector<std::string> device_names;
 };
 
 // File IO function declarations
@@ -82,8 +86,9 @@ void GenerateImpulse(tira::image<glm::mat2>* tensor, unsigned resolution, float 
 GLFWwindow* InitWindow(int width, int height);
 
 // Function to initialize the 3D objects that will be rendered through OpenGL
-void InitActors();
-void GenerateGlyphs(tira::image<float>* lambda, tira::image<float>* theta);
+void InitShaders();
+void InitCmapGeometry();
+void GenerateGlyphs();
 
 // Draw function for the 3D rendering loop
 void RenderFieldOpenGL(GLint display_w, GLint display_h);
@@ -92,6 +97,7 @@ void RenderFieldOpenGL(GLint display_w, GLint display_h);
 void ImGuiRender();
 void ImGuiInit(GLFWwindow* window, const char* glsl_version);
 void ImGuiDestroy();
+void RefreshScalarField();
 
 // callback function signatures
 void glfw_error_callback(int error, const char* description);
@@ -102,12 +108,15 @@ void scroll_callback(GLFWwindow* window, const double xoffset, const double yoff
 // Data processing functions
 glm::vec2 Eigenvector2D(glm::mat2 T, float lambda);
 glm::vec2 Eigenvalues2D(glm::mat2 T);
+float Eccentricity2(float l0, float l1);
+float LinearEccentricity2(float l0, float l1);
 
 
 void GaussianFilter(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
 void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
     const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device);
 void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
+void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_Eigenvalue(tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);
 void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<float>* elements, const unsigned int u, const unsigned int v);
 void ImageFrom_Theta(tira::image<float>* theta, tira::image<float>* scalar, unsigned int i);

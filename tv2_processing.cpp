@@ -78,19 +78,39 @@ void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lamb
     free(eigenvectors_raw);
 }
 
+float Eccentricity2(float l0, float l1) {
+    if (l1 == 0) return 0;
+    const float l0_2 = std::pow(l0, 2.0f);
+    const float l1_2 = std::pow(l1, 2.0f);
+    return std::sqrt(1.0f - l0_2 / l1_2);
+}
+
+float LinearEccentricity2(float l0, float l1) {
+    return std::sqrt((l1 * l1) - (l0 * l0));
+}
+
 void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity) {
     //tira::image<float> ecc(lambda->X(), lambda->Y());
     eccentricity->resize({lambda->X(), lambda->Y()});
 
     for (size_t yi = 0; yi < eccentricity->Y(); yi++) {
         for (size_t xi = 0; xi < eccentricity->X(); xi++) {
-            if ((*lambda)(xi, yi, 1) == 0)
-                (*eccentricity)(xi, yi) = 0;
-            else {
-                const float l02 = std::pow((*lambda)(xi, yi, 0), 2.0f);
-                const float l12 = std::pow((*lambda)(xi, yi, 1), 2.0f);
-                (*eccentricity)(xi, yi) = std::sqrt(1.0f - l02 / l12);
-            }
+            float l0 = (*lambda)(xi, yi, 0);
+            float l1 = (*lambda)(xi, yi, 1);
+            (*eccentricity)(xi, yi) = Eccentricity2(l0, l1);
+        }
+    }
+}
+
+void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity) {
+    //tira::image<float> ecc(lambda->X(), lambda->Y());
+    eccentricity->resize({ lambda->X(), lambda->Y() });
+
+    for (size_t yi = 0; yi < eccentricity->Y(); yi++) {
+        for (size_t xi = 0; xi < eccentricity->X(); xi++) {
+            float l0 = (*lambda)(xi, yi, 0);
+            float l1 = (*lambda)(xi, yi, 1);
+            (*eccentricity)(xi, yi) = LinearEccentricity2(l0, l1);
         }
     }
 }

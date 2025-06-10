@@ -97,6 +97,24 @@ void RefreshScalarField() {
     }
 }
 
+/// <summary>
+/// Completely re-process the field from scratch. This is usually called when a new field is loaded
+/// and processes the field based on the users previous settings.
+/// </summary>
+void ReprocessField() {
+
+    if (UI.processing_type == ProcessingType::Gaussian)
+        GaussianFilter(&T0, &Tn, UI.sigma, UI.cuda_device);
+    else if (UI.processing_type == ProcessingType::Vote)
+        TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+    else
+        Tn = T0;
+    EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
+    RefreshScalarField();
+    GenerateGlyphs();
+    RefreshVisualization();
+}
+
 /// This function renders the user interface every frame
 void ImGuiRender() {
     // Start the Dear ImGui frame
@@ -141,22 +159,60 @@ void ImGuiRender() {
     ImGuiFieldSpecs();
 
     if (ImGui::TreeNodeEx("Generate Impulse", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::InputInt("Resolution", &UI.impulse_resolution, 1);
-        ImGui::SliderFloat("theta", &UI.impulse_theta, 0.0f, std::numbers::pi);
-        ImGui::SliderFloat("anisotropy", &UI.impulse_anisotropy, 0.0f, 1.0f);
-        if (ImGui::Button("Generate Impulse")) {
-            GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
-            Tn = T0;
-            EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
-            RefreshScalarField();
-            RefreshVisualization();
+        if (ImGui::InputInt("Resolution", &UI.impulse_resolution, 1)) {
+            if (UI.field_impulse) {
+                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+                ReprocessField();
+            }
+        }
+        if (ImGui::SliderFloat("theta", &UI.impulse_theta, 0.0f, std::numbers::pi)) {
+            if (UI.field_impulse) {
+                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+                ReprocessField();
+            }
+        }
+        if (ImGui::SliderFloat("anisotropy", &UI.impulse_anisotropy, 0.0f, 1.0f)) {
+            if (UI.field_impulse) {
+                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+                ReprocessField();
+            }
+        }
+        if (!UI.field_impulse) {
+            if (ImGui::Button("Impulse On")) {
+                UI.field_impulse = true;
+                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+                ReprocessField();
+            }
+        }
+        else {
+            if (ImGui::Button("Impulse Off")) {
+                UI.field_impulse = false;
+            }
         }
 
         ImGui::TreePop();
     }
+    const char* combo_preview_value = UI.device_names[UI.cuda_device + 1].c_str();
+    if (ImGui::BeginCombo("CUDA Device", combo_preview_value))
+    {
+        for (int n = 0; n < UI.num_devices + 1; n++)
+        {
+            const bool is_selected = (UI.cuda_device + 1 == n);
+            if (ImGui::Selectable(UI.device_names[n].c_str(), is_selected))
+                UI.cuda_device = n - 1;
+
+            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+            if (is_selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
 
     // select scalar component
     if (ImGui::Button("Reset View")) UI.camera_zoom = 1.0f;
+    //float cam_pos[2] = { UI.camera_position[0], UI.camera_position[1] };
+    ImGui::InputFloat2("Camera Position", (float*)&UI.camera_position);
+    ImGui::InputFloat("Camera Zoom", &UI.camera_zoom);
 
     if (ImGui::Button("Save Image"))					// create a button for loading the shader
         ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
@@ -175,8 +231,8 @@ void ImGuiRender() {
 
 
     ImGui::SeparatorText("Scalar Display");
-    ImGui::RadioButton("None", &UI.processing_type, (int)ScalarType::NoScalar);
-    if (ImGui::RadioButton("[0, 0] = dxdx", &UI.processing_type, (int)ScalarType::Tensor00)) {
+    ImGui::RadioButton("None", &UI.scalar_type, (int)ScalarType::NoScalar);
+    if (ImGui::RadioButton("[0, 0] = dxdx", &UI.scalar_type, (int)ScalarType::Tensor00)) {
         //ScalarRefresh();
         ImageFrom_TensorElement2D(&Tn, &Scalar, 0, 0);
         UI.scalar_min = Scalar.minv();
@@ -184,46 +240,52 @@ void ImGuiRender() {
         RefreshVisualization();
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("[1, 1] = dydy", &UI.processing_type, (int)ScalarType::Tensor11)) {
+    if (ImGui::RadioButton("[1, 1] = dydy", &UI.scalar_type, (int)ScalarType::Tensor11)) {
         ImageFrom_TensorElement2D(&Tn, &Scalar, 1, 1);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
-    if (ImGui::RadioButton("[0, 1] = dxdy", &UI.processing_type, (int)ScalarType::Tensor01)) {
+    if (ImGui::RadioButton("[0, 1] = dxdy", &UI.scalar_type, (int)ScalarType::Tensor01)) {
         ImageFrom_TensorElement2D(&Tn, &Scalar, 0, 1);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
-    if (ImGui::RadioButton("lambda 0", &UI.processing_type, (int)ScalarType::EVal0)) {
+    if (ImGui::RadioButton("lambda 0", &UI.scalar_type, (int)ScalarType::EVal0)) {
         ImageFrom_Eigenvalue(&Lambda, &Scalar, 0);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("lambda 1", &UI.processing_type, (int)ScalarType::EVal1)) {
+    if (ImGui::RadioButton("lambda 1", &UI.scalar_type, (int)ScalarType::EVal1)) {
         ImageFrom_Eigenvalue(&Lambda, &Scalar, 1);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
 
-    if (ImGui::RadioButton("eccentricity", &UI.processing_type, (int)ScalarType::Eccentricity)) {
+    if (ImGui::RadioButton("eccentricity", &UI.scalar_type, (int)ScalarType::Eccentricity)) {
         ImageFrom_Eccentricity(&Lambda, &Scalar);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
-    if (ImGui::RadioButton("evec 0 (theta)", &UI.processing_type, (int)ScalarType::EVec0)) {
+    if (ImGui::RadioButton("linear eccentricity", &UI.scalar_type, (int)ScalarType::LinearEccentricity)) {
+        ImageFrom_LinearEccentricity(&Lambda, &Scalar);
+        UI.scalar_min = Scalar.minv();
+        UI.scalar_max = Scalar.maxv();
+        RefreshVisualization();
+    }
+    if (ImGui::RadioButton("evec 0 (theta)", &UI.scalar_type, (int)ScalarType::EVec0)) {
         ImageFrom_Theta(&Theta, &Scalar, 0);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
         RefreshVisualization();
     }
     ImGui::SameLine();
-    if (ImGui::RadioButton("evec 1 (theta)", &UI.processing_type, (int)ScalarType::EVec1)) {
+    if (ImGui::RadioButton("evec 1 (theta)", &UI.scalar_type, (int)ScalarType::EVec1)) {
         ImageFrom_Theta(&Theta, &Scalar, 1);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
@@ -234,7 +296,7 @@ void ImGuiRender() {
     ss << "Min: " << UI.scalar_min << "\t Max: " << UI.scalar_max;
     ImGui::Text("%s", ss.str().c_str());
 
-    if (UI.processing_type == ScalarType::EVec0 || UI.processing_type == ScalarType::EVec1) {
+    if (UI.scalar_type == ScalarType::EVec0 || UI.scalar_type == ScalarType::EVec1) {
         ImGui::SeparatorText("Eigenvector Display");
         if (ImGui::RadioButton("Negative Evals", &UI.signed_eigenvalues, -1)) {
             RefreshVisualization();
@@ -294,12 +356,14 @@ void ImGuiRender() {
                 GaussianFilter(&T0, &Tn, UI.sigma, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
             else {
                 Tn = T0;
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
@@ -310,6 +374,7 @@ void ImGuiRender() {
                 GaussianFilter(&T0, &Tn, UI.sigma, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
@@ -319,6 +384,7 @@ void ImGuiRender() {
             TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
             EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
             RefreshScalarField();
+            GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
             RefreshVisualization();
         }
         if (ImGui::InputFloat("Sigma 1", &UI.sigma1, 0.2f, 1.0f)) {
@@ -327,6 +393,7 @@ void ImGuiRender() {
                 TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
@@ -336,6 +403,7 @@ void ImGuiRender() {
                 TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
@@ -345,6 +413,7 @@ void ImGuiRender() {
                 TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
@@ -352,6 +421,7 @@ void ImGuiRender() {
             TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
             EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
             RefreshScalarField();
+            GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
             RefreshVisualization();
         }
         ImGui::SameLine();
@@ -359,15 +429,16 @@ void ImGuiRender() {
             TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
             EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
             RefreshScalarField();
+            GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
             RefreshVisualization();
         }
 
         ImGui::TreePop();
     }
 
-    if (ImGui::Checkbox("Glyphs", &UI.render_glyphs)) InitActors();
+    ImGui::Checkbox("Glyphs", &UI.render_glyphs);
     ImGui::InputFloat("Glyph Scale", &UI.glyph_scale, 0.1f, 1.0f);
-    if (ImGui::InputInt("Tesselate", &UI.glyph_tesselation, 1, 10)) InitActors();
+    if (ImGui::InputInt("Tesselate", &UI.glyph_tesselation, 1, 10)) GenerateGlyphs();
     ImGui::Checkbox("Scale by Norm", &UI.glyph_normalize);
 
     int FieldIndex[2] = { static_cast<int>(UI.field_mouse_position[0]), static_cast<int>(UI.field_mouse_position[1]) };
@@ -400,7 +471,16 @@ void ImGuiRender() {
             // display the eigenvalues
             ImGui::Text("Eigenvalues:");
             float lambdas[2] = { evals[0], evals[1] };
-            ImGui::InputFloat2("##lambdas", lambdas, "%1.5F");
+            ImGui::InputFloat2("##lambdas", lambdas, "%1.5e");
+            ImGui::Text("Eccentricity:");
+            ImGui::Columns(2);
+            float e = Eccentricity2(lambdas[0], lambdas[1]);
+            ImGui::InputFloat("e", &e, 0.0f, 0.0f, "%1.5e");
+            //ImGui::SameLine();
+            float c = LinearEccentricity2(lambdas[0], lambdas[1]);
+            ImGui::InputFloat("c", &c, 0.0f, 0.0f, "%1.5e");
+
+            ImGui::Columns(1);
 
             // calculate the eigenvectors
             glm::vec2 ev0 = Eigenvector2D(T, evals[0]);
@@ -411,6 +491,8 @@ void ImGuiRender() {
             ImGui::Columns(2);
             ImGui::InputFloat2("x0, y0", reinterpret_cast<float*>(&ev0), "%1.5F");
             ImGui::InputFloat2("x1, y1", reinterpret_cast<float*>(&ev1), "%1.5F");
+
+            
 
         }
     }

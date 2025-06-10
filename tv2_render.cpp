@@ -43,7 +43,8 @@ tira::glMaterial* testmaterial;
 
 /// Generates the glyph geometry and stores it in a geometry structure for rendering
 void GenerateGlyphs() {
-    if (!UI.render_glyphs) return;                     // don't update if they aren't being displayed
+    //if (!UI.render_glyphs) return;                     // don't update if they aren't being displayed
+    if (Tn.size() == 0) return;
 
     tira::trimesh<float> circle = tira::circle<float>(UI.glyph_tesselation).scale({ 0.0f, 0.0f });
 
@@ -117,6 +118,7 @@ void GenerateColormap() {
     case ScalarType::Tensor11:
     case ScalarType::Tensor01:
     case ScalarType::Eccentricity:
+    case ScalarType::LinearEccentricity:
         if (ScalarMin >= 0)
             ColorMapImage = Scalar.cmap(0, ScalarMax, ColorMap::Magma);
         else
@@ -193,18 +195,19 @@ GLFWwindow* InitWindow(int width, int height) {
 }
 
 // initialize everything that will be rendered (colormapped images and glyph geometry)
-void InitActors() {
-    cmapGeometry = tira::glGeometry::GenerateRectangle<float>();
+void InitShaders() {
     cmapMaterial = new tira::glMaterial(colormap_shader_string);
     glyphMaterial = new tira::glMaterial(glyph_shader_string);
 }
 
+void InitCmapGeometry() {
+    cmapGeometry = tira::glGeometry::GenerateRectangle<float>();
+}
+
 /// Refresh the entire visualizaiton, including glyphs, camera parameters, and scalar fields
 void RefreshVisualization() {
-    UI.glyph_rows = static_cast<int>(Tn.shape()[0]);
-
     GenerateColormap();
-    InitActors();
+    UpdateGlyphTextures(&Lambda, &Theta);
     UI.camera_position = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
 }
 
