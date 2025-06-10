@@ -4,7 +4,7 @@
 #include <tira/math/eigen.cuh>
 
 
-glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
     cudaSetDevice(deviceID);
@@ -13,7 +13,7 @@ glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int 
     return dest;
 }
 
-float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
+float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
     cudaSetDevice(deviceID);
@@ -43,7 +43,7 @@ float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height
     return dest;
 }
 
-float* cudaEigenvalues2(float* tensors, unsigned int n, int device) {
+float* EigenValues2(float* tensors, unsigned int n, int device) {
     if (device < 0) return tira::cpu::Eigenvalues2D<float>(tensors, n);
 
     return tira::cuda::Eigenvalues2D<float>(tensors, n, device);
@@ -55,7 +55,7 @@ float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
     return tira::cuda::Eigenvalues3D<float>(tensors, n);
 }
 
-float* cudaEigenvectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
+float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
     if (device < 0) return tira::cpu::Eigenvectors2DPolar(tensors, evals, n);
 
     return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n, device);

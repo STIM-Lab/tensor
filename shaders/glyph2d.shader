@@ -13,6 +13,8 @@ uniform mat4 Mview;
 uniform mat4 Mobj;
 uniform float scale;
 uniform float norm;
+uniform float max_ecc = 0.99;
+uniform float max_n = 5.0f;
 uniform sampler2D lambda;
 uniform sampler2D evecs;
 
@@ -37,7 +39,7 @@ float eccentricity(float l0, float l1){
 	return sqrt(1.0f - ratio);	// otherwise calculate the elliptical eccentricity [0, 1]
 }
 
-float superquadric(float ecc, float theta, float l0, float l1){
+float old_superquadric(float ecc, float theta, float l0, float l1){
 	float gamma = ecc;
 	float beta = pow(1.0f - ecc, gamma);
 	if(beta < 0.1) beta = 0.1;
@@ -54,6 +56,19 @@ float superquadric(float ecc, float theta, float l0, float l1){
 	return r;
 }
 
+float superquadric(float ecc, float theta){
+	float n = mix(2.0f, max_n, ecc);
+	float a = 1.0f;
+	float b = sqrt(1.0f - (ecc * ecc));
+
+	float cos_theta = cos(theta);
+	float sin_theta = sin(theta);
+	float cos_theta_n = pow(abs(cos_theta/a), n);
+	float sin_theta_n = pow(abs(sin_theta/b), n);
+	float r = 0.5 * scale * pow(cos_theta_n + sin_theta_n, -1.0f/n);
+	return r;
+}
+
 void main() {
 
 	// fetch the eigenvalues
@@ -64,10 +79,11 @@ void main() {
 	vec4 ev = texelFetch(evecs, tensor_coord, 0);
 
 	// calculate the tensor eccentricity
-	float ecc = eccentricity(l.x, l.y);
+	float ecc = min(eccentricity(l.x, l.y), max_ecc);
 
 	// calculate the position on the superquadric
-	float sq = superquadric(ecc, t.y - ev.y, l.x, l.y);
+	//float sq = superquadric(ecc, t.y - ev.y, l.x, l.y);
+	float sq = superquadric(ecc, t.y - ev.y);
 
 	if(norm != 0){
 	    sq = sq * l.y / norm;

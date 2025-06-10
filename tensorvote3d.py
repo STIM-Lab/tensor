@@ -1,6 +1,7 @@
 import math
 import matplotlib
 import numpy as np
+import image2tensor as it
 import matplotlib.pyplot as plt
 from scipy import special as sp
 
@@ -247,6 +248,7 @@ def platefield3_previous(RX, RY, RZ, sigma1, sigma2=0, normalize=True):
     ALPHA = (d[:, :, :, 0, 0]**2) + (d[:, :, :, 1, 0]**2)
     ALPHA = ALPHA[:, :, :, np.newaxis, np.newaxis] * np.ones((1, 1, 1, 3, 3))
     
+    
     # define the terms
     shared_term = D_tilde + D_tilde_T - (2*ALPHA*D)
     A = np.zeros((RX.shape[0], RX.shape[1], RX.shape[2], 3, 3))
@@ -347,6 +349,7 @@ def platevote3(T, sigma=3, sigma2=0, p=1, normalize=True):
     VOTE = VF[pad:-pad, pad:-pad, pad:-pad, :, :]
     return VOTE
 
+
 # generate an impulse tensor field to test tensor voting
 # N is the size of the field (it will be a cube)
 # x, y, z is the orientation of the largest eigenvector
@@ -440,3 +443,4 @@ def visualize3(P):
     Cs = np.divide(threel0, l0l1l2, out=np.zeros_like(l0), where=l0l1l2!=0)    
     plt.imshow(Cs, vmin=0, vmax=1)
     plt.title("Spherical Anisotropy")
+    
