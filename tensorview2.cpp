@@ -228,27 +228,21 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // make sure there the specified CUDA device is available (otherwise switch to CPU)
-    UI.device_names.push_back("CPU");
-    if (in_device >= 0) {
-        cudaError_t error = cudaGetDeviceCount(&UI.num_devices);
-        if (error != cudaSuccess) UI.num_devices = 0;
-        if (UI.num_devices <= in_device) {
-            std::stringstream ss;
-            ss << "WARNING: Specified CUDA device %d" << in_device << " is unavailable (" + UI.num_devices << " compatible devices found)";
-            throw std::runtime_error(ss.str());
-        }
-        else
-            UI.cuda_device = in_device;
+    // set up CUDA devices
+    UI.device_names.push_back("CPU");                            // push the CPU as the first device option
+    cudaError_t error = cudaGetDeviceCount(&UI.num_devices);    // get the number of CUDA devices
 
-        // fill the main structure with a list of the names of every CUDA device
-        for (int di = 0; di < UI.num_devices; di++) {
-            cudaDeviceProp prop;
-            cudaGetDeviceProperties(&prop, di);
-            UI.device_names.push_back(prop.name);
-        }
+    // fill the main structure with a list of the names of every CUDA device
+    for (int di = 0; di < UI.num_devices; di++) {
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, di);
+        UI.device_names.push_back(prop.name);
     }
-    else UI.cuda_device = -1;
+
+    if (error != cudaSuccess) UI.num_devices = 0;                    // if the device count function returns an error, there are no devices
+    if (UI.num_devices <= in_device) UI.cuda_device = -1;            // if the specified device is out of range, set it to the CPU
+    else UI.cuda_device = in_device;                                 // otherwise use the specified CUDA device
+
 
     // Load the tensor field if it is provided as a command-line argument
     if (vm.count("input")) {

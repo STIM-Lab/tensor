@@ -15,7 +15,7 @@ enum ProcessingType { NoProcessing, Gaussian, Vote };
 enum AdjustColorType { NoAdjustment, Darken, Lighten };
 
 struct TV2_UI {
-    float scale = 1.0f;         // user interface scale (font size, etc.)
+    float scale = 1.5f;         // user interface scale (font size, etc.)
 
     // if the current tensor field is from a file, store the name
     std::string loaded_filename = "";
@@ -23,7 +23,7 @@ struct TV2_UI {
     bool field_impulse = false;
 
     // GUI variables for controlling the impulse function parameters
-    int impulse_resolution = 31;
+    int impulse_resolution = 13;
     float impulse_theta = 0;
     float impulse_anisotropy = 0;
 
@@ -40,7 +40,7 @@ struct TV2_UI {
     int processing_type = ProcessingType::NoProcessing;
 
     // processing settings for a gaussian blur
-    float sigma = 3.0f;
+    float sigma = 1.0f;
 
     // processing for tensor voting
     bool stick_voting = true;
