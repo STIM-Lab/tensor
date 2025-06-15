@@ -21,9 +21,9 @@ float in_dx, in_dy, in_dz;
 std::vector<unsigned int> in_crop_loc, in_crop_len;
 int in_device;						// cuda device
 
-glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-float* cudaGaussianBlur(float* source, unsigned int width, unsigned int height, float sigma,
+float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
@@ -31,7 +31,7 @@ glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned in
 float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, 
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
 	unsigned int& out_depth, int deviceID = 0);
-float* cudaEigenvalues2(float* tensors, unsigned int n, int device);
+float* EigenValues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 		if (in_blur > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			float* raw_field = cudaGaussianBlur(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height);
+			float* raw_field = GaussianBlur2D(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height);
 			grey = tira::image<float>(raw_field, raw_width, raw_height);
 			free(raw_field);
 			grey.cmap().save("grey.bmp");
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			glm::mat2* raw_field = cudaGaussianBlur(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height);
+			glm::mat2* raw_field = GaussianBlur2D(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height);
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 			bool keep_positives = true;
 			if(vm.count("negatives")) keep_positives = false;
 
-			float* evals = cudaEigenvalues2((float*)T.data(), T.X() * T.Y(), in_device);
+			float* evals = EigenValues2((float*)T.data(), T.X() * T.Y(), in_device);
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				for (size_t xi = 0; xi < T.X(); xi++) {
 					size_t i = yi * T.X() + xi;

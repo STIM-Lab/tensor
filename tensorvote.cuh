@@ -6,11 +6,11 @@
 
 
 
-struct VoteContribution2D
+/*struct VoteContribution2D
 {
     glm::mat2 votes;
     float decay;
-};
+};*/
 
 struct TensorAngleCalculation2D
 {

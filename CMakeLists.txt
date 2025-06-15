@@ -75,14 +75,14 @@ include_directories(
 
 # tensorview executable
 add_executable(tensorview2
-				tensorview2.cpp
+				tview2.cpp
 				ImGuiFileDialog/ImGuiFileDialog.cpp
-				tv2_render.cpp
-				tv2_imgui.cpp
-				tv2_processing.cpp
-				tv2_io.cpp
-				tv2_callbacks.cpp
-				tv2.h
+				tview2_render.cpp
+				tview2_imgui.cpp
+				tview2_processing.cpp
+				tview2_io.cpp
+				tview2_callbacks.cpp
+				tview2.h
 				cuda_calls.cu
 				tensorvote.cu
 )
