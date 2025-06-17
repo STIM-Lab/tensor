@@ -6,24 +6,13 @@
 #include <cuda_runtime.h>
 
 #include "tview2.h"
-
-
-
-
 #include "tira/image.h"
 
-
-
-
-
-
+#include <imgui.h>
+#include <imgui_impl_opengl3.h>
 
 #include <sstream>
 #include <string>
-#include <complex>
-
-// Function signatures for processing the tensor field
-void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lambda, tira::image<float>* theta, int cuda_device = 0);
 
 glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
@@ -32,10 +21,6 @@ void cudaVote2D(float* input_field, float* output_field,
     unsigned int s0, unsigned int s1,
     float sigma, float sigma2,
     unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug);
-
-
-
-void RefreshVisualization();
 
 TV2_UI UI;                            // structure stores the GUI information for tensorview2
 
@@ -64,142 +49,12 @@ tira::image<float> Scalar;              // scalar component for the current tens
 
 tira::image<unsigned char> CurrentColormap;
 
-//float MINVAL, MAXVAL;
-//float MAXNORM;                          // maximum matrix norm in the field (size of the largest tensor)
-//int DIMENSION;
-
-//float SCALE = 0.3;
 
 
 // Functions for updating individual components of the processed tensor field
 void UpdateEigenDecomposition() {
     EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
 }
-
-
-
-
-
-
-
-
-
-
-
-/*tira::image<unsigned char> ColormapTensor(const unsigned int row, const unsigned int col) {
-    SCALAR = tira::image<float>(Tn.shape()[1], Tn.shape()[0], 1);
-
-    for (unsigned int yi = 0; yi < Tn.shape()[0]; yi++) {
-        for (unsigned int xi = 0; xi < Tn.shape()[1]; xi++) {
-            const float val = Timg(xi, yi, row, col);
-            SCALAR(xi, yi, 0) = val;
-        }
-    }
-    float maxmag = std::max(std::abs(SCALAR.maxv()), std::abs(SCALAR.minv()));  // calculate the highest magnitude scalar value
-    MAXVAL = maxmag;
-    MINVAL = -maxmag;
-    tira::image<unsigned char> C = SCALAR.cmap(MINVAL, MAXVAL, ColorMap::Brewer);
-    return C;
-}
-
-tira::image<unsigned char> ColormapEval(const unsigned int i) {
-    tira::image<float> L = Lambda.channel(i);
-    MAXVAL = Lambda.maxv();
-    MINVAL = Lambda.minv();
-    float MaxMag = std::max(std::abs(MAXVAL), std::abs(MINVAL));
-    tira::image<unsigned char> C = Lambda.channel(i).cmap(-MaxMag, MaxMag, ColorMap::Brewer);
-    return C;
-}
-
-
-
-tira::image<unsigned char> ColormapEccentricity() {
-    tira::image<float> ecc = CalculateEccentricity();
-    MAXVAL = 1.0;
-    MINVAL = 0.0;
-    CurrentColormap = ecc.cmap(0, 1, ColorMap::Magma);
-    return CurrentColormap;
-}
-*/
-
-
-
-
-
-
-/// <summary>
-/// Create a scalar image from the specified eigenvalue
-/// </summary>
-/*void ScalarFrom_Eccentricity() {
-    CurrentColormap = ColormapEccentricity();
-    CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
-}
-
-/// <summary>
-/// Create a scalar image from the specified eigenvector and component
-/// </summary>
-/// <param name="i"></param>
-void ScalarFrom_Evec(const unsigned int i) {
-    Scalar = Theta.channel(i);
-    CurrentColormap = ColormapEvec(i);
-    CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
-}
-*/
-
-
-/*void ScalarRefresh() {
-    if (!FIELD_LOADED) return;              // return if there's no field loaded
-
-    // calculate the max norm
-    ScalarFrom_Eval(0);
-    MAXNORM = MAXVAL;
-
-    switch (UI.scalar_type) {
-    case ScalarType::EVal0:
-        ScalarFrom_Eval(0);
-        break;
-    case ScalarType::EVal1:
-        ScalarFrom_Eval(1);
-        break;
-    case ScalarType::EVec0:
-        ScalarFrom_Evec(0);
-        break;
-    case ScalarType::EVec1:
-        ScalarFrom_Evec(1);
-        break;
-    case ScalarType::Tensor00:
-        ScalarFrom_TensorElement2D(0, 0);
-        break;
-    case ScalarType::Tensor11:
-        ScalarFrom_TensorElement2D(1, 1);
-        break;
-    case ScalarType::Tensor01:
-        ScalarFrom_TensorElement2D(0, 1);
-        break;
-    case ScalarType::Eccentricity:
-        ScalarFrom_Eccentricity();
-        break;
-    default:
-        throw std::runtime_error("Invalid scalar type");
-    }
-    MAXVAL = Scalar.maxv();
-    MINVAL = Scalar.minv();
-}*/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 int main(int argc, char** argv) {
     // Declare the supported options.
@@ -229,14 +84,14 @@ int main(int argc, char** argv) {
     }
 
     // set up CUDA devices
-    UI.device_names.push_back("CPU");                            // push the CPU as the first device option
+    UI.device_names.emplace_back("CPU");                            // push the CPU as the first device option
     cudaError_t error = cudaGetDeviceCount(&UI.num_devices);    // get the number of CUDA devices
 
     // fill the main structure with a list of the names of every CUDA device
     for (int di = 0; di < UI.num_devices; di++) {
-        cudaDeviceProp prop;
+        cudaDeviceProp prop{};
         cudaGetDeviceProperties(&prop, di);
-        UI.device_names.push_back(prop.name);
+        UI.device_names.emplace_back(prop.name);
     }
 
     if (error != cudaSuccess) UI.num_devices = 0;                    // if the device count function returns an error, there are no devices
@@ -250,24 +105,10 @@ int main(int argc, char** argv) {
         Tn = T0;
         UI.loaded_filename = in_inputname;
         UI.field_loaded = true;
-        //UI.glyph_rows = static_cast<int>(Tn.shape()[0]);
     }
     else {
     }
 
-    /*if (FIELD_LOADED) {
-        if (vm.count("blur")) {
-            GaussianFilter(&T0, &Tn, in_blur_strength, in_device);
-        }
-        if (vm.count("l0")) ColormapEval(0).save(in_l0_outputname);
-        if (vm.count("l1")) ColormapEval(1).save(in_l1_outputname);
-        if (vm.count("v0")) ColormapEvec(0).save(in_v0_outputname);
-        if (vm.count("v1")) ColormapEvec(1).save(in_v1_outputname);
-
-        if (vm.count("nogui")) {
-            return 0;
-        }
-    }*/
 
     // create a GLSL window, initialize the OpenGL context, and assign callback functions
     window = InitWindow(1600, 1200);    
@@ -281,7 +122,6 @@ int main(int argc, char** argv) {
         EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
         RefreshScalarField();
         RefreshVisualization();
-        //UI.camera_position = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
     }
     
 
@@ -296,7 +136,6 @@ int main(int argc, char** argv) {
         glfwGetFramebufferSize(window, &display_w, &display_h);
 
         glViewport(0, 0, display_w, display_h);                     // specifies the area of the window where OpenGL can render
-        //glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
         glClear(GL_COLOR_BUFFER_BIT);                               // clear the Viewport using the clear color

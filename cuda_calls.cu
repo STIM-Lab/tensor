@@ -5,8 +5,8 @@
 #include <tira/filter.h>
 
 
-glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-                            unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
+glm::mat2* GaussianBlur2D(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,
+                            unsigned int& out_width, unsigned int& out_height, const int deviceID = 0) {
     if (deviceID < 0) {
         unsigned kernel_size = (unsigned)(6 * sigma);
         float* gauss = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
@@ -66,9 +66,9 @@ float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height
 }
 
 float* EigenValues2(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::Eigenvalues2D<float>(tensors, n);
+    if (device < 0) return tira::cpu::eigenvalues2<float>(tensors, n);
 
-    return tira::cuda::Eigenvalues2D<float>(tensors, n, device);
+    return tira::cuda::eigenvalues2<float>(tensors, n, device);
 }
 
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
@@ -78,9 +78,9 @@ float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
 }
 
 float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::Eigenvectors2DPolar(tensors, evals, n);
+    if (device < 0) return tira::cpu::eigenvectors2polar(tensors, evals, n);
 
-    return tira::cuda::Eigenvectors2DPolar<float>(tensors, evals, n, device);
+    return tira::cuda::eigenvectors2polar<float>(tensors, evals, n, device);
 }
 
 float* cudaEigenvectors3DPolar(float* tensors, float* evals, unsigned int n, int device) {
@@ -111,7 +111,7 @@ void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsi
 }
 
 void cudaEigenvalue0(float* tensors, unsigned int n, float* evals, int device) {
-    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n, device);
+    float* both_evals = tira::cuda::eigenvalues2<float>(tensors, n, device);
     for (size_t i = 0; i < n; i++) {
         evals[i] = both_evals[2 * i];
     }
@@ -119,7 +119,7 @@ void cudaEigenvalue0(float* tensors, unsigned int n, float* evals, int device) {
 }
 
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals, int device) {
-    float* both_evals = tira::cuda::Eigenvalues2D<float>(tensors, n, device);
+    float* both_evals = tira::cuda::eigenvalues2<float>(tensors, n, device);
     for (size_t i = 0; i < n; i++) {
         evals[i] = both_evals[2 * i + 1];
     }

@@ -6,15 +6,11 @@
 #include <tira/eigen.cuh>
 
 #include <tira/tensorvote.cuh>
-//#include "tensorvote.cuh"
-#include <stdio.h>
 #include <string>
 #include <iostream>
 #include <boost/math/special_functions/beta.hpp>
 #include <boost/math/special_functions/hypergeometric_pFq.hpp>
 
-#include <iostream>
-#include <numbers>
 #include <chrono>
 #include <driver_types.h>
 #include <cuda_runtime_api.h>
@@ -66,121 +62,15 @@ struct TensorAngleCalculation3D
 
 void save_field3D(float* field, unsigned int sx, unsigned int sy, unsigned int sz, unsigned int vals, std::string filename);
 
-
-/*static void HandleError(cudaError_t err, const char* file, int line)
-{
-    if (err != cudaSuccess)
-    {
-        std::cout << cudaGetErrorString(err) << "in" << file << "at line" << line << std::endl;
-    }
-}
-#define HANDLE_ERROR(err) (HandleError(err, __FILE__, __LINE__))
-*/
-
-
-
-
-
-
-/// @brief The kernel to perform the tensor voting on the GPU
-/// @param data Input tensor field
-/// @param VT Output tensor field
-/// @param eigenvalues Eigenvalues of the input tensor field
-/// @param eigenvectors Eigenvalues of the input tensor field
-/// @param sigma Sigma value for the decay function
-/// @param w Window size
-/// @param width Tensor field width in pixels
-/// @param height Tensor field height in pixels
-/*__global__ void kernelStickVote2D(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, float norm, int w, int s0, int s1) {
-    int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
-    int x1 = blockDim.y * blockIdx.y + threadIdx.y;
-
-    if (x0 >= s0 || x1 >= s1)                                                          // if not within bounds of image, return
-        return;
-
-    glm::mat2 Votee(0.0f);
-
-    int hw = w / 2;
-    int r0, r1;
-    for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
-        r0 = x0 + v;
-        if (r0 >= 0 && r0 < s0) {
-            for (int u = -hw; u < hw; u++) {
-
-                r1 = x1 + u;
-                if (r1 >= 0 && r1 < s1) {
-                    // calculate the contribution of (u,v) to (x,y)
-                    float Vcart[2];
-                    Vcart[0] = std::cos(V[(r0 * s1 + r1) * 2 + 1]);
-                    Vcart[1] = std::sin(V[(r0 * s1 + r1) * 2 + 1]);
-                    //VoteContribution2D vote = StickVote2D(u, v, sigma1, sigma2, Vcart, power);
-                    glm::vec2 uv(u, v);
-                    glm::vec2 sigma(sigma1, sigma2);
-                    glm::vec2 evec(Vcart[0], Vcart[1]);
-                    glm::mat2 vote = stickvote2(uv, sigma, evec, power);
-                    float l0 = L[(r0 * s1 + r1) * 2 + 0];
-                    float l1 = L[(r0 * s1 + r1) * 2 + 1];
-                    float scale = std::abs(l1) - std::abs(l0);
-                    if(l1 < 0) scale = scale * (-1);
-                    //Votee = Votee + scale * vote.votes * norm * vote.decay;
-                    Votee = Votee + scale * vote * norm;
-                }
-            }
-        }
-    }
-    
-    VT[4 * (x0 * s1 + x1) + 0] += Votee[0][0];
-    VT[4 * (x0 * s1 + x1) + 1] += Votee[1][0];
-    VT[4 * (x0 * s1 + x1) + 2] += Votee[0][1];
-    VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
-}
-*/
-
-/*__global__ void kernelPlateVote2D(float* VT, float* L, float* V, float sigma1, float sigma2, unsigned int power, int w, int s0, int s1) {
-    int x0 = blockDim.x * blockIdx.x + threadIdx.x;                                       // get the x and y image coordinates for the current thread
-    int x1 = blockDim.y * blockIdx.y + threadIdx.y;
-
-    if (x0 >= s0 || x1 >= s1)                                                          // if not within bounds of image, return
-        return;
-
-    glm::mat2 Votee(0.0f);
-
-    int hw = w / 2;
-    int r0, r1;
-    for (int v = -hw; v < hw; v++) {                    // for each pixel in the window
-        r0 = x0 + v;
-        if (r0 >= 0 && r0 < s0) {
-            for (int u = -hw; u < hw; u++) {
-                r1 = x1 + u;
-                if (r1 >= 0 && r1 < s1) {
-                    float l0 = L[(r0 * s1 + r1) * 2 + 0];
-                    glm::vec2 uv(u, v);
-                    glm::vec2 sigma(sigma1, sigma2);
-                    Votee = Votee + l0 * platevote2(uv, sigma);
-                }
-            }
-        }
-    }
-
-    VT[4 * (x0 * s1 + x1) + 0] += Votee[0][0];
-    VT[4 * (x0 * s1 + x1) + 1] += Votee[1][0];
-    VT[4 * (x0 * s1 + x1) + 2] += Votee[0][1];
-    VT[4 * (x0 * s1 + x1) + 3] += Votee[1][1];
-}*/
-
-
-
-
-
 /// <summary>
 /// Calculate the stick vote for the relative position (u, v) given the voter eigenvales and eigenvectors
 /// </summary>
 /// <param name="u">u coordinate for the relative position of the receiver</param>
 /// <param name="v">v coordinate for the relative position of the receiver</param>
-/// <param name="sigma">decay value (standard deviation)</param>
+/// <param name="sigma1">decay value (standard deviation)</param>
 /// <param name="eigenvectors">array containing the largest eigenvector</param>
 /// <returns></returns>
-__host__ __device__  VoteContribution3D StickVote3D(float u, float v, float w, float sigma1, float sigma2, float* eigenvectors, unsigned int power) {
+__host__ __device__  VoteContribution3D StickVote3D(const float u, const float v, const float w, const float sigma1, const float sigma2, const float* eigenvectors, const unsigned int power) {
 
     glm::vec3 q(eigenvectors[0], eigenvectors[1], eigenvectors[2]);             // get the eigenvector
 

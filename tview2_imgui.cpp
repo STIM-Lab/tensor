@@ -118,24 +118,27 @@ void ReprocessField() {
 
 void RenderInspectionWindow() {
 
-    int FieldIndex[2] = { static_cast<int>(UI.field_mouse_position[0]), static_cast<int>(UI.field_mouse_position[1]) };
-    float f0 = UI.field_mouse_position[0];
-    float f1 = UI.field_mouse_position[1];
+    const int FieldIndex[2] = { static_cast<int>(UI.field_mouse_position[0]), static_cast<int>(UI.field_mouse_position[1]) };
+    const float f0 = UI.field_mouse_position[0];
+    const float f1 = UI.field_mouse_position[1];
+
+    const int f0_i = static_cast<int>(f0);
+    const int f1_i = static_cast<int>(f1);
 
     if (UI.field_loaded) {
-        if ((f0 < 0 || f0 >= static_cast<int>(Tn.width()))
-            && (f1 < 0 || f1 >= static_cast<int>(Tn.height())))
+        if ((f0 < 0 || f0 >= static_cast<float>(Tn.width()))
+            && (f1 < 0 || f1 >= static_cast<float>(Tn.height())))
             ImGui::Text("Field Index: ---, ---");
-        else if (f1 < 0 || f1 >= static_cast<int>(Tn.height()))
+        else if (f1 < 0 || f1 >= static_cast<float>(Tn.height()))
             ImGui::Text("Field Index: %d, ---", FieldIndex[0]);
-        else if (f0 < 0 || f0 >= static_cast<int>(Tn.width()))
-            ImGui::Text("Field Index: ---, %d", (int)f1);
+        else if (f0 < 0 || f0 >= static_cast<float>(Tn.width()))
+            ImGui::Text("Field Index: ---, %d", f1_i);
         else {
-            ImGui::Text("Field Index: %d, %d", (int)f0, (int)f1);
+            ImGui::Text("Field Index: %d, %d", f0_i, f1_i);
 
 
             // get the current tensor value
-            glm::mat2 T = Tn((int)f0, (int)f1);
+            glm::mat2 T = Tn(static_cast<int>(f0), static_cast<int>(f1));
 
             // display the current tensor as a matrix
             ImGui::Text("Tensor:");
@@ -147,7 +150,7 @@ void RenderInspectionWindow() {
             // calculate the eigenvalues
             //glm::vec2 evals = Eigenvalues2D(T);
             float eval0, eval1;
-            eval2D<float>((float*)&T, eval0, eval1);
+            eval2D<float>(reinterpret_cast<float*>(&T), eval0, eval1);
             glm::vec2 evals(eval0, eval1);
 
             // display the eigenvalues
@@ -166,7 +169,7 @@ void RenderInspectionWindow() {
 
             // calculate the eigenvectors
             float theta0, theta1;
-            evec2Dpolar<float>((float*)(&T), (float*)(&evals), theta0, theta1);
+            evec2polar<float>(reinterpret_cast<float*>(&T), reinterpret_cast<float*>(&evals), theta0, theta1);
             glm::vec2 ev0(std::cos(theta0), std::sin(theta0));
             glm::vec2 ev1(std::cos(theta1), std::sin(theta1));
 
@@ -193,15 +196,15 @@ void ImGuiRender() {
     ImGui::NewFrame();
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
-    ImGui::Text("File: %s", UI.loaded_filename == "" ? "N/A" : UI.loaded_filename.c_str());
+    ImGui::Text("File: %s", UI.loaded_filename.empty() ? "N/A" : UI.loaded_filename.c_str());
 
     if (ImGui::Button("Load Field"))					// create a button for loading the shader
-        ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz", ".");
+        ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz");
     if (ImGuiFileDialog::Instance()->Display("LoadNpyFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
-            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+            const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
-            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+            if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
                 UI.loaded_filename = filename;              // store the file name in the UI
                 LoadTensorField(UI.loaded_filename, &T0);
                 UI.field_loaded = true;
@@ -252,12 +255,12 @@ void ImGuiRender() {
     }
 
     if (ImGui::Button("Save Field"))
-        ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz", ".");
+        ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz");
     if (ImGuiFileDialog::Instance()->Display("SaveNpyFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
-            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+            const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
-            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+            if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
                 Tn.save_npy<float>(filename);
             }
         }
@@ -266,8 +269,7 @@ void ImGuiRender() {
     ImGuiFieldSpecs();
 
 
-    const char* combo_preview_value = UI.device_names[UI.cuda_device + 1].c_str();
-    if (ImGui::BeginCombo("CUDA Device", combo_preview_value))
+    if (const char* combo_preview_value = UI.device_names[UI.cuda_device + 1].c_str(); ImGui::BeginCombo("CUDA Device", combo_preview_value))
     {
         for (int n = 0; n < UI.num_devices + 1; n++)
         {
@@ -285,15 +287,15 @@ void ImGuiRender() {
     // select scalar component
     if (ImGui::Button("Reset View")) UI.camera_zoom = 1.0f;
     //float cam_pos[2] = { UI.camera_position[0], UI.camera_position[1] };
-    ImGui::InputFloat2("Camera Position", (float*)&UI.camera_position);
+    ImGui::InputFloat2("Camera Position", reinterpret_cast<float*>(&UI.camera_position));
     ImGui::InputFloat("Camera Zoom", &UI.camera_zoom);
 
     if (ImGui::Button("Save Image"))					// create a button for loading the shader
-        ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp", ".");
+        ImGuiFileDialog::Instance()->OpenDialog("ChooseBmpFile", "Choose BMP File", ".bmp");
     if (ImGuiFileDialog::Instance()->Display("ChooseBmpFile")) {				    // if the user opened a file dialog
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
-            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
-            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "bmp") {
+            const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+            if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "bmp") {
                 //CurrentColormap.save(filename);
                 throw std::runtime_error("Implement a way to save the colormapped image");
             }

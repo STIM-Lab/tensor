@@ -8,7 +8,7 @@ extern TV2_UI UI;
 
 float* EigenValues2(float* tensors, unsigned int n, int device);
 float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
-glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+glm::mat2* GaussianBlur2D(const glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
     unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug);
@@ -146,16 +146,20 @@ void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<floa
 /// <summary>
 /// Create a scalar image from the specified eigenvalue
 /// </summary>
-/// <param name="i"></param>
-void ImageFrom_Eigenvalue(tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i) {
+/// <param name="lambda">pointer to the image containing all of the eigenvalues</param>
+/// <param name="scalar">pointer to the image that will be filled with the specified eigenvalues</param>
+/// <param name="i">eigenvalue to turn into an image
+void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i) {
     *scalar = lambda->channel(i);
 }
 
 /// <summary>
 /// Create a scalar image from the specified eigenvalue
 /// </summary>
-/// <param name="i"></param>
-void ImageFrom_Theta(tira::image<float>* theta, tira::image<float>* scalar, unsigned int i) {
+/// <param name="theta">pointer to the image containing the eigenvectors</param>
+/// <param name="scalar">pointer to the image that will be filled with the specified eigenvector</param>
+/// <param name="i">eigenvector to turn into an image
+void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, unsigned int i) {
     *scalar = theta->channel(i);
 }
 
@@ -165,13 +169,16 @@ void ImageFrom_Theta(tira::image<float>* theta, tira::image<float>* scalar, unsi
 /// <summary>
 /// Blurs the tensor field and re-calculates the current scalar image
 /// </summary>
-/// <param name="sigma"></param>
-void GaussianFilter(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device) {
+/// <param name="tensors_in">input tensor field</param>
+/// <param name="tensors_out">output tensor field</param>
+/// <param name="sigma">standard deviation of the Gaussian kernel</param>
+/// <param name="cuda_device">CUDA device used for filtering (-1 will use the CPU)</param>
+void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, const int cuda_device) {
     // if a CUDA device is enabled, use a blur kernel
     if (cuda_device >= 0) {
         unsigned int blur_width;
         unsigned int blur_height;
-        glm::mat2* blurred = GaussianBlur2D(tensors_in->data(), tensors_in->X(), tensors_in->Y(), sigma, blur_width, blur_height, cuda_device);
+        glm::mat2* blurred = GaussianBlur2D(tensors_in->const_data(), tensors_in->X(), tensors_in->Y(), sigma, blur_width, blur_height, cuda_device);
 
         *tensors_out = tira::image<glm::mat2>(blurred, blur_width, blur_height);
         free(blurred);
@@ -214,8 +221,8 @@ void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tens
     }
     else {
         //throw std::runtime_error("ERROR: no CPU implementation of tensor voting");
-        float* lambdas = tira::cpu::Eigenvalues2D<float>((float*)tensors_in->data(), tensors_in->size());
-        float* evecs = tira::cpu::Eigenvectors2DPolar<float>((float*)tensors_in->data(), lambdas, tensors_in->size());
+        float* lambdas = tira::cpu::eigenvalues2<float>((float*)tensors_in->data(), tensors_in->size());
+        float* evecs = tira::cpu::eigenvectors2polar<float>((float*)tensors_in->data(), lambdas, tensors_in->size());
         tira::cpu::tensorvote2(tensors_out->data(), (glm::vec2*)lambdas, (glm::vec2*)evecs, glm::vec2(sigma, sigma2), p, 
             w, tensors_in->shape()[0], tensors_in->shape()[1], stick, plate, samples);
     }

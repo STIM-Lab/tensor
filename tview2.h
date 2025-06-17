@@ -1,10 +1,10 @@
+#pragma once
+
 #include <string>
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
+
 
 #include <glm/glm.hpp>
 
@@ -48,7 +48,7 @@ struct TV2_UI {
     // processing for tensor voting
     bool stick_voting = true;
     bool plate_voting = true;
-    int platevote_samples = 20;
+    int platevote_samples = 4;
     float sigma1 = 3.0f;
     float sigma2 = 0.0f;
     int vote_refinement = 1;
@@ -116,14 +116,14 @@ float Eccentricity2(float l0, float l1);
 float LinearEccentricity2(float l0, float l1);
 
 
-void GaussianFilter(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
+void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
 void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
     const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device, unsigned samples);
 void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
-void ImageFrom_Eigenvalue(tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);
+void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);
 void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<float>* elements, const unsigned int u, const unsigned int v);
-void ImageFrom_Theta(tira::image<float>* theta, tira::image<float>* scalar, unsigned int i);
+void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, unsigned int i);
 void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lambda, tira::image<float>* theta, int cuda_device);
 
 // Visualization functions (generating colormaps, etc.)
