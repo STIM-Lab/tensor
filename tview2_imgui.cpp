@@ -4,7 +4,7 @@
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include "tview2.h"
-#include <tira/math/eigen.h>
+#include <tira/eigen.h>
 
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);   // specify the OpenGL color used to clear the back buffer
 
@@ -107,7 +107,7 @@ void ReprocessField() {
     if (UI.processing_type == ProcessingType::Gaussian)
         GaussianFilter(&T0, &Tn, UI.sigma, UI.cuda_device);
     else if (UI.processing_type == ProcessingType::Vote)
-        TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+        TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
     else
         Tn = T0;
     EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
@@ -213,22 +213,10 @@ void ImGuiRender() {
         }
         ImGuiFileDialog::Instance()->Close();									// close the file dialog box
     }
-
-    if (ImGui::Button("Save Field"))
-        ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz", ".");
-    if (ImGuiFileDialog::Instance()->Display("SaveNpyFile")) {				    // if the user opened a file dialog
-        if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
-            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
-
-            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
-                Tn.save_npy<float>(filename);
-            }
-        }
-        ImGuiFileDialog::Instance()->Close();									// close the file dialog box
-    }
-    ImGuiFieldSpecs();
-
-    if (ImGui::TreeNodeEx("Generate Impulse", ImGuiTreeNodeFlags_DefaultOpen)) {
+    ImGui::SameLine();
+    if (ImGui::Button("Impulse")) UI.impulse_window = true;
+    if (UI.impulse_window) {
+        ImGui::Begin("Impulse");
         if (ImGui::InputInt("Resolution", &UI.impulse_resolution, 1)) {
             if (UI.field_impulse) {
                 GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
@@ -259,9 +247,25 @@ void ImGuiRender() {
                 UI.field_impulse = false;
             }
         }
-
-        ImGui::TreePop();
+        if (ImGui::Button("Close")) UI.impulse_window = false;
+        ImGui::End();
     }
+
+    if (ImGui::Button("Save Field"))
+        ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz", ".");
+    if (ImGuiFileDialog::Instance()->Display("SaveNpyFile")) {				    // if the user opened a file dialog
+        if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+            std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+
+            if (std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+                Tn.save_npy<float>(filename);
+            }
+        }
+        ImGuiFileDialog::Instance()->Close();									// close the file dialog box
+    }
+    ImGuiFieldSpecs();
+
+
     const char* combo_preview_value = UI.device_names[UI.cuda_device + 1].c_str();
     if (ImGui::BeginCombo("CUDA Device", combo_preview_value))
     {
@@ -451,7 +455,7 @@ void ImGuiRender() {
 
         ImGui::SeparatorText("Tensor Voting");
         if (ImGui::RadioButton("Tensor Voting", &UI.processing_type, (int)ProcessingType::Vote)) {
-            TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+            TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
             EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
             RefreshScalarField();
             GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
@@ -460,7 +464,7 @@ void ImGuiRender() {
         if (ImGui::InputFloat("Sigma 1", &UI.sigma1, 0.2f, 1.0f)) {
             if (UI.sigma1 < 0) UI.sigma1 = 0.0;
             if (UI.processing_type == ProcessingType::Vote) {
-                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
                 GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
@@ -470,7 +474,7 @@ void ImGuiRender() {
         if (ImGui::InputFloat("Sigma 2", &UI.sigma2, 0.2f, 1.0f)) {
             if (UI.sigma2 < 0) UI.sigma2 = 0.0;
             if (UI.processing_type == ProcessingType::Vote) {
-                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
                 GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
@@ -480,16 +484,17 @@ void ImGuiRender() {
         if (ImGui::InputInt("Power", &UI.vote_refinement, 1, 5)) {
             if (UI.vote_refinement < 1) UI.vote_refinement = 1;
             if (UI.processing_type == ProcessingType::Vote) {
-                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
                 GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
+        //ImGui::Columns(2);
         if (ImGui::Checkbox("Stick", &UI.stick_voting)) {
             if (UI.processing_type == ProcessingType::Vote) {
-                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
                 GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
@@ -499,13 +504,25 @@ void ImGuiRender() {
         ImGui::SameLine();
         if (ImGui::Checkbox("Plate", &UI.plate_voting)) {
             if (UI.processing_type == ProcessingType::Vote) {
-                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device);
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
                 RefreshScalarField();
                 GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
                 RefreshVisualization();
             }
         }
+        //ImGui::NextColumn();
+        if (ImGui::InputInt("samples", &UI.platevote_samples)) {
+            if (UI.processing_type == ProcessingType::Vote){
+                if (UI.platevote_samples < 0) UI.platevote_samples = 0;
+                TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
+                EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
+                RefreshScalarField();
+                GenerateGlyphs();                                               // the field size has changed, so regenerate glyphs
+                RefreshVisualization();
+            }
+        }
+        //ImGui::Columns(1);
 
         ImGui::TreePop();
     }

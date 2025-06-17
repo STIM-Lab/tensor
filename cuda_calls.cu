@@ -1,11 +1,22 @@
 #include <glm/glm.hpp>
 #include <tira/cuda/cudaGaussianFilter.cuh>
 
-#include <tira/math/eigen.cuh>
+#include <tira/eigen.cuh>
+#include <tira/filter.h>
 
 
 glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
+    if (deviceID < 0) {
+        unsigned kernel_size = (unsigned)(6 * sigma);
+        float* gauss = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
+
+        glm::mat2* dest_x = tira::cpu::convolve2<glm::mat2, float>(source, width, height, gauss, kernel_size, 1, out_width, out_height);
+        glm::mat2* dest_xy = tira::cpu::convolve2<glm::mat2, float>(dest_x, out_width, out_height, gauss, 1, kernel_size, out_width, out_height);
+        free(gauss);
+        free(dest_x);
+        return dest_xy;
+    }
 
     cudaSetDevice(deviceID);
     glm::mat2* dest = tira::cuda::GaussianFilter2D<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
@@ -15,6 +26,17 @@ glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int he
 
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
+
+    if (deviceID < 0) {
+        unsigned kernel_size = (unsigned)(6 * sigma);
+        float* gauss = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
+
+        float* dest_x = tira::cpu::convolve2<float>(source, width, height, gauss, kernel_size, 1, out_width, out_height);
+        float* dest_xy = tira::cpu::convolve2<float>(dest_x, out_width, out_height, gauss, 1, kernel_size, out_width, out_height);
+        free(gauss);
+        free(dest_x);
+        return dest_xy;
+    }
 
     cudaSetDevice(deviceID);
     float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);

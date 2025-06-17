@@ -23,6 +23,7 @@ struct TV2_UI {
     bool field_impulse = false;
 
     bool inspection_window = false;
+    bool impulse_window = false;
 
     // GUI variables for controlling the impulse function parameters
     int impulse_resolution = 13;
@@ -47,6 +48,7 @@ struct TV2_UI {
     // processing for tensor voting
     bool stick_voting = true;
     bool plate_voting = true;
+    int platevote_samples = 20;
     float sigma1 = 3.0f;
     float sigma2 = 0.0f;
     int vote_refinement = 1;
@@ -116,7 +118,7 @@ float LinearEccentricity2(float l0, float l1);
 
 void GaussianFilter(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
 void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
-    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device);
+    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device, unsigned samples);
 void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_Eigenvalue(tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);

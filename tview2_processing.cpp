@@ -1,8 +1,8 @@
 #include <glm/glm.hpp>
 #include <tira/image.h>
 #include "tview2.h"
-#include <tira/math/eigen.h>
-#include <tira/math/tensorvote.h>
+#include <tira/eigen.h>
+#include <tira/tensorvote.h>
 
 extern TV2_UI UI;
 
@@ -61,6 +61,9 @@ inline float normaldist(const float x, const float sigma) {
     return scale * exp(ex);
 }
 
+void cudacaller_tensorvote2(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
+        unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples);
+
 /// <summary>
 /// Calculate the eigenvectors and eigenvalues of a 2D tensor field using the CPU or CUDA
 /// </summary>
@@ -72,7 +75,9 @@ void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lamb
     // calculate and store the largest eigenvalue magnitude
     float SmallestEigenvalue = lambda->minv();
     float LargestEigenvalue = lambda->maxv();
-    UI.largest_eigenvalue_magnitude = std::max(abs(SmallestEigenvalue), abs(LargestEigenvalue));
+    float SmallestEigenvalueMag = std::abs(SmallestEigenvalue);
+    float LargestEigenvalueMag = std::abs(LargestEigenvalue);
+    UI.largest_eigenvalue_magnitude = std::max(SmallestEigenvalueMag, LargestEigenvalueMag);
 
     float* eigenvectors_raw = EigenVectors2DPolar(reinterpret_cast<float*>(tensor->data()), eigenvalues_raw, tensor->X() * tensor->Y(), cuda_device);
     *theta = tira::image<float>(eigenvectors_raw, tensor->X(), tensor->Y(), 2);
@@ -197,21 +202,21 @@ void GaussianFilter(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* 
 /// <param name="stick"></param>
 /// <param name="plate"></param>
 void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
-    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device) {
+    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device, unsigned samples) {
     *tensors_out = tira::image<glm::mat2>(tensors_in->X(), tensors_in->Y());
 
     const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
 
     if (cuda_device >= 0) {
-        cudaVote2D(reinterpret_cast<float*>(tensors_in->data()), reinterpret_cast<float*>(tensors_out->data()),
+        cudacaller_tensorvote2(reinterpret_cast<float*>(tensors_in->data()), reinterpret_cast<float*>(tensors_out->data()),
             static_cast<unsigned int>(tensors_in->shape()[0]), static_cast<unsigned int>(tensors_in->shape()[1]),
-            sigma, sigma2, w, p, cuda_device, stick, plate, false);
+            sigma, sigma2, w, p, cuda_device, stick, plate, false, samples);
     }
     else {
         //throw std::runtime_error("ERROR: no CPU implementation of tensor voting");
         float* lambdas = tira::cpu::Eigenvalues2D<float>((float*)tensors_in->data(), tensors_in->size());
         float* evecs = tira::cpu::Eigenvectors2DPolar<float>((float*)tensors_in->data(), lambdas, tensors_in->size());
         tira::cpu::tensorvote2(tensors_out->data(), (glm::vec2*)lambdas, (glm::vec2*)evecs, glm::vec2(sigma, sigma2), p, 
-            w, tensors_in->shape()[0], tensors_in->shape()[1], stick, plate);
+            w, tensors_in->shape()[0], tensors_in->shape()[1], stick, plate, samples);
     }
 }

@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 		if (in_blur > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			float* raw_field = GaussianBlur2D(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height);
+			float* raw_field = GaussianBlur2D(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height, in_device);
 			grey = tira::image<float>(raw_field, raw_width, raw_height);
 			free(raw_field);
 			grey.cmap().save("grey.bmp");
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			glm::mat2* raw_field = GaussianBlur2D(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height);
+			glm::mat2* raw_field = GaussianBlur2D(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
