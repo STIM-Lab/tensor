@@ -9,10 +9,6 @@
 #include "tview2.h"
 
 
-
-
-
-
 extern TV2_UI UI;
 
 extern tira::image<glm::mat2> T0;
@@ -23,8 +19,6 @@ extern tira::image<float> Lambda;
 
 extern GLFWwindow* window;                                     // pointer to the GLFW window that will be created (used in GLFW calls to request properties)
 extern const char* glsl_version;              // specify the version of GLSL
-
-//float ui_scale = 1.5f;                                  // scale value for the UI and UI text
 
 const std::string colormap_shader_string =
 #include "shaders/colormap.shader"
@@ -43,7 +37,6 @@ tira::glMaterial* testmaterial;
 
 /// Generates the glyph geometry and stores it in a geometry structure for rendering
 void GenerateGlyphs() {
-    //if (!UI.render_glyphs) return;                     // don't update if they aren't being displayed
     if (Tn.size() == 0) return;
 
     tira::trimesh<float> circle = tira::circle<float>(UI.glyph_tesselation).scale({ 0.0f, 0.0f });
@@ -99,7 +92,6 @@ tira::image<unsigned char> ColormapEigenvector(const unsigned int i) {
 
         AngleColor = AngleColor * L1norm + (-L1norm + 1) * MagnitudeColor;
     }
-    AngleColor.save("test_anglecolor.png");
     return AngleColor;
 }
 
@@ -144,7 +136,6 @@ void UpdateGlyphTextures(tira::image<float>* lambda, tira::image<float>* theta) 
 }
 
 
-
 // Calculate the viewport width and height in field pixels given the size of the field and window
 void FitRectangleToWindow(float field_width_pixels, float field_height_pixels,
     float window_width, float window_height,// float scale,
@@ -181,9 +172,7 @@ GLFWwindow* InitWindow(int width, int height) {
 
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
-    //if (FIELD_LOADED) {
     glfwSetCursorPosCallback(window, mouse_callback);
-    //}
     glfwSetScrollCallback(window, scroll_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
 

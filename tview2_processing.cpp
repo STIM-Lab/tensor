@@ -10,22 +10,20 @@ float* EigenValues2(float* tensors, unsigned int n, int device);
 float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
 glm::mat2* GaussianBlur2D(const glm::mat2* source, unsigned int width, unsigned int height, float sigma,
                             unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-void cudaVote2D(float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
-    unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug);
 
-inline float Timg(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y, const unsigned int u, const unsigned int v) {
+inline static float Timg(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y, const unsigned int u, const unsigned int v) {
     return (*tensors)(x, y)[static_cast<int>(u)][static_cast<int>(v)];
 }
 
-inline float Trace2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y) {
+inline static float Trace2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y) {
     return Timg(tensors, x, y, 0, 0) + Timg(tensors, x, y, 1, 1);
 }
 
-inline float Determinant2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y) {
+inline static float Determinant2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y) {
     return Timg(tensors, x, y, 0, 0) * Timg(tensors, x, y, 1, 1) - pow(Timg(tensors, x, y, 0, 1), 2.0f);
 }
 
-inline float Eigenvalue2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y, const unsigned int i) {
+inline static float Eigenvalue2D(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y, const unsigned int i) {
     const float d = Timg(tensors, x, y, 0, 0);
     const float e = Timg(tensors, x, y, 0, 1);
     const float f = e;
@@ -39,7 +37,7 @@ inline float Eigenvalue2D(tira::image<glm::mat2>* tensors, const unsigned int x,
     else return std::min(a, b);
 }
 
-inline glm::vec2 Eigenvector2D(tira::image<glm::mat2>* tensors, unsigned int x, unsigned int y, unsigned int i) {
+inline static glm::vec2 Eigenvector2D(tira::image<glm::mat2>* tensors, unsigned int x, unsigned int y, unsigned int i) {
 
     const float lambda = Eigenvalue2D(tensors, x, y, i);
 
@@ -55,7 +53,7 @@ inline glm::vec2 Eigenvector2D(tira::image<glm::mat2>* tensors, unsigned int x, 
         return { 0.0f, 1.0f };
 }
 
-inline float normaldist(const float x, const float sigma) {
+inline static float normaldist(const float x, const float sigma) {
     const float scale = 1.0f / (sigma * sqrt(2 * 3.14159f));
     const float ex = -(x * x) / (2 * sigma * sigma);
     return scale * exp(ex);

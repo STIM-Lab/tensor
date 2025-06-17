@@ -14,14 +14,6 @@
 #include <sstream>
 #include <string>
 
-glm::mat2* cudaGaussianBlur(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-    unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-
-void cudaVote2D(float* input_field, float* output_field,
-    unsigned int s0, unsigned int s1,
-    float sigma, float sigma2,
-    unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug);
-
 TV2_UI UI;                            // structure stores the GUI information for tensorview2
 
 GLFWwindow* window;
@@ -152,7 +144,6 @@ int main(int argc, char** argv) {
 
         glfwSwapBuffers(window);                                    // swap the double buffer
 
-        //glfwPollEvents();
     }
 
     ImGuiDestroy();                                                    // Clear the ImGui user interface

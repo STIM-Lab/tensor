@@ -9,9 +9,6 @@ extern TV2_UI UI;
 
 void LoadTensorField(const std::string& filename, tira::image<glm::mat2>* tensor) {
     tensor->load_npy<float>(filename);
-    //Tn = T0;
-    //UpdateEigens();
-    //UI.field_loaded = true;
 }
 
 void SaveTensorField(const std::string& filename, tira::image<glm::mat2>* tensor) {
@@ -32,8 +29,5 @@ void GenerateImpulse(tira::image<glm::mat2>* tensor, unsigned resolution, float 
 
     (*tensor)(resolution/2, resolution/2) = P * L * Pinv;
 
-    //Tn = T0;
-
-    //UpdateEigenDecomposition();
     UI.field_loaded = true;
 }

@@ -35,10 +35,6 @@ void ImGuiInit(GLFWwindow* window, const char* glsl_version) {
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-
-    // Load Fonts
-    //io.Fonts->AddFontFromFileTTF("Roboto-Medium.ttf", ui_scale * 16.0f);
-
 }
 
 /// <summary>
@@ -62,7 +58,6 @@ void ImGuiFieldSpecs() {
     ss << Tn.shape()[0] << " x " << Tn.shape()[1];
 
     ImGui::Text("%s", ("Field Size: " + ss.str()).c_str());
-    //ImGui::Text("Maximum Norm: %f", MAXNORM);
 }
 
 /// re-calculate the scalar field based on the current settings in the UI
@@ -116,7 +111,7 @@ void ReprocessField() {
     RefreshVisualization();
 }
 
-void RenderInspectionWindow() {
+static void RenderInspectionWindow() {
 
     const int FieldIndex[2] = { static_cast<int>(UI.field_mouse_position[0]), static_cast<int>(UI.field_mouse_position[1]) };
     const float f0 = UI.field_mouse_position[0];
@@ -148,7 +143,6 @@ void RenderInspectionWindow() {
             ImGui::InputFloat2("##Row1", Row1, "%1.5F");
 
             // calculate the eigenvalues
-            //glm::vec2 evals = Eigenvalues2D(T);
             float eval0, eval1;
             eval2D<float>(reinterpret_cast<float*>(&T), eval0, eval1);
             glm::vec2 evals(eval0, eval1);
@@ -161,7 +155,6 @@ void RenderInspectionWindow() {
             ImGui::Columns(2);
             float e = Eccentricity2(lambdas[0], lambdas[1]);
             ImGui::InputFloat("e", &e, 0.0f, 0.0f, "%1.5e");
-            //ImGui::SameLine();
             float c = LinearEccentricity2(lambdas[0], lambdas[1]);
             ImGui::InputFloat("c", &c, 0.0f, 0.0f, "%1.5e");
 
@@ -181,9 +174,6 @@ void RenderInspectionWindow() {
             ImGui::NextColumn();
             ImGui::InputFloat("theta0", &theta0);
             ImGui::InputFloat("theta1", &theta1);
-
-
-
         }
     }
 }
@@ -286,7 +276,6 @@ void ImGuiRender() {
 
     // select scalar component
     if (ImGui::Button("Reset View")) UI.camera_zoom = 1.0f;
-    //float cam_pos[2] = { UI.camera_position[0], UI.camera_position[1] };
     ImGui::InputFloat2("Camera Position", reinterpret_cast<float*>(&UI.camera_position));
     ImGui::InputFloat("Camera Zoom", &UI.camera_zoom);
 
@@ -296,7 +285,6 @@ void ImGuiRender() {
         if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
             const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
             if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "bmp") {
-                //CurrentColormap.save(filename);
                 throw std::runtime_error("Implement a way to save the colormapped image");
             }
         }
@@ -309,7 +297,6 @@ void ImGuiRender() {
     ImGui::SeparatorText("Scalar Display");
     ImGui::RadioButton("None", &UI.scalar_type, (int)ScalarType::NoScalar);
     if (ImGui::RadioButton("[0, 0] = dxdx", &UI.scalar_type, (int)ScalarType::Tensor00)) {
-        //ScalarRefresh();
         ImageFrom_TensorElement2D(&Tn, &Scalar, 0, 0);
         UI.scalar_min = Scalar.minv();
         UI.scalar_max = Scalar.maxv();
@@ -493,7 +480,6 @@ void ImGuiRender() {
                 RefreshVisualization();
             }
         }
-        //ImGui::Columns(2);
         if (ImGui::Checkbox("Stick", &UI.stick_voting)) {
             if (UI.processing_type == ProcessingType::Vote) {
                 TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
@@ -513,7 +499,6 @@ void ImGuiRender() {
                 RefreshVisualization();
             }
         }
-        //ImGui::NextColumn();
         if (ImGui::InputInt("samples", &UI.platevote_samples)) {
             if (UI.processing_type == ProcessingType::Vote){
                 if (UI.platevote_samples < 0) UI.platevote_samples = 0;
@@ -524,8 +509,6 @@ void ImGuiRender() {
                 RefreshVisualization();
             }
         }
-        //ImGui::Columns(1);
-
         ImGui::TreePop();
     }
 
