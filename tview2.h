@@ -117,8 +117,8 @@ float LinearEccentricity2(float l0, float l1);
 
 
 void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
-void TensorVote(tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
-    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, int cuda_device, unsigned samples);
+void TensorVote(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
+    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, const int cuda_device, const unsigned samples);
 void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
 void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);

@@ -112,6 +112,7 @@ void ReprocessField() {
 }
 
 static void RenderInspectionWindow() {
+    ImGui::Begin("Inspection");
 
     const int FieldIndex[2] = { static_cast<int>(UI.field_mouse_position[0]), static_cast<int>(UI.field_mouse_position[1]) };
     const float f0 = UI.field_mouse_position[0];
@@ -176,6 +177,44 @@ static void RenderInspectionWindow() {
             ImGui::InputFloat("theta1", &theta1);
         }
     }
+    if (ImGui::Button("Close")) UI.inspection_window = false;
+    ImGui::End();
+}
+
+void RenderImpulseWindow() {
+    ImGui::Begin("Impulse");
+    if (ImGui::InputInt("Resolution", &UI.impulse_resolution, 1)) {
+        if (UI.field_impulse) {
+            GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+            ReprocessField();
+        }
+    }
+    if (ImGui::SliderFloat("theta", &UI.impulse_theta, 0.0f, std::numbers::pi)) {
+        if (UI.field_impulse) {
+            GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+            ReprocessField();
+        }
+    }
+    if (ImGui::SliderFloat("anisotropy", &UI.impulse_anisotropy, 0.0f, 1.0f)) {
+        if (UI.field_impulse) {
+            GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+            ReprocessField();
+        }
+    }
+    if (!UI.field_impulse) {
+        if (ImGui::Button("Impulse On")) {
+            UI.field_impulse = true;
+            GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
+            ReprocessField();
+        }
+    }
+    else {
+        if (ImGui::Button("Impulse Off")) {
+            UI.field_impulse = false;
+        }
+    }
+    if (ImGui::Button("Close")) UI.impulse_window = false;
+    ImGui::End();
 }
 
 /// This function renders the user interface every frame
@@ -209,39 +248,7 @@ void ImGuiRender() {
     ImGui::SameLine();
     if (ImGui::Button("Impulse")) UI.impulse_window = true;
     if (UI.impulse_window) {
-        ImGui::Begin("Impulse");
-        if (ImGui::InputInt("Resolution", &UI.impulse_resolution, 1)) {
-            if (UI.field_impulse) {
-                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
-                ReprocessField();
-            }
-        }
-        if (ImGui::SliderFloat("theta", &UI.impulse_theta, 0.0f, std::numbers::pi)) {
-            if (UI.field_impulse) {
-                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
-                ReprocessField();
-            }
-        }
-        if (ImGui::SliderFloat("anisotropy", &UI.impulse_anisotropy, 0.0f, 1.0f)) {
-            if (UI.field_impulse) {
-                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
-                ReprocessField();
-            }
-        }
-        if (!UI.field_impulse) {
-            if (ImGui::Button("Impulse On")) {
-                UI.field_impulse = true;
-                GenerateImpulse(&T0, UI.impulse_resolution, UI.impulse_theta, UI.impulse_anisotropy);
-                ReprocessField();
-            }
-        }
-        else {
-            if (ImGui::Button("Impulse Off")) {
-                UI.field_impulse = false;
-            }
-        }
-        if (ImGui::Button("Close")) UI.impulse_window = false;
-        ImGui::End();
+        RenderImpulseWindow();
     }
 
     if (ImGui::Button("Save Field"))
@@ -524,10 +531,9 @@ void ImGuiRender() {
     }
     else {
         if (ImGui::Button("Close Inspection")) UI.inspection_window = false;
-        ImGui::Begin("Inspection");
+
         RenderInspectionWindow();
-        if (ImGui::Button("Close")) UI.inspection_window = false;
-        ImGui::End();
+
     }
 
     ImGui::Render();                                                            // Render all windows
