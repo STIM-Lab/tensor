@@ -1,7 +1,6 @@
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-import image2tensor as st
 import tensorvote as tv
 import tensorvote3d as tv3
 import skimage as ski
@@ -35,7 +34,6 @@ def addGaussian2T(T, sigma1, sigma0 = None):
     ETA0[:, :, 1, 1] = Y0 * Y0 * lambda_0
     
     return T + ETA1 + ETA0
-
 
 def addShiftT(T, sigma, dropout=0.5):
 
@@ -306,8 +304,45 @@ def genSample3D(shape, noise=0):
     #vol = np.floor(((vol - np.min(vol)) / (np.max(vol) - np.min(vol))) * 255).astype(np.uint8)
     return vol
 
+# generates a 3D filed with  field with a single tensor at teh center
+def genImpulse3d(N, impulsefile, theta, phi, anisotropy):
+    T = np.zeros((N, N, N, 3, 3), dtype=np.float32)
+
+    # direction vector
+    dx = np.cos(theta) * np.sin(phi)
+    dy = np.sin(theta) * np.sin(phi)
+    dz = np.cos(phi)
+    d = np.array([dx, dy, dz])
+    
+    # create the rotation matrix from spherical angles
+    # tmp is a test vector that is not collinear with d 
+    tmp = np.array([0, 0, 1]) if abs(dz) < 1 else np.array([0, 1, 0])
+    u = np.cross(d, tmp)
+    u /= np.linalg.norm(u)
+    v = np.cross(d, u)
+    
+    # rotation matrix from the 3 orthogonal vectors
+    P = np.column_stack((u, v, d))
+    Pinv = np.linalg.inv(P)
+    
+    # anisotropic tensor aligned with d
+    L = np.eye(3, dtype=np.float32)
+    L[2, 2] = anisotropy**2
+    
+    impulse = P @ L @ Pinv
+
+    # place impulse at the center
+    c = N // 2
+    T[c, c, c] = impulse
+    
+    if impulsefile is not None:
+        np.save(impulsefile, T.astype(np.float32))
+    
+    return T
+
 # generates an empty field with a plate "impulse" tensor at the center
-def gen_plate_impulse(N, impulsefile, votefile, numericalfile, normalize=True):
+def gen_plate_impulse(N, impulsefile, votefile, numericalfile, sigma=3, sigma2=0, p=1, 
+                      normalize=True):
     # generate an empty tensor field
     T = np.zeros(N + (3, 3))
 
@@ -319,37 +354,27 @@ def gen_plate_impulse(N, impulsefile, votefile, numericalfile, normalize=True):
     # set the center pixel to a plate tensor
     C = tuple(int(n/2) for n in N)
     T[C] = P
-
+    T[2, 0, 0, 1] = 2
+    T[1, 0, 0, 2] = 5
     # save the plate tensor "impulse"
     np.save(impulsefile, T.astype(np.float32))
 
     # perform tensor voting
-    T_vote = tv3.platevote3(T, 3, 0, normalize)
+    T_vote = tv3.platevote3(T, sigma, sigma2, p, normalize)
     # save the result of tensor voting
     np.save(votefile, T_vote.astype(np.float32))
     
-    T_numerical = tv3.platevote3_numerical(T, 3, 0, 1, 3, normalize)
+    T_numerical = tv3.platevote3_numerical(T, sigma, sigma2, p, 10, normalize)
     np.save(numericalfile, T_numerical.astype(np.float32))
     
     return T, T_vote, T_numerical
 
 
 # generate an impulse plate field
-print("Generating plate impulse response:")
-T, Ta, Tn = gen_plate_impulse((1, 1, 1), "plate_field.npy", "plate_python.npy", "plate_python_numerical.npy", normalize=False)
+# print("Generating plate impulse response:")
+# T, Ta, Tn = gen_plate_impulse((3, 2, 1), "plate_field.npy", "plate_python.npy",
+#                               "plate_python_numerical.npy", p=3, normalize=False)
 
-#%%
-#plt.subplot(1, 2, 1)
-#plt.imshow(Tv[:, :, 5, 0, 0])
-#plt.subplot(1, 2, 2)
-#plt.imshow(Tn[:, :, 5, 0, 0])
 
-#size = 100
-#vol = genSample3D((size, size, size), 0.6)
-#st = st.structure3d(vol.astype(np.float32), 3)
-#vol = st.addGaussian3T(vol, 2)
-#np.save('synthetic.npy', st)
-
-#np.save("impulse.npy", tv3.impulse3(size, 1, 0, 0))
 
 
