@@ -5,24 +5,7 @@
 #include <tira/filter.h>
 
 
-glm::mat2* GaussianBlur2D(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,
-                            unsigned int& out_width, unsigned int& out_height, const int deviceID = 0) {
-    if (deviceID < 0) {
-        unsigned kernel_size = (unsigned)(6 * sigma);
-        float* gauss = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
 
-        glm::mat2* dest_x = tira::cpu::convolve2<glm::mat2, float>(source, width, height, gauss, kernel_size, 1, out_width, out_height);
-        glm::mat2* dest_xy = tira::cpu::convolve2<glm::mat2, float>(dest_x, out_width, out_height, gauss, 1, kernel_size, out_width, out_height);
-        free(gauss);
-        free(dest_x);
-        return dest_xy;
-    }
-
-    cudaSetDevice(deviceID);
-    glm::mat2* dest = tira::cuda::GaussianFilter2D<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
-
-    return dest;
-}
 
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
@@ -65,16 +48,12 @@ float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height
     return dest;
 }
 
-float* EigenValues2(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvalues2<float>(tensors, n);
 
-    return tira::cuda::eigenvalues2<float>(tensors, n, device);
-}
 
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::Eigenvalues3D<float>(tensors, n);
+    if (device < 0) return tira::cpu::eigenvalues3<float>(tensors, n);
 
-    return tira::cuda::Eigenvalues3D<float>(tensors, n);
+    return tira::cuda::eigenvalues3<float>(tensors, n);
 }
 
 float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
@@ -84,15 +63,15 @@ float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int dev
 }
 
 float* cudaEigenvectors3DPolar(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::Eigenvectors3DPolar(tensors, evals, n);
+    if (device < 0) return tira::cpu::eigenvectors3polar(tensors, evals, n);
 
-    return tira::cuda::Eigenvectors3DPolar<float>(tensors, evals, n);
+    return tira::cuda::eigenvectors3polar<float>(tensors, evals, n);
 }
 
 void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device) {
     if (device < 0) {
-        evals = tira::cpu::Eigenvalues3D(tensors, n);
-        evecs = tira::cpu::Eigenvectors3DPolar(tensors, evals, n);
+        evals = tira::cpu::eigenvalues3(tensors, n);
+        evecs = tira::cpu::eigenvectors3polar(tensors, evals, n);
     }
 
     float* gpu_tensors;
@@ -100,12 +79,12 @@ void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsi
     HANDLE_ERROR(cudaMemcpy(gpu_tensors, tensors, n * sizeof(float) * 9, cudaMemcpyHostToDevice));
 
 
-    float* gpu_evals = tira::cuda::Eigenvalues3D(gpu_tensors, n);
+    float* gpu_evals = tira::cuda::eigenvalues3(gpu_tensors, n);
     evals = (float*)malloc(n * sizeof(float) * 3);
     HANDLE_ERROR(cudaMemcpy(evals, gpu_evals, n * sizeof(float) * 3, cudaMemcpyDeviceToHost));
 
 
-    float* gpu_evecs = tira::cuda::Eigenvectors3DPolar(gpu_tensors, gpu_evals, n);    
+    float* gpu_evecs = tira::cuda::eigenvectors3polar(gpu_tensors, gpu_evals, n);
     evecs = (float*)malloc(n * sizeof(float) * 4);    
     HANDLE_ERROR(cudaMemcpy(evecs, gpu_evecs, n * sizeof(float) * 4, cudaMemcpyDeviceToHost));
 }

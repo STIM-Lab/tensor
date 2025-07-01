@@ -145,7 +145,10 @@ static void RenderInspectionWindow() {
 
             // calculate the eigenvalues
             float eval0, eval1;
-            eval2D<float>(reinterpret_cast<float*>(&T), eval0, eval1);
+            float a = T[0][0];
+            float b = T[0][1];
+            float c = T[1][1];
+            eval2_symmetric<float>(a, b, c, eval0, eval1);
             glm::vec2 evals(eval0, eval1);
 
             // display the eigenvalues
@@ -154,16 +157,16 @@ static void RenderInspectionWindow() {
             ImGui::InputFloat2("##lambdas", lambdas, "%1.5e");
             ImGui::Text("Eccentricity:");
             ImGui::Columns(2);
-            float e = Eccentricity2(lambdas[0], lambdas[1]);
-            ImGui::InputFloat("e", &e, 0.0f, 0.0f, "%1.5e");
-            float c = LinearEccentricity2(lambdas[0], lambdas[1]);
-            ImGui::InputFloat("c", &c, 0.0f, 0.0f, "%1.5e");
+            float ecc_e = Eccentricity2(lambdas[0], lambdas[1]);
+            ImGui::InputFloat("e", &ecc_e, 0.0f, 0.0f, "%1.5e");
+            float ecc_c = LinearEccentricity2(lambdas[0], lambdas[1]);
+            ImGui::InputFloat("c", &ecc_c, 0.0f, 0.0f, "%1.5e");
 
             ImGui::Columns(1);
 
             // calculate the eigenvectors
             float theta0, theta1;
-            evec2polar<float>(reinterpret_cast<float*>(&T), reinterpret_cast<float*>(&evals), theta0, theta1);
+            evec2polar_symmetric<float>(a, b, c, reinterpret_cast<float*>(&evals), theta0, theta1);
             glm::vec2 ev0(std::cos(theta0), std::sin(theta0));
             glm::vec2 ev1(std::cos(theta1), std::sin(theta1));
 
@@ -227,14 +230,14 @@ void ImGuiRender() {
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);  // Render a separate window showing the FPS
     ImGui::Text("File: %s", UI.loaded_filename.empty() ? "N/A" : UI.loaded_filename.c_str());
 
-    if (ImGui::Button("Load Field"))					// create a button for loading the shader
+    if (ImGui::Button("Load Field"))					                        // create a button for loading the field
         ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz");
     if (ImGuiFileDialog::Instance()->Display("LoadNpyFile")) {				    // if the user opened a file dialog
-        if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+        if (ImGuiFileDialog::Instance()->IsOk()) {								// and clicks okay, they've probably selected a file
             const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
             if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
-                UI.loaded_filename = filename;              // store the file name in the UI
+                UI.loaded_filename = filename;                                  // store the file name in the UI
                 LoadTensorField(UI.loaded_filename, &T0);
                 UI.field_loaded = true;
                 Tn = T0;

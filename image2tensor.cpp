@@ -31,7 +31,7 @@ glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned in
 float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, 
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
 	unsigned int& out_depth, int deviceID = 0);
-float* EigenValues2(float* tensors, unsigned int n, int device);
+//float* EigenValues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.

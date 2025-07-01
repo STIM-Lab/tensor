@@ -6,11 +6,6 @@
 
 extern TV2_UI UI;
 
-float* EigenValues2(float* tensors, unsigned int n, int device);
-float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device);
-glm::mat2* GaussianBlur2D(const glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-                            unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
-
 inline static float Timg(tira::image<glm::mat2>* tensors, const unsigned int x, const unsigned int y, const unsigned int u, const unsigned int v) {
     return (*tensors)(x, y)[static_cast<int>(u)][static_cast<int>(v)];
 }
@@ -21,15 +16,14 @@ inline static float normaldist(const float x, const float sigma) {
     return scale * std::exp(ex);
 }
 
-void cudacaller_tensorvote2(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
-        unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples);
+
 
 /// <summary>
 /// Calculate the eigenvectors and eigenvalues of a 2D tensor field using the CPU or CUDA
 /// </summary>
 void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lambda, tira::image<float>* theta, int cuda_device) {
 
-    float* eigenvalues_raw = EigenValues2(reinterpret_cast<float*>(tensor->data()), tensor->X() * tensor->Y(), cuda_device);
+    float* eigenvalues_raw = hsa_eigenvalues2(reinterpret_cast<float*>(tensor->data()), tensor->X() * tensor->Y(), cuda_device);
     *lambda = tira::image<float>(eigenvalues_raw, tensor->X(), tensor->Y(), 2);
 
     // calculate and store the largest eigenvalue magnitude
@@ -39,20 +33,20 @@ void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lamb
     float LargestEigenvalueMag = std::abs(LargestEigenvalue);
     UI.largest_eigenvalue_magnitude = std::max(SmallestEigenvalueMag, LargestEigenvalueMag);
 
-    float* eigenvectors_raw = EigenVectors2DPolar(reinterpret_cast<float*>(tensor->data()), eigenvalues_raw, tensor->X() * tensor->Y(), cuda_device);
+    float* eigenvectors_raw = hsa_eigenvectors2polar(reinterpret_cast<float*>(tensor->data()), eigenvalues_raw, tensor->X() * tensor->Y(), cuda_device);
     *theta = tira::image<float>(eigenvectors_raw, tensor->X(), tensor->Y(), 2);
     free(eigenvalues_raw);
     free(eigenvectors_raw);
 }
 
-float Eccentricity2(float l0, float l1) {
+float Eccentricity2(const float l0, const float l1) {
     if (l1 == 0) return 0;
     const float l0_2 = std::pow(l0, 2.0f);
     const float l1_2 = std::pow(l1, 2.0f);
     return std::sqrt(1.0f - l0_2 / l1_2);
 }
 
-float LinearEccentricity2(float l0, float l1) {
+float LinearEccentricity2(const float l0, const float l1) {
     return std::sqrt((l1 * l1) - (l0 * l0));
 }
 
@@ -98,9 +92,6 @@ void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<floa
             (*elements)(xi, yi, 0) = val;
         }
     }
-
-    //CurrentColormap = ColormapTensor(u, v);
-    //CMAP_MATERIAL->SetTexture("mapped_image", CurrentColormap, GL_RGB8, GL_NEAREST);
 }
 
 /// <summary>
@@ -109,7 +100,7 @@ void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<floa
 /// <param name="lambda">pointer to the image containing all of the eigenvalues</param>
 /// <param name="scalar">pointer to the image that will be filled with the specified eigenvalues</param>
 /// <param name="i">eigenvalue to turn into an image</param>
-void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i) {
+void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, const unsigned i) {
     *scalar = lambda->channel(i);
 }
 
@@ -119,7 +110,7 @@ void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* 
 /// <param name="theta">pointer to the image containing the eigenvectors</param>
 /// <param name="scalar">pointer to the image that will be filled with the specified eigenvector</param>
 /// <param name="i">eigenvector to turn into an image</param>
-void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, unsigned int i) {
+void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, const unsigned i) {
     *scalar = theta->channel(i);
 }
 
@@ -138,7 +129,7 @@ void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::m
     if (cuda_device >= 0) {
         unsigned int blur_width;
         unsigned int blur_height;
-        glm::mat2* blurred = GaussianBlur2D(tensors_in->const_data(), tensors_in->X(), tensors_in->Y(), sigma, blur_width, blur_height, cuda_device);
+        glm::mat2* blurred = hsa_gaussian2(tensors_in->const_data(), tensors_in->X(), tensors_in->Y(), sigma, blur_width, blur_height, cuda_device);
 
         *tensors_out = tira::image<glm::mat2>(blurred, blur_width, blur_height);
         free(blurred);
@@ -179,14 +170,14 @@ void TensorVote(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>
     const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
 
     if (cuda_device >= 0) {
-        cudacaller_tensorvote2(reinterpret_cast<const float*>(tensors_in->const_data()), reinterpret_cast<float*>(tensors_out->data()),
+        hsa_tensorvote2(reinterpret_cast<const float*>(tensors_in->const_data()), reinterpret_cast<float*>(tensors_out->data()),
             static_cast<unsigned int>(tensors_in->shape()[0]), static_cast<unsigned int>(tensors_in->shape()[1]),
             sigma, sigma2, w, p, cuda_device, stick, plate, false, samples);
     }
     else {
         //throw std::runtime_error("ERROR: no CPU implementation of tensor voting");
-        auto* lambdas = tira::cpu::eigenvalues2<float>(reinterpret_cast<const float*>(tensors_in->const_data()), tensors_in->size());
-        auto* evecs = tira::cpu::eigenvectors2polar<float>(reinterpret_cast<const float*>(tensors_in->const_data()), lambdas, tensors_in->size());
+        auto* lambdas = tira::cpu::eigenvalues2_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), tensors_in->size());
+        auto* evecs = tira::cpu::eigenvectors2polar_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), lambdas, tensors_in->size());
         tira::cpu::tensorvote2(tensors_out->data(), reinterpret_cast<glm::vec2*>(lambdas), reinterpret_cast<glm::vec2*>(evecs), glm::vec2(sigma, sigma2), p,
             w, tensors_in->shape()[0], tensors_in->shape()[1], stick, plate, samples);
     }

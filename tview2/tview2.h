@@ -61,9 +61,7 @@ struct TV2_UI {
     float scalar_max;
 
     // glyph display settings
-    bool render_glyphs = false;
-    //int glyph_rows = 100;
-    //int glyph_cols = 100;
+    bool render_glyphs = true;
     float glyph_scale = 0.8;
     bool glyph_normalize = false;
     int glyph_tesselation = 100;
@@ -128,3 +126,11 @@ void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lamb
 
 // Visualization functions (generating colormaps, etc.)
 void RefreshVisualization();
+
+// Heterogeneous system architecture calls
+void hsa_tensorvote2(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
+        unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples);
+float* hsa_eigenvectors2polar(float* tensors, float* evals, unsigned int n, int device);
+float* hsa_eigenvalues2(float* tensors, unsigned int n, int device);
+glm::mat2* hsa_gaussian2(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,
+    unsigned int& out_width, unsigned int& out_height, const int deviceID = 0);

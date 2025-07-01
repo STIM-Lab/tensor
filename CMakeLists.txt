@@ -75,16 +75,15 @@ include_directories(
 
 # tensorview executable
 add_executable(tensorview2
-				tview2.cpp
+				tview2/tview2.cpp
+				tview2/tview2.h
 				ImGuiFileDialog/ImGuiFileDialog.cpp
-				tview2_render.cpp
-				tview2_imgui.cpp
-				tview2_processing.cpp
-				tview2_io.cpp
-				tview2_callbacks.cpp
-				tview2.h
-				cuda_calls.cu
-				tensorvote.cu
+				tview2/tview2_render.cpp
+				tview2/tview2_imgui.cpp
+				tview2/tview2_processing.cpp
+				tview2/tview2_io.cpp
+				tview2/tview2_callbacks.cpp
+				tview2/tview2_hsa.cu
 )
 
 target_link_libraries(tensorview2
@@ -101,12 +100,17 @@ target_link_libraries(tensorview2
 
 #create an executable
 add_executable(tensorview3
-				tensorview3.cpp
-				cuda_calls.cu
-				tensorvote.cu
-				ImGuiFileBrowser/ImGuiFileBrowser.cpp
-				ImGuiFileBrowser/ImGuiFileBrowser.h
-				ImGuiFileBrowser/dirent.h
+				tview3/tview3.cpp
+				tview3/tview3.h
+				tview3/tview3_render.cpp
+				tview3/tview3_imgui.cpp
+				tview3/tview3_processing.cpp
+				tview3/tview3_io.cpp
+				tview3/tview3_callbacks.cpp
+				tview3/tview3_hsa.cu
+				#cuda_calls.cu
+				#tensorvote.cu
+				ImGuiFileDialog/ImGuiFileDialog.cpp
 )
 
 target_link_libraries(tensorview3
