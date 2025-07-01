@@ -1,6 +1,6 @@
 #include <glm/glm.hpp>
 #include <tira/image.h>
-#include "tview2.h"
+#include "tvote2.h"
 #include <tira/eigen.h>
 #include <tira/tensorvote.h>
 

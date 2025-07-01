@@ -6,7 +6,7 @@
 #include "tira/graphics/shapes/circle.h"
 #include "tira/image/colormap.h"
 
-#include "tview2.h"
+#include "tvote2.h"
 
 
 extern TV2_UI UI;

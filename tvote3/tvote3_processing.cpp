@@ -1,6 +1,6 @@
 
 
-#include "tview3.h"
+#include "tvote3.h"
 extern TV3_UI UI;
 
 auto tic() {

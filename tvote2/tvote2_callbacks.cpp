@@ -1,4 +1,4 @@
-#include "tview2.h"
+#include "tvote2.h"
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 extern TV2_UI UI;

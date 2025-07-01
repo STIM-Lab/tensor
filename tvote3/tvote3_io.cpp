@@ -1,4 +1,4 @@
-#include "tview3.h"
+#include "tvote3.h"
 
 glm::mat3 GenerateImpulse(glm::vec2 stick_polar, float plate_theta, glm::vec2 lambdas) {
     // create a tensor from the input data

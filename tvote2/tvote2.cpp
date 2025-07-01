@@ -5,7 +5,7 @@
 
 #include <cuda_runtime.h>
 
-#include "tview2.h"
+#include "tvote2.h"
 #include "tira/image.h"
 
 #include <imgui.h>

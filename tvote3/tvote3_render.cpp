@@ -2,7 +2,7 @@
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
 
-#include "tview3.h"
+#include "tvote3.h"
 extern TV3_UI UI;
 extern const char* glsl_version;              // specify the version of GLSL
 

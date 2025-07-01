@@ -74,19 +74,19 @@ include_directories(
 )
 
 # tensorview executable
-add_executable(tensorview2
-				tview2/tview2.cpp
-				tview2/tview2.h
+add_executable(tvote2
+				tvote2/tvote2.cpp
+				tvote2/tvote2.h
 				ImGuiFileDialog/ImGuiFileDialog.cpp
-				tview2/tview2_render.cpp
-				tview2/tview2_imgui.cpp
-				tview2/tview2_processing.cpp
-				tview2/tview2_io.cpp
-				tview2/tview2_callbacks.cpp
-				tview2/tview2_hsa.cu
+				tvote2/tvote2_render.cpp
+				tvote2/tvote2_imgui.cpp
+				tvote2/tvote2_processing.cpp
+				tvote2/tvote2_io.cpp
+				tvote2/tvote2_callbacks.cpp
+				tvote2/tvote2_hsa.cu
 )
 
-target_link_libraries(tensorview2
+target_link_libraries(tvote2
 				PRIVATE glfw
 				PRIVATE glm::glm
 				PRIVATE GLEW::GLEW
@@ -99,21 +99,21 @@ target_link_libraries(tensorview2
 )
 
 #create an executable
-add_executable(tensorview3
-				tview3/tview3.cpp
-				tview3/tview3.h
-				tview3/tview3_render.cpp
-				tview3/tview3_imgui.cpp
-				tview3/tview3_processing.cpp
-				tview3/tview3_io.cpp
-				tview3/tview3_callbacks.cpp
-				tview3/tview3_hsa.cu
+add_executable(tvote3
+				tvote3/tvote3.cpp
+				tvote3/tvote3.h
+				tvote3/tvote3_render.cpp
+				tvote3/tvote3_imgui.cpp
+				tvote3/tvote3_processing.cpp
+				tvote3/tvote3_io.cpp
+				tvote3/tvote3_callbacks.cpp
+				tvote3/tvote3_hsa.cu
 				#cuda_calls.cu
 				#tensorvote.cu
 				ImGuiFileDialog/ImGuiFileDialog.cpp
 )
 
-target_link_libraries(tensorview3
+target_link_libraries(tvote3
 				PRIVATE glm::glm
 				PRIVATE glfw
 				PRIVATE GLEW::GLEW
@@ -151,7 +151,7 @@ target_link_libraries(tensorvote
 				Boost::math
 )
 
-target_compile_options(tensorview3 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
+target_compile_options(tvote3 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 		--generate-line-info
 		>)
 

@@ -5,7 +5,7 @@
 
 #include <cuda_runtime.h>
 
-#include "tview3.h"
+#include "tvote3.h"
 
 TV3_UI UI;
 

@@ -3,7 +3,7 @@
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
-#include "tview2.h"
+#include "tvote2.h"
 #include <tira/eigen.h>
 
 ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.00f);   // specify the OpenGL color used to clear the back buffer

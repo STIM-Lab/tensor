@@ -3,7 +3,7 @@
 #include <tira/image.h>
 #include <glm/glm.hpp>
 
-#include "tview2.h"
+#include "tvote2.h"
 
 extern TV2_UI UI;
 
