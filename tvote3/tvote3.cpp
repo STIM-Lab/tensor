@@ -7,6 +7,8 @@
 
 #include "tvote3.h"
 
+#include <tira/graphics/glOrthoView.h>
+
 TV3_UI UI;
 
 tira::volume<glm::mat3> T0;								// 3D tensor field (3x3 voxels)
@@ -14,6 +16,8 @@ tira::volume<glm::mat3> Tn;								// processed tensor field
 tira::volume<float> Lambda;								// eigenvalues of the tensor field
 tira::volume<glm::vec2> ThetaPhi;						// eigenvectors of the tensor field (in spherical coordinates)
 tira::volume<float> Scalar;								// scalar field that is currently being visualized
+
+tira::glOrthoView<unsigned char>* OrthoViewer;
 
 GLFWwindow* window;
 const char* glsl_version = "#version 130";
@@ -65,6 +69,12 @@ int main(int argc, char** argv) {
     // create a GLSL window, initialize the OpenGL context, and assign callback functions
     window = InitWindow(1600, 1200);
 
+    OrthoViewer = new tira::glOrthoView<unsigned char>();
+    OrthoViewer->init();
+
+    OrthoViewer->generate_rgb(32, 24, 10, 2);
+    UI.field_loaded = true;
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
 
@@ -73,17 +83,26 @@ int main(int argc, char** argv) {
 
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
+        OrthoViewer->aspect((float)display_w / (float)display_h);
 
-        glViewport(0, 0, display_w, display_h);                     // specifies the area of the window where OpenGL can render
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
         glClear(GL_COLOR_BUFFER_BIT);                               // clear the Viewport using the clear color
 
         ImGuiRender();
 
         // if a tensor field is loaded
         if (UI.field_loaded) {
-            //RenderFieldOpenGL(display_w, display_h);
+            // render the XY plane
+            glViewport(display_w / 2, 0, display_w/2, display_h/2);
+            OrthoViewer->render_slice(2);
+
+            // render the XZ plane
+            glViewport(display_w / 2, display_h / 2, display_w / 2, display_h / 2);
+            OrthoViewer->render_slice(1);
+
+            // render the YZ plane
+            glViewport(0, 0, display_w / 2, display_h / 2);
+            OrthoViewer->render_slice(0);
         }
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());     // draw the GUI data from its buffer
@@ -92,7 +111,7 @@ int main(int argc, char** argv) {
 
     }
 
-    ImGuiDestroy();                                                    // Clear the ImGui user interface
+    ImGuiDestroy();                                                 // Clear the ImGui user interface
 
     glfwDestroyWindow(window);                                      // Destroy the GLFW rendering window
     glfwTerminate();                                                // Terminate GLFW

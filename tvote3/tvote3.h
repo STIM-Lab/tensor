@@ -32,6 +32,9 @@ struct TV3_UI {
 	glm::vec2 impulse_lambdas = glm::vec2(1.0f);
 	float impulse_anisotropy = 0;
 
+	// visualization
+	glm::vec3 slice_positions = glm::vec3(0.0f);
+
 	std::string loaded_filename = "";
 	bool field_loaded = false;			// indicates that a tensor field has been loaded
 	bool image_loaded = false;
@@ -44,7 +47,7 @@ struct TV3_UI {
 	float sigma;						// sigma for Gaussian blur
 
 	// display settings for scalar fields
-	int scalar_type = ScalarType::EVal2;
+	int scalar_type = ScalarType::Tensor00;
 
 	//timers
 	float t_eigendecomposition = inf;
@@ -127,7 +130,8 @@ void VolumeFrom_TensorElement3D(tira::volume<glm::mat3>* tensors, tira::volume<f
 
 // Visualization functions (generating colormaps, etc.)
 
-//void RefreshVisualization();
+void RefreshVisualization();
+void UpdateColormap();
 
 // Heterogeneous system architecture calls
 float* hsa_eigenvalues3(float* tensors, unsigned int n, int device);

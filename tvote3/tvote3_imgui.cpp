@@ -5,6 +5,8 @@
 #include "imgui_impl_opengl3.h"
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
+#include <tira/graphics/glOrthoView.h>
+
 #include <glm/gtc/matrix_access.hpp>
 
 extern TV3_UI UI;
@@ -14,11 +16,12 @@ extern tira::volume<glm::mat3> Tn;								// processed tensor field
 extern tira::volume<float> Lambda;								// eigenvalues of the tensor field
 extern tira::volume<glm::vec2> ThetaPhi;						// eigenvectors of the tensor field (in spherical coordinates)
 extern tira::volume<float> Scalar;								// scalar field that is currently being visualized
+extern tira::glOrthoView<unsigned char>* OrthoViewer;
 
 #define PI 3.14159265358979323846264338327950288
 
 /// re-calculate the scalar field based on the current settings in the UI
-void RefreshScalarField() {
+void UpdateScalarField() {
 	switch (UI.scalar_type) {
 	case ScalarType::EVal0:
 		VolumeFrom_Eigenvalue(&Lambda, &Scalar, 0);
@@ -59,13 +62,8 @@ void RefreshScalarField() {
 	default:
 		throw std::runtime_error("Invalid scalar type");
 	}
-}
-
-/// Refresh the entire visualizaiton, including glyphs, camera parameters, and scalar fields
-void RefreshVisualization() {
-	//GenerateColormap();
-	//UpdateGlyphTextures(&Lambda, &Theta);
-	//UI.camera_position = glm::vec3(static_cast<float>(Tn.width()) / 2.0f, static_cast<float>(Tn.height()) / 2.0f, 0.0f);
+	UpdateColormap();
+	RefreshVisualization();
 }
 
 void ReprocessField() {
@@ -78,9 +76,8 @@ void ReprocessField() {
 	else
 		Tn = T0;
 	EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
-	RefreshScalarField();
-	//GenerateGlyphs();
-	RefreshVisualization();
+	UpdateScalarField();
+
 }
 
 /// <summary>
@@ -251,6 +248,88 @@ void ImGuiRender() {
 		if (UI.impulse_window) {
 			RenderImpulseWindow();
 		}
+
+		ImGui::SeparatorText("Slice Positions");
+		glm::vec3 field_size = OrthoViewer->dimensions();
+		if (ImGui::SliderFloat("X", &UI.slice_positions[0], 0.0f, field_size[0])) {
+			RefreshVisualization();
+		}
+		if (ImGui::SliderFloat("Y", &UI.slice_positions[1], 0.0f, field_size[1])) {
+			RefreshVisualization();
+		}
+		if (ImGui::SliderFloat("Z", &UI.slice_positions[2], 0.0f, field_size[2])) {
+			RefreshVisualization();
+		}
+
+		ImGui::SeparatorText("Color Mapping");
+		ImGui::RadioButton("None", &UI.scalar_type, (int)ScalarType::NoScalar);
+		ImGui::SameLine();
+		if (ImGui::RadioButton("Fractional Anisotropy", &UI.scalar_type, (int)ScalarType::FractionalAnisotropy)) {
+
+		}
+		ImGui::Columns(2);
+		ImGui::SeparatorText("Tensor Scalars");
+		if (ImGui::RadioButton("##dxdx", &UI.scalar_type, (int)ScalarType::Tensor00)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dxdy", &UI.scalar_type, (int)ScalarType::Tensor01)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dxdz", &UI.scalar_type, (int)ScalarType::Tensor02)) {
+			UpdateScalarField();
+		}
+		if (ImGui::RadioButton("##dydx", &UI.scalar_type, (int)ScalarType::Tensor01)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dydy", &UI.scalar_type, (int)ScalarType::Tensor11)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dydz", &UI.scalar_type, (int)ScalarType::Tensor12)) {
+			UpdateScalarField();
+		}
+
+		if (ImGui::RadioButton("##dzdx", &UI.scalar_type, (int)ScalarType::Tensor02)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dzdy", &UI.scalar_type, (int)ScalarType::Tensor12)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("##dzdz", &UI.scalar_type, (int)ScalarType::Tensor22)) {
+			UpdateScalarField();
+		}
+		ImGui::NextColumn();
+
+		ImGui::SeparatorText("Eigen");
+		if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("evec0", &UI.scalar_type, (int)ScalarType::EVec0)) {
+			UpdateColormap();
+		}
+
+		if (ImGui::RadioButton("l1", &UI.scalar_type, (int)ScalarType::EVal1)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("evec1", &UI.scalar_type, (int)ScalarType::EVec1)) {
+			UpdateColormap();
+		}
+
+		if (ImGui::RadioButton("l2", &UI.scalar_type, (int)ScalarType::EVal2)) {
+			UpdateScalarField();
+		}
+		ImGui::SameLine();
+		if (ImGui::RadioButton("evec2", &UI.scalar_type, (int)ScalarType::EVec2)) {
+			UpdateColormap();
+		}
+
 
 		/*
 		if (ImGui::BeginTabBar("MyTabBar"))

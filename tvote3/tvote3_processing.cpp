@@ -23,12 +23,12 @@ inline static float Timg(tira::volume<glm::mat3>* tensors, const unsigned int x,
 
 void VolumeFrom_TensorElement3D(tira::volume<glm::mat3>* tensors, tira::volume<float>* elements, const unsigned int u, const unsigned int v) {
 
-    *elements = tira::volume<float>(tensors->shape()[1], tensors->shape()[0], 1);
+    *elements = tira::volume<float>(tensors->X(), tensors->Y(), tensors->Z(), 1);
     for (unsigned int zi = 0; zi < tensors->shape()[0]; zi++) {
         for (unsigned int yi = 0; yi < tensors->shape()[1]; yi++) {
             for (unsigned int xi = 0; xi < tensors->shape()[2]; xi++) {
                 const float val = Timg(tensors, xi, yi, zi, u, v);
-                (*elements)(xi, yi, 0) = val;
+                (*elements)(xi, yi, zi, 0) = val;
             }
         }
     }
