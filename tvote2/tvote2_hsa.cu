@@ -8,15 +8,15 @@ void hsa_tensorvote2(const float* input_field, float* output_field, unsigned int
 }
 
 float* hsa_eigenvalues2(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvalues2_symmetric<float>(tensors, n);
+    if (device < 0) return tira::cpu::evals2_symmetric<float>(tensors, n);
 
-    return tira::cuda::eigenvalues2<float>(tensors, n, device);
+    return tira::cuda::evals2_symmetric<float>(tensors, n, device);
 }
 
 float* hsa_eigenvectors2polar(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvectors2polar_symmetric(tensors, evals, n);
+    if (device < 0) return tira::cpu::evecs2polar_symmetric(tensors, evals, n);
 
-    return tira::cuda::eigenvectors2polar_symmetric<float>(tensors, evals, n, device);
+    return tira::cuda::evecs2polar_symmetric<float>(tensors, evals, n, device);
 }
 
 glm::mat2* hsa_gaussian2(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,

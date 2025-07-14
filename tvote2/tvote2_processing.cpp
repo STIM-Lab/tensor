@@ -176,8 +176,8 @@ void TensorVote(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>
     }
     else {
         //throw std::runtime_error("ERROR: no CPU implementation of tensor voting");
-        auto* lambdas = tira::cpu::eigenvalues2_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), tensors_in->size());
-        auto* evecs = tira::cpu::eigenvectors2polar_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), lambdas, tensors_in->size());
+        auto* lambdas = tira::cpu::evals2_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), tensors_in->size());
+        auto* evecs = tira::cpu::evecs2polar_symmetric<float>(reinterpret_cast<const float*>(tensors_in->const_data()), lambdas, tensors_in->size());
         tira::cpu::tensorvote2(tensors_out->data(), reinterpret_cast<glm::vec2*>(lambdas), reinterpret_cast<glm::vec2*>(evecs), glm::vec2(sigma, sigma2), p,
             w, tensors_in->shape()[0], tensors_in->shape()[1], stick, plate, samples);
     }

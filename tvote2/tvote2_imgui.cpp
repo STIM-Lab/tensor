@@ -148,7 +148,7 @@ static void RenderInspectionWindow() {
             float a = T[0][0];
             float b = T[0][1];
             float c = T[1][1];
-            eval2_symmetric<float>(a, b, c, eval0, eval1);
+            tira::eval2_symmetric<float>(a, b, c, eval0, eval1);
             glm::vec2 evals(eval0, eval1);
 
             // display the eigenvalues
@@ -166,7 +166,7 @@ static void RenderInspectionWindow() {
 
             // calculate the eigenvectors
             float theta0, theta1;
-            evec2polar_symmetric<float>(a, b, c, reinterpret_cast<float*>(&evals), theta0, theta1);
+            tira::evec2polar_symmetric<float>(a, b, c, reinterpret_cast<float*>(&evals), theta0, theta1);
             glm::vec2 ev0(std::cos(theta0), std::sin(theta0));
             glm::vec2 ev1(std::cos(theta1), std::sin(theta1));
 

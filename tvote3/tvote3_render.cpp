@@ -33,7 +33,6 @@ void ColormapEigenvector(unsigned vi) {
                 float z = std::abs(cos_phi);
 
                 (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(x * 255.0);
-                //(*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)((float)xi / (float)OrthoViewer->X() * 255);
                 (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(y * 255.0);
                 (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(z * 255.0);
             }

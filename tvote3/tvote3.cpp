@@ -8,6 +8,7 @@
 #include "tvote3.h"
 
 #include <tira/graphics/glOrthoView.h>
+#include <tira/eigen.h>
 
 TV3_UI UI;
 
@@ -22,7 +23,25 @@ tira::glOrthoView<unsigned char>* OrthoViewer;
 GLFWwindow* window;
 const char* glsl_version = "#version 130";
 
+float dot(float v0[3], float v1[3]) {
+    return v0[0] * v1[0] + v0[1] * v1[1] + v0[2] * v1[2];
+}
+
 int main(int argc, char** argv) {
+
+    glm::mat3 M(0.41863424, 0.27482766, -0.1500264, 0.27482766, 0.87008137, 0.07092162, -0.1500264, 0.07092162, 0.9612844);
+
+    float evals[3];
+    tira::eval3_symmetric(M[0][0], M[1][0], M[1][1], M[2][0], M[2][1], M[2][2], evals[0], evals[1], evals[2]);
+
+    float evec0[3];
+    float evec1[3];
+    float evec2[3];
+    tira::evec3_symmetric(M[0][0], M[1][0], M[1][1], M[2][0], M[2][1], M[2][2], evals, evec0, evec1, evec2);
+
+    float dot_01 = dot(evec0, evec1);
+    float dot_12 = dot(evec1, evec2);
+    float dot_02 = dot(evec0, evec2);
 
     std::string in_filename;
     int in_device;

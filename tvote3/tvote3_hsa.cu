@@ -1,18 +1,21 @@
 #include <tira/tensorvote.cuh>
 #include <tira/filter.cuh>
 
+/// Heterogeneous System Architecture calls (functions that decide how to execute a function)
+
 float* hsa_eigenvalues3(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvalues3_symmetric<float>(tensors, n);
+    if (device < 0) return tira::cpu::evals3_symmetric<float>(tensors, n);
 
     HANDLE_ERROR(cudaSetDevice(device));
-    return tira::cuda::eigenvalues3_symmetric<float>(tensors, n);
+    return tira::cuda::evals3_symmetric<float>(tensors, n);
 }
 
 float* hsa_eigenvectors3spherical(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvectors3spherical_symmetric(tensors, evals, n);
+    if (device < 0) return tira::cpu::evecs3spherical_symmetric(tensors, evals, n);
 
     HANDLE_ERROR(cudaSetDevice(device));
-    return tira::cuda::eigenvectors3spherical_symmetric<float>(tensors, evals, n);
+    //return tira::cuda::eigenvectors3spherical_symmetric<float>(tensors, evals, n);
+    throw std::runtime_error("Not implemented");
 }
 
 glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const unsigned int s1, const unsigned int s2, const float sigma, glm::vec2 pixel_size,

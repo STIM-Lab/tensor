@@ -6,6 +6,7 @@
 #include "ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include <tira/graphics/glOrthoView.h>
+#include <tira/eigen.h>
 
 #include <glm/gtc/matrix_access.hpp>
 
@@ -119,6 +120,15 @@ void RenderImpulseWindow() {
 	ImGui::Begin("Impulse");
 
 	glm::mat3 P = GenerateImpulse(UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
+	float evals[3];
+	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
+	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
+
+	float evec0[3];
+	float evec1[3];
+	float evec2[3];
+	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, evec0, evec1, evec2);
+	std::cout<<"Eigenvector 2: "<<evec2[0]<<", "<<evec2[1]<<", "<<evec2[2]<<std::endl;
 
 	ImGui::Columns(2);
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
