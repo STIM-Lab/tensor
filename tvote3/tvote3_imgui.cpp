@@ -119,8 +119,6 @@ void ImGuiDestroy() {
 void RenderImpulseWindow() {
 	ImGui::Begin("Impulse");
 
-
-
 	ImGui::Columns(2);
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
 		if (UI.impulse_field) {
@@ -359,8 +357,38 @@ void ImGuiRender() {
 			UpdateColormap();
 		}
 
-
-
+		ImGui::Columns(1);
+		///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
+		ImGui::SeparatorText("Gaussian Blur");
+		if (ImGui::RadioButton("Blur", &UI.processing_type, (int)ProcessingType::Gaussian)) {
+			if (UI.processing_type == ProcessingType::Gaussian) {
+				GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
+				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+				UpdateScalarField();
+				RefreshVisualization();
+			}
+			else {
+				Tn = T0;
+				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+				UpdateScalarField();
+				RefreshVisualization();
+			}
+		}
+		ImGui::SameLine();
+		if (ImGui::InputFloat("##Sigma", &UI.sigma, 0.2f, 1.0f)) {
+			if (UI.sigma <= 0.0f) UI.sigma = 0.01f;
+			float maxSigma0 = T0.X() * T0.dx() / 6.0f;
+			float maxSigma1 = T0.Y() * T0.dy() / 6.0f;
+			float maxSigma2 = T0.Z() * T0.dz() / 6.0f;
+			float maxSigma = std::min({ maxSigma0, maxSigma1, maxSigma2 });
+			if (UI.sigma >= maxSigma)	UI.sigma = maxSigma;
+			if (UI.processing_type == ProcessingType::Gaussian) {
+				GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
+				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+				UpdateScalarField();
+				RefreshVisualization();
+			}
+		}
 
 		/*
 		if (ImGui::BeginTabBar("MyTabBar"))

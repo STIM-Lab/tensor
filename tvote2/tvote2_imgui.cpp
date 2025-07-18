@@ -443,6 +443,7 @@ void ImGuiRender() {
         ImGui::SameLine();
         if (ImGui::InputFloat("##Sigma", &UI.sigma, 0.2f, 1.0f)) {
             if (UI.sigma <= 0) UI.sigma = 0.01;
+
             if (UI.processing_type == ProcessingType::Gaussian) {
                 GaussianFilter(&T0, &Tn, UI.sigma, UI.cuda_device);
                 EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);

@@ -44,7 +44,7 @@ struct TV3_UI {
 	// settings for processing the tensor field
 	int processing_type = ProcessingType::NoProcessing;
 
-	float sigma;						// sigma for Gaussian blur
+	float sigma = 1.0f;						// sigma for Gaussian blur
 
 	// display settings for scalar fields
 	int scalar_type = ScalarType::Tensor00;
@@ -136,5 +136,5 @@ void UpdateColormap();
 // Heterogeneous system architecture calls
 float* hsa_eigenvalues3(float* tensors, unsigned int n, int device);
 float* hsa_eigenvectors3spherical(float* tensors, float* evals, unsigned int n, int device);
-glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const unsigned int s1, const unsigned int s2, const float sigma, glm::vec2 pixel_size,
+glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const unsigned int s1, const unsigned int s2, const float sigma, glm::vec3 pixel_size,
 	unsigned int& out_s0, unsigned int& out_s1, unsigned int& out_s2, const int deviceID = 0);
