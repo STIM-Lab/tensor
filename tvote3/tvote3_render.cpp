@@ -11,6 +11,7 @@ extern const char* glsl_version;                                // specify the v
 extern tira::glOrthoView<unsigned char>* OrthoViewer;
 extern tira::volume<float> Scalar;								// scalar field that is currently being visualized
 extern tira::volume<glm::vec2> ThetaPhi;
+extern tira::volume<float> Lambda;								// eigenvalues of the tensor field
 extern tira::volume<glm::mat3> Tn;
 
 void RefreshVisualization() {
@@ -22,19 +23,45 @@ void ColormapEigenvector(unsigned vi) {
     for (unsigned zi=0; zi<OrthoViewer->Z(); zi++) {
         for (unsigned yi=0; yi<OrthoViewer->Y(); yi++) {
             for (unsigned xi=0; xi<OrthoViewer->X(); xi++) {
-                glm::vec2 theta_phi = ThetaPhi(xi, yi, zi, vi);
+
+                float l0 = std::abs(Lambda(xi, yi, zi, 0));
+                float l1 = std::abs(Lambda(xi, yi, zi, 1));
+                float l2 = std::abs(Lambda(xi, yi, zi, 2));
+
+                float alpha = 1.0f;
+                if (vi == 2) {
+                    alpha = (l2 - l1) / (l0 + l1 + l2);
+                }
+                if (vi == 1) {
+                    float a1 = (l2 - l1) / (l0 + l1 + l2);
+                    float a2 = (l1 - l0) / (l0 + l1);
+                    alpha = std::min(a1, a2);
+                }
+                if (vi == 0) {
+                    alpha = (l1 - l0) / (l0 + l1);
+                }
+                if  (l2 == 0)
+                    alpha = 0.0f;
+
+                //alpha = 1.0f - alpha;
+
+                glm::vec2 theta_phi = ThetaPhi(xi, yi, zi, vi);         // get the eigenvector in spherical coordinates
                 float cos_theta = std::cos(theta_phi.x);
                 float sin_theta = std::sin(theta_phi.x);
                 float cos_phi = std::cos(theta_phi.y);
                 float sin_phi = std::sin(theta_phi.y);
 
-                float x = std::abs(cos_theta * sin_phi);
+                float x = std::abs(cos_theta * sin_phi);                        // convert to cartesian coordinates
                 float y = std::abs(sin_theta * sin_phi);
                 float z = std::abs(cos_phi);
 
-                (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(x * 255.0);
-                (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(y * 255.0);
-                (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(z * 255.0);
+                float r = alpha * x + (1.0f - alpha);
+                float g = alpha * y + (1.0f - alpha);
+                float b = alpha * z + (1.0f - alpha);
+
+                (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(r * 255.0); // set the color
+                (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(g * 255.0);
+                (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(b * 255.0);
             }
         }
     }

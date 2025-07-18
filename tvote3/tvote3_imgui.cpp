@@ -119,16 +119,7 @@ void ImGuiDestroy() {
 void RenderImpulseWindow() {
 	ImGui::Begin("Impulse");
 
-	glm::mat3 P = GenerateImpulse(UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-	float evals[3];
-	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
-	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
 
-	float evec0[3];
-	float evec1[3];
-	float evec2[3];
-	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, evec0, evec1, evec2);
-	std::cout<<"Eigenvector 2: "<<evec2[0]<<", "<<evec2[1]<<", "<<evec2[2]<<std::endl;
 
 	ImGui::Columns(2);
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
@@ -186,6 +177,18 @@ void RenderImpulseWindow() {
 			ReprocessField();
 		}
 	}
+
+	glm::mat3 P = GenerateImpulse(UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
+	float evals[3];
+	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
+	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
+
+	float v0[3];
+	float v1[3];
+	float v2[3];
+	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
+	//std::cout<<"Eigenvector 2: "<<evec2[0]<<", "<<evec2[1]<<", "<<evec2[2]<<std::endl;
+
 	ImGui::SeparatorText("Impulse Tensor");
 	glm::vec3 row1 = glm::row(P, 0);
 	glm::vec3 row2 = glm::row(P, 1);
@@ -196,15 +199,27 @@ void RenderImpulseWindow() {
 
 	ImGui::SeparatorText("Cartesian Eigenvectors");
 
-	float cos_t2 = std::cos(UI.impulse_stick[0]);
-	float sin_t2 = std::sin(UI.impulse_stick[0]);
-	float cos_p2 = std::cos(UI.impulse_stick[1]);
-	float sin_p2 = std::sin(UI.impulse_stick[1]);
-	glm::vec3 v2 = glm::vec3(cos_t2*sin_p2, sin_t2*sin_p2, cos_p2);
+	//float cos_t2 = std::cos(UI.impulse_stick[0]);
+	//float sin_t2 = std::sin(UI.impulse_stick[0]);
+	//float cos_p2 = std::cos(UI.impulse_stick[1]);
+	//float sin_p2 = std::sin(UI.impulse_stick[1]);
+	//glm::vec3 v2 = glm::vec3(cos_t2*sin_p2, sin_t2*sin_p2, cos_p2);
 
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2[0]), std::abs(v2[1]), std::abs(v2[2])));
-	ImGui::InputFloat3("##row1", &v2[0]);
+	ImGui::InputFloat3("v2", &v2[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v1[0]), std::abs(v1[1]), std::abs(v1[2])));
+	ImGui::InputFloat3("v1", &v1[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0[0]), std::abs(v0[1]), std::abs(v0[2])));
+	ImGui::InputFloat3("v0", &v0[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
 	
@@ -315,12 +330,15 @@ void ImGuiRender() {
 		}
 		ImGui::NextColumn();
 
+
+
 		ImGui::SeparatorText("Eigen");
-		if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
+
+		if (ImGui::RadioButton("l2", &UI.scalar_type, (int)ScalarType::EVal2)) {
 			UpdateScalarField();
 		}
 		ImGui::SameLine();
-		if (ImGui::RadioButton("evec0", &UI.scalar_type, (int)ScalarType::EVec0)) {
+		if (ImGui::RadioButton("evec2", &UI.scalar_type, (int)ScalarType::EVec2)) {
 			UpdateColormap();
 		}
 
@@ -332,13 +350,16 @@ void ImGuiRender() {
 			UpdateColormap();
 		}
 
-		if (ImGui::RadioButton("l2", &UI.scalar_type, (int)ScalarType::EVal2)) {
+
+		if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
 			UpdateScalarField();
 		}
 		ImGui::SameLine();
-		if (ImGui::RadioButton("evec2", &UI.scalar_type, (int)ScalarType::EVec2)) {
+		if (ImGui::RadioButton("evec0", &UI.scalar_type, (int)ScalarType::EVec0)) {
 			UpdateColormap();
 		}
+
+
 
 
 		/*
