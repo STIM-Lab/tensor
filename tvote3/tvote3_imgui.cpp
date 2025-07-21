@@ -53,12 +53,13 @@ void UpdateScalarField() {
 		break;
 	case ScalarType::FractionalAnisotropy:
 		throw std::runtime_error("Not implemented");
-		break;
-	case ScalarType::EVec0:
-		throw std::runtime_error("Not implemented");
+	case ScalarType::EVec0:										// if the eigenvectors are being display, there is no scalar field to update
+		//throw std::runtime_error("Not implemented");
 		break;
 	case ScalarType::EVec1:
-		throw std::runtime_error("Not implemented");
+		//throw std::runtime_error("Not implemented");
+		break;
+	case ScalarType::EVec2:
 		break;
 	default:
 		throw std::runtime_error("Invalid scalar type");
@@ -121,38 +122,52 @@ void RenderImpulseWindow() {
 
 	ImGui::Columns(2);
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
 	ImGui::Columns(1);
-	ImGui::SeparatorText("Stick Orientation");
+	ImGui::SeparatorText("Stick Orientation (largest eigenvector)");
 	ImGui::Columns(2);
 	if (ImGui::SliderFloat("theta##stick", &UI.impulse_stick[0], 0, 2 * PI)) {
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
+
+
+
 	ImGui::NextColumn();
 	if (ImGui::SliderFloat("phi##stick", &UI.impulse_stick[1], 0, PI)) {
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
 	ImGui::Columns(1);
-	ImGui::SeparatorText("Plate Orientation");
+	float cos_theta = std::cos(UI.impulse_stick[0]);
+	float sin_theta = std::sin(UI.impulse_stick[0]);
+	float cos_phi = std::cos(UI.impulse_stick[1]);
+	float sin_phi = std::sin(UI.impulse_stick[1]);
+	float cart_v2[3] = {cos_theta * sin_phi, sin_theta * sin_phi, cos_phi};
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(cart_v2[0]), std::abs(cart_v2[1]), std::abs(cart_v2[2])));
+	ImGui::InputFloat3("##cart_v2", &cart_v2[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+
+	ImGui::SeparatorText("Plate Orientation (smallest eigenvector)");
 	ImGui::Columns(2);
 	//ImGui::NextColumn();
 	if (ImGui::SliderFloat("theta##plate", &UI.impulse_plate, 0.0f, 2 * PI)) {
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
@@ -161,31 +176,23 @@ void RenderImpulseWindow() {
 	if (ImGui::SliderFloat("l1", &UI.impulse_lambdas[1], 0.0f, 1.0f)) {
 		if (UI.impulse_lambdas[1] < UI.impulse_lambdas[0]) UI.impulse_lambdas[0] = UI.impulse_lambdas[1];
 
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
 	if (ImGui::SliderFloat("l0", &UI.impulse_lambdas[0], 0.0f, 1.0f)) {
 		if (UI.impulse_lambdas[1] < UI.impulse_lambdas[0]) UI.impulse_lambdas[1] = UI.impulse_lambdas[0];
-		if (UI.impulse_field) {
+		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			UI.field_loaded = true;
+			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
 
+	// calculate the impulse tensor so that it can be displayed in the window UI
 	glm::mat3 P = GenerateImpulse(UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-	float evals[3];
-	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
-	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
-
-	float v0[3];
-	float v1[3];
-	float v2[3];
-	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
-	//std::cout<<"Eigenvector 2: "<<evec2[0]<<", "<<evec2[1]<<", "<<evec2[2]<<std::endl;
 
 	ImGui::SeparatorText("Impulse Tensor");
 	glm::vec3 row1 = glm::row(P, 0);
@@ -195,13 +202,20 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat3("##row2", &row2[0]);
 	ImGui::InputFloat3("##row3", &row3[0]);
 
+
+	float evals[3];
+	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
+	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
+
+	float v0[3];
+	float v1[3];
+	float v2[3];
+	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
+
+
+
 	ImGui::SeparatorText("Cartesian Eigenvectors");
 
-	//float cos_t2 = std::cos(UI.impulse_stick[0]);
-	//float sin_t2 = std::sin(UI.impulse_stick[0]);
-	//float cos_p2 = std::cos(UI.impulse_stick[1]);
-	//float sin_p2 = std::sin(UI.impulse_stick[1]);
-	//glm::vec3 v2 = glm::vec3(cos_t2*sin_p2, sin_t2*sin_p2, cos_p2);
 
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2[0]), std::abs(v2[1]), std::abs(v2[2])));
@@ -223,9 +237,9 @@ void RenderImpulseWindow() {
 	
 
 
-	if (!UI.impulse_field) {
+	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {
-			UI.impulse_field = true;
+			UI.impulse_field_active = true;
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
 			UI.field_loaded = true;
 			ReprocessField();
@@ -233,7 +247,7 @@ void RenderImpulseWindow() {
 	}
 	else {
 		if (ImGui::Button("Impulse Off")) {
-			UI.impulse_field = false;
+			UI.impulse_field_active = false;
 		}
 	}
 	if (ImGui::Button("Close")) UI.impulse_window = false;

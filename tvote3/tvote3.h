@@ -25,7 +25,7 @@ struct TV3_UI {
 
 	// impulse window inputs
 	bool impulse_window = false;
-	bool impulse_field = false;
+	bool impulse_field_active = false;
 	int impulse_resolution = 13;
 	glm::vec2 impulse_stick = glm::vec2(0.0f);
 	float impulse_plate = 0.0f;
