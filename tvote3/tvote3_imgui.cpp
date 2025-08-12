@@ -120,7 +120,6 @@ void ImGuiDestroy() {
 void RenderImpulseWindow() {
 	ImGui::Begin("Impulse");
 
-	ImGui::Columns(2);
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
@@ -128,7 +127,6 @@ void RenderImpulseWindow() {
 			ReprocessField();
 		}
 	}
-	ImGui::Columns(1);
 	ImGui::SeparatorText("Stick Orientation (largest eigenvector)");
 	ImGui::Columns(2);
 	if (ImGui::SliderFloat("theta##stick", &UI.impulse_stick[0], 0, 2 * PI)) {
@@ -138,8 +136,6 @@ void RenderImpulseWindow() {
 			ReprocessField();
 		}
 	}
-
-
 
 	ImGui::NextColumn();
 	if (ImGui::SliderFloat("phi##stick", &UI.impulse_stick[1], 0, PI)) {
@@ -162,8 +158,6 @@ void RenderImpulseWindow() {
 	ImGui::PopID();
 
 	ImGui::SeparatorText("Plate Orientation (smallest eigenvector)");
-	ImGui::Columns(2);
-	//ImGui::NextColumn();
 	if (ImGui::SliderFloat("theta##plate", &UI.impulse_plate, 0.0f, 2 * PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
@@ -171,7 +165,6 @@ void RenderImpulseWindow() {
 			ReprocessField();
 		}
 	}
-	ImGui::Columns(1);
 	ImGui::SeparatorText("Lambda");
 	if (ImGui::SliderFloat("l1", &UI.impulse_lambdas[1], 0.0f, 1.0f)) {
 		if (UI.impulse_lambdas[1] < UI.impulse_lambdas[0]) UI.impulse_lambdas[0] = UI.impulse_lambdas[1];
@@ -212,10 +205,7 @@ void RenderImpulseWindow() {
 	float v2[3];
 	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
 
-
-
 	ImGui::SeparatorText("Cartesian Eigenvectors");
-
 
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2[0]), std::abs(v2[1]), std::abs(v2[2])));
@@ -235,8 +225,6 @@ void RenderImpulseWindow() {
 	ImGui::PopStyleColor();
 	ImGui::PopID();
 	
-
-
 	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {
 			UI.impulse_field_active = true;
@@ -361,7 +349,6 @@ void ImGuiRender() {
 		if (ImGui::RadioButton("evec1", &UI.scalar_type, (int)ScalarType::EVec1)) {
 			UpdateColormap();
 		}
-
 
 		if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
 			UpdateScalarField();
