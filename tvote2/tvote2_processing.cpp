@@ -17,7 +17,6 @@ inline static float normaldist(const float x, const float sigma) {
 }
 
 
-
 /// <summary>
 /// Calculate the eigenvectors and eigenvalues of a 2D tensor field using the CPU or CUDA
 /// </summary>

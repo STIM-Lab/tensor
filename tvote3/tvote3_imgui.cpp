@@ -73,13 +73,11 @@ void ReprocessField() {
 	if (UI.processing_type == ProcessingType::Gaussian)
 		GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
 	else if (UI.processing_type == ProcessingType::Vote)
-		//TensorVote(&T0, &Tn, UI.sigma1, UI.vote_refinement, UI.sigma2, UI.stick_voting, UI.plate_voting, UI.cuda_device, UI.platevote_samples);
-		throw std::runtime_error("Not implemented");
+		TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
 	else
 		Tn = T0;
 	EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
 	UpdateScalarField();
-
 }
 
 /// <summary>
@@ -259,530 +257,211 @@ void ImGuiRender() {
 		ImGui::PushFont(ImGui::GetFont());
 
 		ImGui::Begin("Tensor");
-
-
 		UI.window_focused = (ImGui::IsWindowHovered()) ? false : true;
 
-		// Change style 
-		ImGuiStyle& style = ImGui::GetStyle();
-		style.FrameRounding = 5.f;
-		style.GrabRounding = 3.f;
-		style.WindowRounding = 7.f;
-
-		if (ImGui::Button("Impulse")) UI.impulse_window = true;
-		if (UI.impulse_window) {
-			RenderImpulseWindow();
-		}
-
-		ImGui::SeparatorText("Slice Positions");
-		glm::vec3 field_size = OrthoViewer->dimensions();
-		if (ImGui::SliderFloat("X", &UI.slice_positions[0], 0.0f, field_size[0])) {
-			RefreshVisualization();
-		}
-		if (ImGui::SliderFloat("Y", &UI.slice_positions[1], 0.0f, field_size[1])) {
-			RefreshVisualization();
-		}
-		if (ImGui::SliderFloat("Z", &UI.slice_positions[2], 0.0f, field_size[2])) {
-			RefreshVisualization();
-		}
-
-		ImGui::SeparatorText("Color Mapping");
-		ImGui::RadioButton("None", &UI.scalar_type, (int)ScalarType::NoScalar);
-		ImGui::SameLine();
-		if (ImGui::RadioButton("Fractional Anisotropy", &UI.scalar_type, (int)ScalarType::FractionalAnisotropy)) {
-
-		}
-		ImGui::Columns(2);
-		ImGui::SeparatorText("Tensor Scalars");
-		if (ImGui::RadioButton("##dxdx", &UI.scalar_type, (int)ScalarType::Tensor00)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dxdy", &UI.scalar_type, (int)ScalarType::Tensor01)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dxdz", &UI.scalar_type, (int)ScalarType::Tensor02)) {
-			UpdateScalarField();
-		}
-		if (ImGui::RadioButton("##dydx", &UI.scalar_type, (int)ScalarType::Tensor01)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dydy", &UI.scalar_type, (int)ScalarType::Tensor11)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dydz", &UI.scalar_type, (int)ScalarType::Tensor12)) {
-			UpdateScalarField();
-		}
-
-		if (ImGui::RadioButton("##dzdx", &UI.scalar_type, (int)ScalarType::Tensor02)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dzdy", &UI.scalar_type, (int)ScalarType::Tensor12)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("##dzdz", &UI.scalar_type, (int)ScalarType::Tensor22)) {
-			UpdateScalarField();
-		}
-		ImGui::NextColumn();
-
-
-
-		ImGui::SeparatorText("Eigen");
-
-		if (ImGui::RadioButton("l2", &UI.scalar_type, (int)ScalarType::EVal2)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("evec2", &UI.scalar_type, (int)ScalarType::EVec2)) {
-			UpdateColormap();
-		}
-
-		if (ImGui::RadioButton("l1", &UI.scalar_type, (int)ScalarType::EVal1)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("evec1", &UI.scalar_type, (int)ScalarType::EVec1)) {
-			UpdateColormap();
-		}
-
-		if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
-			UpdateScalarField();
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton("evec0", &UI.scalar_type, (int)ScalarType::EVec0)) {
-			UpdateColormap();
-		}
-
-		ImGui::Columns(1);
-		///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
-		ImGui::SeparatorText("Gaussian Blur");
-		if (ImGui::RadioButton("Blur", &UI.processing_type, (int)ProcessingType::Gaussian)) {
-			if (UI.processing_type == ProcessingType::Gaussian) {
-				GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
-				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
-				UpdateScalarField();
-				RefreshVisualization();
-			}
-			else {
-				Tn = T0;
-				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
-				UpdateScalarField();
-				RefreshVisualization();
-			}
-		}
-		ImGui::SameLine();
-		if (ImGui::InputFloat("##Sigma", &UI.sigma, 0.2f, 1.0f)) {
-			if (UI.sigma <= 0.0f) UI.sigma = 0.01f;
-			float maxSigma0 = T0.X() * T0.dx() / 6.0f;
-			float maxSigma1 = T0.Y() * T0.dy() / 6.0f;
-			float maxSigma2 = T0.Z() * T0.dz() / 6.0f;
-			float maxSigma = std::min({ maxSigma0, maxSigma1, maxSigma2 });
-			if (UI.sigma >= maxSigma)	UI.sigma = maxSigma;
-			if (UI.processing_type == ProcessingType::Gaussian) {
-				GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
-				EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
-				UpdateScalarField();
-				RefreshVisualization();
-			}
-		}
-
-		/*
 		if (ImGui::BeginTabBar("MyTabBar"))
 		{
-
-			// 1st tab
 			if (ImGui::BeginTabItem("Tensor Field"))
 			{
-				////////////////////////////////////////////////  Load tensor field  ///////////////////////////////////////////////
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::SeparatorText("Load");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-				if (ImGui::Button("Load Tensor"))					                                // create a button for loading the shader
-				{
-					if (ImGui::Button("Load Field"))					                        // create a button for loading the field
-						ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz");
-					ImGui::OpenPopup("Open File");
-					UI.field_loaded = true;
-				}
-				if (ImGuiFileDialog::Instance()->Display("LoadNpyFile")) {				    // if the user opened a file dialog
-					if (ImGuiFileDialog::Instance()->IsOk()) {								// and clicks okay, they've probably selected a file
-						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+				// Change style 
+				ImGuiStyle& style = ImGui::GetStyle();
+				style.FrameRounding = 5.f;
+				style.GrabRounding = 3.f;
+				style.WindowRounding = 7.f;
 
-						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
-							UI.loaded_filename = filename;                                  // store the file name in the UI
-							LoadTensorField(UI.loaded_filename, &T0);
-							UI.field_loaded = true;
-							Tn = T0;
-							EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
-							RefreshScalarField();
-							RefreshVisualization();
-						}
-					}
-					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
-				}
-				//if (file_dialog.showFileDialog("Open File", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 700), ".npy"))
-				//	OpenFileDialog();
+				if (ImGui::Button("Impulse")) UI.impulse_window = true;
+				if (UI.impulse_window) RenderImpulseWindow();
 
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				if (ImGui::InputFloat3("Voxel Sizes", &in_voxelsize[0])) {
-					if (in_voxelsize[0] < epsilon) in_voxelsize[0] = epsilon;
-					if (in_voxelsize[1] < epsilon) in_voxelsize[1] = epsilon;
-					if (in_voxelsize[2] < epsilon) in_voxelsize[2] = epsilon;
-					T0.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
-					Tn.spacing(in_voxelsize[0], in_voxelsize[1], in_voxelsize[2]);
-					UpdateCamera();
+				ImGui::SeparatorText("Slice Positions");
+				glm::vec3 field_size = OrthoViewer->dimensions();
+				if (ImGui::SliderFloat("X", &UI.slice_positions[0], 0.0f, field_size[0])) {
+					RefreshVisualization();
+				}
+				if (ImGui::SliderFloat("Y", &UI.slice_positions[1], 0.0f, field_size[1])) {
+					RefreshVisualization();
+				}
+				if (ImGui::SliderFloat("Z", &UI.slice_positions[2], 0.0f, field_size[2])) {
+					RefreshVisualization();
 				}
 
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::PushItemWidth(-100);
-				ImGui::SliderFloat("alpha", &alpha, 0.01f, 1.0f, "%.2f");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-
-				///////////////////////////////////////////////  Render Planes  //////////////////////////////////////////////////
-
-				ImGui::SeparatorText("Planes");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-
-				ImGui::Checkbox("X", &RENDER_PLANE[0]);
-				ImGui::SetItemTooltip("Render plane X of the volume.");
+				ImGui::SeparatorText("Color Mapping");
+				ImGui::RadioButton("None", &UI.scalar_type, (int)ScalarType::NoScalar);
 				ImGui::SameLine();
-				ImGui::SliderInt("##XPosition", &PLANE_POSITION[0], 0, Tn.X() - 1);
+				if (ImGui::RadioButton("Fractional Anisotropy", &UI.scalar_type, (int)ScalarType::FractionalAnisotropy)) {
 
-				ImGui::Checkbox("Y", &RENDER_PLANE[1]);
-				ImGui::SetItemTooltip("Render plane Y of the volume.");
+				}
+				ImGui::Columns(2);
+				ImGui::SeparatorText("Tensor Scalars");
+				if (ImGui::RadioButton("##dxdx", &UI.scalar_type, (int)ScalarType::Tensor00)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-				ImGui::SliderInt("##YPosition", &PLANE_POSITION[1], 0, Tn.Y() - 1);
-
-				ImGui::Checkbox("Z", &RENDER_PLANE[2]);
-				ImGui::SetItemTooltip("Render plane Z of the volume.");
+				if (ImGui::RadioButton("##dxdy", &UI.scalar_type, (int)ScalarType::Tensor01)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-				ImGui::SliderInt("##ZPosition", &PLANE_POSITION[2], 0, Tn.Z() - 1);
-
-				ImGui::Checkbox("F", &RENDER_EN_FACE);
-				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
+				if (ImGui::RadioButton("##dxdz", &UI.scalar_type, (int)ScalarType::Tensor02)) {
+					UpdateScalarField();
+				}
+				if (ImGui::RadioButton("##dydx", &UI.scalar_type, (int)ScalarType::Tensor01)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-				ImGui::SliderFloat("##EFPosition", &EN_FACE_POSITION, -Tn.smax(), Tn.smax());
-
-				///////////////////////////////////////////////  Render Volume  //////////////////////////////////////////////////
-
-				ImGui::SeparatorText("Volume");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-
-				ImGui::Checkbox("V", &RENDER_VOLUMETRIC);
-				ImGui::SetItemTooltip("Render a camera-oriented en face plane.");
+				if (ImGui::RadioButton("##dydy", &UI.scalar_type, (int)ScalarType::Tensor11)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-				ImGui::SliderInt("##VPlanes", &VOLUMETRIC_PLANES, 0, 4 * std::max(Tn.X(), std::max(Tn.Y(), Tn.Z())));
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-
-				///////////////////////////////////////////////   Cropping   ///////////////////////////////////////////////////
-
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-				ImGui::LabelText("Width", "Position");
-
-				float child_width = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 4 - ImGui::GetStyle().ItemInnerSpacing.x * 2;
-
-				// position control
-				ImGui::BeginChild("position", ImVec2(child_width / 2.0f, 175), ImGuiChildFlags_Border);
-				for (int i = 0; i < 3; i++) {
-					if (i > 0) ImGui::SameLine();
-					ImGui::PushID(i);
-					ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.5f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.6f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.7f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.9f, 0.9f));
-					int size = (i == 0) ? Tn.sx() : ((i == 1) ? Tn.sy() : Tn.sz());
-					ImGui::VSliderInt("##pos", ImVec2(50, 150), &position_values[i], 1, size);
-					ImGui::PopStyleColor(4);
-					ImGui::PopID();
+				if (ImGui::RadioButton("##dydz", &UI.scalar_type, (int)ScalarType::Tensor12)) {
+					UpdateScalarField();
 				}
-				ImGui::EndChild();
+
+				if (ImGui::RadioButton("##dzdx", &UI.scalar_type, (int)ScalarType::Tensor02)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-
-				// width control
-				ImGui::BeginChild("width", ImVec2(child_width / 2.0f, 175), ImGuiChildFlags_Border);
-				for (int i = 0; i < 3; i++) {
-					ImGui::PushStyleVar(ImGuiStyleVar_SelectableTextAlign, ImVec2(child_width / 2.0f, child_width / 2.0f));
-					if (i > 0) ImGui::SameLine();
-					ImGui::PushID(i);
-					ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.5f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_FrameBgHovered, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.6f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_FrameBgActive, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.7f, 0.5f));
-					ImGui::PushStyleColor(ImGuiCol_SliderGrab, (ImVec4)ImColor::HSV(i * 2 / 7.0f, 0.9f, 0.9f));
-					int width_max = (i == 0) ? Tn.sx() : ((i == 1) ? Tn.sy() : Tn.sz());
-					ImGui::VSliderInt("##width", ImVec2(50, 150), &width_values[i], 0, width_max);
-					ImGui::PopStyleColor(4);
-					ImGui::PopStyleVar();
-					ImGui::PopID();
+				if (ImGui::RadioButton("##dzdy", &UI.scalar_type, (int)ScalarType::Tensor12)) {
+					UpdateScalarField();
 				}
-				ImGui::EndChild();
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-
-				////////////////////////////////////////////  Scalar Visualization  /////////////////////////////////////////////
-
-				ImGui::SeparatorText("Scalar Visualization");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-				bool eigenvalues = ImGui::RadioButton("Eigenvalues", &SCALAR_TYPE, ScalarType::EVal);
-				if (eigenvalues) {
-					ColormapEval(SCALAR_EVAL);
-				}
-
-				if (ImGui::InputInt("Eigenvalue", &SCALAR_EVAL)) {
-					if (SCALAR_EVAL < 0) SCALAR_EVAL = 0;
-					if (SCALAR_EVAL > 2) SCALAR_EVAL = 2;
-					if (SCALAR_TYPE == ScalarType::EVal) ColormapEval(SCALAR_EVAL);
-				}
-				if (ImGui::RadioButton("Anisotropy", &SCALAR_TYPE, ScalarType::Anisotropy)) {
-					ColormapScalar();
-				}
-				const char* items[] = { "Fractional", "Linear", "Plate", "Spherical" };
-
-				// Pass in the preview value visible before opening the combo (it could technically be different contents or not pulled from items[])
-				const char* combo_preview_value = items[SCALAR_ANISOTROPY];
-
-				if (ImGui::BeginCombo("##AnisotropyType", combo_preview_value))
-				{
-					for (int n = 0; n < IM_ARRAYSIZE(items); n++)
-					{
-						const bool is_selected = (SCALAR_ANISOTROPY == n);
-						if (ImGui::Selectable(items[n], is_selected)) {
-							SCALAR_ANISOTROPY = n;
-							ColormapScalar();
-						}
-
-						// Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-						if (is_selected)
-							ImGui::SetItemDefaultFocus();
-					}
-
-					ImGui::EndCombo();
-				}
-
-				if (ImGui::RadioButton("Eigenvectors", &SCALAR_TYPE, ScalarType::EVec)) {
-					ColormapEvec(2);
-				}
-				if (ImGui::InputInt("Eigenvector", &SCALAR_EVEC)) {
-					if (SCALAR_EVEC < 0) SCALAR_EVEC = 0;
-					if (SCALAR_EVEC > 2) SCALAR_EVEC = 2;
-					if (SCALAR_TYPE == ScalarType::EVec) ColormapEvec(SCALAR_EVEC);
-				}
-				//ImGui::PopItemWidth();
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-
-				//////////////////////////////////////////  Orthogonal / Perspective View  /////////////////////////////////////////
-
-				// Use perspective view instead of ortho view
-				ImGui::SeparatorText("Projection");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-
-				if (ImGui::RadioButton("Ortho", !perspective))
-					perspective = false;
 				ImGui::SameLine();
-				if (ImGui::RadioButton("Perspective", perspective))
-					perspective = true;
-				ImGui::Spacing(); ImGui::Spacing();
+				if (ImGui::RadioButton("##dzdz", &UI.scalar_type, (int)ScalarType::Tensor22)) {
+					UpdateScalarField();
+				}
 
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
+				ImGui::NextColumn();
 
-				//////////////////////////////////////////////////     Zoom      //////////////////////////////////////////////////
-				// Zooming in and out option
-				ImGui::SeparatorText("Zoom");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
+				ImGui::SeparatorText("Eigen");
 
-				ImGui::InputFloat("##Zoom", &zoom, 0.1f, 2.0f);
-				zoom = (zoom < 1.0f) ? 1.0f : ((zoom > 5) ? 5 : zoom);
+				if (ImGui::RadioButton("l2", &UI.scalar_type, (int)ScalarType::EVal2)) {
+					UpdateScalarField();
+				}
 				ImGui::SameLine();
-				if (ImGui::Button("O", ImVec2(25, 25))) zoom = 1.0f;             // reset zoom
-				ImGui::Spacing(); ImGui::Spacing();
-				ImGui::Dummy(ImVec2(0.0f, 5.0f));
+				if (ImGui::RadioButton("evec2", &UI.scalar_type, (int)ScalarType::EVec2)) {
+					UpdateColormap();
+				}
 
-				///////////////////////////////////////////////////   Reset View   //////////////////////////////////////////////////
-				ImGui::SeparatorText("Reset");
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-				//float avail = ImGui::GetContentRegionAvail().x;
-				//float off = (avail - 50) * 0.5f;
-				//if (off > 0.0f)
-				//	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
-				RESET = ImGui::Button("Reset", ImVec2(50, 25));
+				if (ImGui::RadioButton("l1", &UI.scalar_type, (int)ScalarType::EVal1)) {
+					UpdateScalarField();
+				}
+				ImGui::SameLine();
+				if (ImGui::RadioButton("evec1", &UI.scalar_type, (int)ScalarType::EVec1)) {
+					UpdateColormap();
+				}
 
+				if (ImGui::RadioButton("l0", &UI.scalar_type, (int)ScalarType::EVal0)) {
+					UpdateScalarField();
+				}
+				ImGui::SameLine();
+				if (ImGui::RadioButton("evec0", &UI.scalar_type, (int)ScalarType::EVec0)) {
+					UpdateColormap();
+				}
+				ImGui::Columns(1);
 				ImGui::EndTabItem();
 			}
-
-			// 2nd tab
+			
 			if (ImGui::BeginTabItem("Processing"))
 			{
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::SeparatorText("Filter");
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-
-				if (ImGui::RadioButton("None", &PROCESSINGTYPE, (int)ProcessingType::NoProcessing) ||
-					(PROCESSINGTYPE == ProcessingType::Vote && !TV_STICK && !TV_PLATE)) {
-					ResetField();
-					UpdateEigens();
-					ScalarRefresh();
+				if (ImGui::Button("Bake")) {
+					T0 = Tn;
+					UI.processing_type = ProcessingType::NoProcessing;
 				}
-				ImGui::Dummy(ImVec2(0.0f, 5.0f));
-				///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
+				if (ImGui::RadioButton("None", &UI.processing_type, (int)ProcessingType::NoProcessing)) {
+					Tn = T0;
+					EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+					UpdateScalarField();
+					RefreshVisualization();
+				}
 
-				if (ImGui::RadioButton("Gaussian Blur", &PROCESSINGTYPE, (int)ProcessingType::Gaussian)) {
-					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
-						GaussianFilter(SIGMA);
-						UpdateEigens();
-						ScalarRefresh();
+				///////////////////////////////////////////////  Gaussian Blur  ///////////////////////////////////////////////////
+				ImGui::SeparatorText("Gaussian Blur");
+				if (ImGui::RadioButton("Blur", &UI.processing_type, (int)ProcessingType::Gaussian)) {
+					if (UI.processing_type == ProcessingType::Gaussian) {
+						GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
+					}
+					else {
+						Tn = T0;
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
 					}
 				}
 				ImGui::SameLine();
-				if (ImGui::InputFloat("##Sigma", &SIGMA, 0.2f, 1.0f)) {
-					if (SIGMA < 0.0f) SIGMA = 0.0f;
-					if (PROCESSINGTYPE == ProcessingType::Gaussian) {
-						GaussianFilter(SIGMA);
-						UpdateEigens();
-						ScalarRefresh();
+				if (ImGui::InputFloat("##Sigma", &UI.sigma, 0.2f, 1.0f)) {
+					if (UI.sigma <= 0.0f) UI.sigma = 0.01f;
+					float maxSigma0 = T0.X() * T0.dx() / 6.0f;
+					float maxSigma1 = T0.Y() * T0.dy() / 6.0f;
+					float maxSigma2 = T0.Z() * T0.dz() / 6.0f;
+					float maxSigma = std::min({ maxSigma0, maxSigma1, maxSigma2 });
+					if (UI.sigma >= maxSigma)	UI.sigma = maxSigma;
+					if (UI.processing_type == ProcessingType::Gaussian) {
+						GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
 					}
 				}
 
 				///////////////////////////////////////////////  Tensor Voting  ///////////////////////////////////////////////////
-
-				if (ImGui::RadioButton("Tensor Voting", &PROCESSINGTYPE, (int)ProcessingType::Vote)) {
-					UpdateTensorField();
+				ImGui::SeparatorText("Tensor Vote");
+				if (ImGui::RadioButton("Tensor Voting", &UI.processing_type, (int)ProcessingType::Vote)) {
+					TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+					EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+					UpdateScalarField();
+					RefreshVisualization();
 				}
 
-				if (ImGui::InputFloat("Sigma 1", &TV_SIGMA1, 0.2f, 1.0f) && PROCESSINGTYPE == ProcessingType::Vote) {
-					TV_SIGMA1 = std::max(0.0f, TV_SIGMA1);
-					if (ImGui::IsItemEdited()) UpdateTensorField();
+				if (ImGui::InputFloat("Sigma 1", &UI.tv_sigma1, 0.2f, 1.0f) && UI.processing_type == ProcessingType::Vote) {
+					UI.tv_sigma1 = (UI.tv_sigma1 < 0.0f) ? 0.0f : UI.tv_sigma1;
+					if (ImGui::IsItemEdited()) {
+						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
+					}
 				}
 
-				if (ImGui::InputFloat("Sigma 2", &TV_SIGMA2, 0.2f, 1.0f) && PROCESSINGTYPE == ProcessingType::Vote) {
-					TV_SIGMA2 = std::max(0.0f, TV_SIGMA2);
-					if (ImGui::IsItemEdited()) UpdateTensorField();
+				if (ImGui::InputFloat("Sigma 2", &UI.tv_sigma2, 0.2f, 1.0f) && UI.processing_type == ProcessingType::Vote) {
+					UI.tv_sigma2 = (UI.tv_sigma2 < 0.0f) ? 0.0f : UI.tv_sigma2;
+					if (ImGui::IsItemEdited()) {
+						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
+					}
 				}
 
-				if (ImGui::InputInt("Power", &TV_POWER, 1, 5) && PROCESSINGTYPE == ProcessingType::Vote) {
-					TV_POWER = std::max(1, TV_POWER);
-					UpdateTensorField();
+				if (ImGui::InputInt("Power", &UI.tv_power, 1, 5) && UI.processing_type == ProcessingType::Vote) {
+					UI.tv_power = (UI.tv_power < 1) ? 1 : UI.tv_power;
+					if (ImGui::IsItemEdited()) {
+						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
+					}
 				}
 
-				if (ImGui::Checkbox("Stick", &TV_STICK) && PROCESSINGTYPE == ProcessingType::Vote)
-					UpdateTensorField();
+				if (ImGui::Checkbox("Stick", &UI.tv_stick) && UI.processing_type == ProcessingType::Vote)
+					if (ImGui::IsItemEdited()) {
+						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
+					}
 				ImGui::SameLine();
-				if (ImGui::Checkbox("Plate", &TV_PLATE) && PROCESSINGTYPE == ProcessingType::Vote)
-					UpdateTensorField();
-
-				ImGui::EndTabItem();
-			}
-
-			// 3rd tab
-			if (ImGui::BeginTabItem("Data"))
-			{
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::SeparatorText("Eigenvalues");
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-				static ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
-				if (ImGui::BeginTable("table_eigenvalues", 3, flags))
-				{
-					ImGui::TableSetupColumn("Eigenvalues");
-					ImGui::TableSetupColumn("min");
-					ImGui::TableSetupColumn("max");
-					ImGui::TableHeadersRow();
-
-					for (int row = 0; row < 3; row++)
-					{
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::Text("L%d", row);
-						ImGui::TableNextColumn();
-						ImGui::Text("%.3f", Ln.channel(row).minv());
-						ImGui::TableNextColumn();
-						ImGui::Text("%.3f", Ln.channel(row).maxv());
-					}
-					ImGui::EndTable();
-				}
-				// we are only interested in the x,y,z coordinates
-				//std::vector<size_t> smallest_loc = Ln.index_of(Ln.channel(0).minv());						// location of the minimum value of the smallest eigenvalue
-				//std::vector<size_t> largest_loc = Ln.index_of(Ln.channel(2).maxv());						// location of the maximum value of the largest eigenvalue
-
-				//// corresponding eigenvectors of the minimum of the smallest eigenvalue
-				//float theta1 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 0);
-				//float phi1 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 1);
-				//float theta2 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 2);
-				//float phi2 = Vn(smallest_loc[2], smallest_loc[1], smallest_loc[0], 3);
-				//std::vector<std::vector<float>> smallest_eigenvector = GetEigenVectors(theta1, theta2, phi1, phi2);
-
-				ImGui::Dummy(ImVec2(0.0f, 7.5f));
-				ImGui::SeparatorText("Eigenvectors of L0 (smallest L)");
-				ImGui::Dummy(ImVec2(0.0, 5.0f));
-
-				if (ImGui::BeginTable("table_eigenvector_L0", 4, flags))
-				{
-					const char* row_labels[3] = { "V1", "V2", "V3" };
-					for (int row = 0; row < 3; row++)
-					{
-						ImGui::TableNextRow();
-						ImGui::TableNextColumn();
-						ImGui::Text("%s", row_labels[row]);
-
-						for (int col = 0; col < 3; col++)
-						{
-							ImGui::TableNextColumn();
-							ImGui::Text("%.3f", Vn.channel(row).minv());
-						}
+				if (ImGui::Checkbox("Plate", &UI.tv_plate) && UI.processing_type == ProcessingType::Vote)
+					if (ImGui::IsItemEdited()) {
+						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+						UpdateScalarField();
+						RefreshVisualization();
 					}
 
-					ImGui::EndTable();
-				}
-
 				ImGui::EndTabItem();
 			}
-
-			// 4th tab
-			if (ImGui::BeginTabItem("Profiling")) {
-
-				///////////////////////////////////////////////  Memory bar  ///////////////////////////////////////////////////
-				ImGui::SeparatorText("CUDA Device");
-				ImGui::Text("Device ID: %d", in_device);
-				ImGui::Dummy(ImVec2(0.0f, 2.5f));
-				float free_m, total_m, used_m;
-				size_t free_t, total_t;
-				char buf[64];
-				if (in_device >= 0) {
-					cudaMemGetInfo(&free_t, &total_t);
-					free_m = static_cast<float>(free_t) / (1048576.0f);
-					total_m = static_cast<float>(total_t) / (1048576.0f);
-					used_m = total_m - free_m;
-				}
-				else {								// CPU memory will be added later
-					used_m = 0.0f;
-					total_m = 0.0f;
-				}
-				sprintf(buf, "%.1f/%.1f MB", used_m, total_m);
-				float bar_size = ImGui::GetWindowWidth() - ImGui::CalcTextSize("Memory Usage").x -
-					ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ItemInnerSpacing.x;
-				ImGui::ProgressBar((used_m / total_m), ImVec2(bar_size, 0.0f), buf);
-				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-				ImGui::Text("Memory Usage");
-				ImGui::EndTabItem();
-
-				ImGui::SeparatorText("Timers");
-				ImGui::Text("Load Field: %f s", t_loading);
-				ImGui::Text("Reset Field: %f s", t_resetfield);
-				ImGui::Text("Eigendecomposition Calculation: %f s", t_eigendecomposition);
-				ImGui::Text("Colormap Eigenvalues: %f s", t_cmap_eval);
-				ImGui::Text("Colormap Eigenvectors: %f s", t_cmap_evec);
-				ImGui::Text("Colormap Fractional Anisotropy: %f s", t_cmap_fa);
-				ImGui::Text("Colormap Linear Anisotropy: %f s", t_cmap_linear);
-				ImGui::Text("Colormap Plate Anisotropy: %f s", t_cmap_plate);
-				ImGui::Text("Colormap Spherical Anisotropy: %f s", t_cmap_sphere);
-				ImGui::Text("Gaussian Blur: %f s", t_gaussian);
-			}
-
 			ImGui::EndTabBar();
 		}
-
-		*/
 
 		ImGui::GetFont()->Scale = old_size;
 		ImGui::PopFont();

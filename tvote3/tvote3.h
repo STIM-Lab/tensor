@@ -32,6 +32,14 @@ struct TV3_UI {
 	glm::vec2 impulse_lambdas = glm::vec2(1.0f);
 	float impulse_anisotropy = 0;
 
+	// settings for tensor voting
+	bool tv_stick = true;
+	bool tv_plate = false;
+	int platevote_samples = 4;
+	float tv_sigma1 = 3.0f;
+	float tv_sigma2 = 1.0f;
+	int tv_power = 1;
+
 	// visualization
 	glm::vec3 slice_positions = glm::vec3(0.0f);
 
@@ -108,32 +116,20 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
 // Data processing functions
 void EigenDecomposition(tira::volume<glm::mat3>* tensor, tira::volume<float>* lambda, tira::volume<glm::vec2>* theta, int cuda_device);
-void GaussianFilter(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, glm::vec3 pixel_size, const int cuda_device);
+void GaussianFilter(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, 
+	glm::vec3 pixel_size, const int cuda_device);
+void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, const float sigma2, 
+	const unsigned int p, const bool stick, const bool plate, const int cuda_device, const unsigned samples);
 void VolumeFrom_Eigenvalue(const tira::volume<float>* lambda, tira::volume<float>* scalar, const unsigned i);
 void VolumeFrom_TensorElement3D(tira::volume<glm::mat3>* tensors, tira::volume<float>* elements, const unsigned int u, const unsigned int v);
 
-//glm::vec2 Eigenvector2D(glm::mat2 T, float lambda);
-//glm::vec2 Eigenvalues2D(glm::mat2 T);
-//float Eccentricity2(float l0, float l1);
-//float LinearEccentricity2(float l0, float l1);
-
-
-//void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, int cuda_device);
-//void TensorVote(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out,
-//    const float sigma, const unsigned int p, const float sigma2, const bool stick, const bool plate, const int cuda_device, const unsigned samples);
-//void ImageFrom_Eccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
-//void ImageFrom_LinearEccentricity(tira::image<float>* lambda, tira::image<float>* eccentricity);
-//void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, unsigned int i);
-//void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<float>* elements, const unsigned int u, const unsigned int v);
-//void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, unsigned int i);
-//void EigenDecomposition(tira::image<glm::mat2>* tensor, tira::image<float>* lambda, tira::image<float>* theta, int cuda_device);
-
 // Visualization functions (generating colormaps, etc.)
-
 void RefreshVisualization();
 void UpdateColormap();
 
 // Heterogeneous system architecture calls
+void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2, 
+	unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples);
 float* hsa_eigenvalues3(float* tensors, unsigned int n, int device);
 float* hsa_eigenvectors3spherical(float* tensors, float* evals, unsigned int n, int device);
 glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const unsigned int s1, const unsigned int s2, const float sigma, glm::vec3 pixel_size,

@@ -7,15 +7,14 @@ float* hsa_eigenvalues3(float* tensors, unsigned int n, int device) {
     if (device < 0) return tira::cpu::evals3_symmetric<float>(tensors, n);
 
     HANDLE_ERROR(cudaSetDevice(device));
-    return tira::cuda::evals3_symmetric<float>(tensors, n);
+    return tira::cuda::evals3_symmetric<float>(tensors, n, device);
 }
 
 float* hsa_eigenvectors3spherical(float* tensors, float* evals, unsigned int n, int device) {
     if (device < 0) return tira::cpu::evecs3spherical_symmetric(tensors, evals, n);
 
     HANDLE_ERROR(cudaSetDevice(device));
-    return tira::cuda::evecs3spherical_symmetric<float>(tensors, evals, n);
-    //throw std::runtime_error("Not implemented");
+    return tira::cuda::evecs3spherical_symmetric<float>(tensors, evals, n, device);
 }
 
 glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const unsigned int s1, const unsigned int s2, const float sigma, glm::vec3 pixel_size,
@@ -49,10 +48,12 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
     return dest;
 }
 
-void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, glm::vec3 pixel_size, float sigma, float sigma2,
-    unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples) {
+void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
+    unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples) {
 
-    throw std::runtime_error("Not implemented");
+    //throw std::runtime_error("Not implemented");
+	tira::cuda::tensorvote3(input_field, output_field, s0, s1, s2, sigma, sigma2, w,
+		power, device, STICK, PLATE, debug, samples);
 }
 
 
