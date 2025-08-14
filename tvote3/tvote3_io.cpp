@@ -28,14 +28,28 @@ glm::mat3 GenerateImpulse(glm::vec2 stick_polar, float plate_theta, glm::vec2 la
 
     glm::vec3 v1 = glm::normalize(glm::cross(v0, v2));
 
-    //glm::vec3 ortho_start(1.0f, 0.0f, 0.0f);
-    //glm::vec3 v1 = glm::normalize(glm::cross(v0_temp, v2));
-    //glm::vec3 v0 = glm::normalize(glm::cross(v1, v2));
-
-    glm::mat3 T = lambdas[0] * glm::outerProduct(v0, v0) +
-        lambdas[1] * glm::outerProduct(v1, v1) +
-        glm::outerProduct(v2, v2);
+    glm::mat3 V;
+    V[0][0] = v0[0];    V[0][1] = v0[1];    V[0][2] = v0[2];
+    V[1][0] = v1[0];    V[1][1] = v1[1];    V[1][2] = v1[2];
+    V[2][0] = v2[0];    V[2][1] = v2[1];    V[2][2] = v2[2];
+    glm::mat3 Vinv = glm::transpose(V);
+    glm::mat3 L(1.0f);
+    L[0][0] = lambdas[0];
+    L[1][1] = lambdas[1];
+    L[2][2] = 1.0f;
+    glm::mat3 T = V * L * Vinv;
     return T;
+
+    std::cout<<"------------------------------------------------------"<<std::endl;
+    std::cout<<"impulse v0: "<<v0.x<<", "<<v0.y<<", "<<v0.z<<std::endl;
+    std::cout<<"v0 . v1 = "<<glm::dot(v0, v1)<<std::endl;
+    std::cout<<"v0 . v2 = "<<glm::dot(v0, v2)<<std::endl;
+    std::cout<<"v1 . v2 = "<<glm::dot(v1, v2)<<std::endl;
+
+    //glm::mat3 T = glm::outerProduct(lambdas[0] * v0, lambdas[0] * v0) +
+    //              glm::outerProduct(lambdas[1] * v1, lambdas[1] * v1) +
+    //                           glm::outerProduct(v2, v2);
+    //return T;
 }
 
 void GenerateImpulseField(tira::volume<glm::mat3>* tensor, unsigned resolution, glm::vec2 stick_polar, float plate_theta, glm::vec2 lambdas) {

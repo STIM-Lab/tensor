@@ -54,10 +54,20 @@ int main(int argc, char** argv) {
         //("volume", boost::program_options::value<std::string>(&in_image), "optional image field corresponding to the tensors")
         //("gamma, g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
         //("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
-        ("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
+        ("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "CUDA device ID (-1 for CPU only)")
         ("voxel", boost::program_options::value<std::vector<float>>(&in_voxel_size)->multitoken()->default_value(std::vector<float>{1.0f, 1.0f, 1.0f}, "1.0 1.0 1.0"), "voxel size")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
+
+    boost::program_options::positional_options_description p;
+    p.add("input", -1);
+    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
+    boost::program_options::notify(vm);
+
+    if (vm.count("help")) {
+        std::cout << desc << std::endl;
+        return 1;
+    }
 
     // make sure there the specified CUDA device is available (otherwise switch to CPU)
     if (in_device < 0) {
@@ -75,15 +85,7 @@ int main(int argc, char** argv) {
             UI.cuda_device = in_device;
     }
 
-    boost::program_options::positional_options_description p;
-    p.add("input", -1);
-    boost::program_options::store(boost::program_options::command_line_parser(argc, argv).options(desc).positional(p).run(), vm);
-    boost::program_options::notify(vm);
 
-    if (vm.count("help")) {
-        std::cout << desc << std::endl;
-        return 1;
-    }
 
     // create a GLSL window, initialize the OpenGL context, and assign callback functions
     window = InitWindow(1600, 1200);

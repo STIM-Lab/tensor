@@ -130,7 +130,6 @@ void RenderImpulseWindow() {
 	if (ImGui::SliderFloat("theta##stick", &UI.impulse_stick[0], 0, 2 * PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
@@ -139,7 +138,6 @@ void RenderImpulseWindow() {
 	if (ImGui::SliderFloat("phi##stick", &UI.impulse_stick[1], 0, PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
@@ -210,18 +208,24 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat3("v2", &v2[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#eval2", &evals[2]);
 
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v1[0]), std::abs(v1[1]), std::abs(v1[2])));
 	ImGui::InputFloat3("v1", &v1[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#eval1", &evals[1]);
 
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0[0]), std::abs(v0[1]), std::abs(v0[2])));
 	ImGui::InputFloat3("v0", &v0[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#eval0", &evals[0]);
 	
 	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {
