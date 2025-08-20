@@ -9,6 +9,9 @@
 #include <tira/eigen.h>
 
 #include <glm/gtc/matrix_access.hpp>
+#include <Eigen/Core>
+#include <Eigen/Eigenvalues>
+#include <glm/gtc/type_ptr.hpp>
 
 extern TV3_UI UI;
 
@@ -194,7 +197,6 @@ void RenderImpulseWindow() {
 
 	float evals[3];
 	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
-	//std::cout<<"Eigenvalues: "<<evals[0]<<", "<<eval1<<", "<<eval2<<std::endl;
 
 	float v0[3];
 	float v1[3];
@@ -218,7 +220,7 @@ void RenderImpulseWindow() {
 	ImGui::PopID();
 	ImGui::SameLine();
 	ImGui::InputFloat("#eval1", &evals[1]);
-
+	
 	ImGui::PushID(0);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0[0]), std::abs(v0[1]), std::abs(v0[2])));
 	ImGui::InputFloat3("v0", &v0[0]);
@@ -227,6 +229,45 @@ void RenderImpulseWindow() {
 	ImGui::SameLine();
 	ImGui::InputFloat("#eval0", &evals[0]);
 	
+	// -------------------------------  Testing Eigen Decomposition -------------------------------
+	ImGui::SeparatorText("Eigen Results");
+	Eigen::Map<const Eigen::Matrix<float, 3, 3, Eigen::ColMajor>> A(glm::value_ptr(P));
+
+	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(A);
+	// Eigen returns eigenvalues in increasing order; eigenvectors are columns
+	const auto& L = solver.eigenvalues();
+	const auto& V = solver.eigenvectors();
+
+	evals[0] = L(0);  evals[1] = L(1);  evals[2] = L(2);		// eigenvalues
+	v0[0] = V(0, 0);	v0[1] = V(1, 0);	v0[2] = V(2, 0);	// col 0
+	v1[0] = V(0, 1);	v1[1] = V(1, 1);	v1[2] = V(2, 1);	// col 1
+	v2[0] = V(0, 2);	v2[1] = V(1, 2);	v2[2] = V(2, 2);    // col 2
+
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 0)), std::abs(V(1, 0)), std::abs(V(2, 0))));
+	ImGui::InputFloat3("Eig_v2", &v2[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#Eig_eval2", &evals[2]);
+
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 1)), std::abs(V(1, 1)), std::abs(V(2, 1))));
+	ImGui::InputFloat3("Eig_v1", &v1[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#Eig_eval1", &evals[1]);
+
+	ImGui::PushID(0);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 2)), std::abs(V(1, 2)), std::abs(V(2, 2))));
+	ImGui::InputFloat3("Eig_v0", &v0[0]);
+	ImGui::PopStyleColor();
+	ImGui::PopID();
+	ImGui::SameLine();
+	ImGui::InputFloat("#Eig_eval0", &evals[0]);
+
+
 	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {
 			UI.impulse_field_active = true;
