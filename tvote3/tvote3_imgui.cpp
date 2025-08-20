@@ -9,9 +9,9 @@
 #include <tira/eigen.h>
 
 #include <glm/gtc/matrix_access.hpp>
-#include <Eigen/Core>
-#include <Eigen/Eigenvalues>
-#include <glm/gtc/type_ptr.hpp>
+//#include <Eigen/Core>
+//#include <Eigen/Eigenvalues>
+//#include <glm/gtc/type_ptr.hpp>
 
 extern TV3_UI UI;
 
@@ -229,7 +229,7 @@ void RenderImpulseWindow() {
 	ImGui::SameLine();
 	ImGui::InputFloat("#eval0", &evals[0]);
 	
-	// -------------------------------  Testing Eigen Decomposition -------------------------------
+	/*// -------------------------------  Testing Eigen Decomposition -------------------------------
 	ImGui::SeparatorText("Eigen Results");
 	Eigen::Map<const Eigen::Matrix<float, 3, 3, Eigen::ColMajor>> A(glm::value_ptr(P));
 
@@ -266,7 +266,7 @@ void RenderImpulseWindow() {
 	ImGui::PopID();
 	ImGui::SameLine();
 	ImGui::InputFloat("#Eig_eval0", &evals[0]);
-
+	*/
 
 	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {

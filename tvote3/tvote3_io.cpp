@@ -61,4 +61,5 @@ void GenerateImpulseField(tira::volume<glm::mat3>* tensor, unsigned resolution, 
     *tensor = zero;
 
     (*tensor)(resolution/2, resolution/2, resolution/2) = T;
+    tensor->save_npy<float>("impulse_field.npy");
 }
