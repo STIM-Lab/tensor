@@ -51,27 +51,27 @@ float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height
 
 
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvalues3<float>(tensors, n);
+    if (device < 0) return tira::cpu::eigenvalues3_symmetric<float>(tensors, n);
 
-    return tira::cuda::eigenvalues3<float>(tensors, n);
+    return tira::cuda::eigenvalues3_symmetric<float>(tensors, n);
 }
 
 float* EigenVectors2DPolar(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvectors2polar(tensors, evals, n);
+    if (device < 0) return tira::cpu::eigenvectors2polar_symmetric(tensors, evals, n);
 
-    return tira::cuda::eigenvectors2polar<float>(tensors, evals, n, device);
+    return tira::cuda::eigenvectors2polar_symmetric<float>(tensors, evals, n, device);
 }
 
 float* cudaEigenvectors3DPolar(float* tensors, float* evals, unsigned int n, int device) {
-    if (device < 0) return tira::cpu::eigenvectors3polar(tensors, evals, n);
+    if (device < 0) return tira::cpu::evecs3spherical_symmetric(tensors, evals, n);
 
-    return tira::cuda::eigenvectors3polar<float>(tensors, evals, n);
+    return tira::cuda::evecs3spherical_symmetric<float>(tensors, evals, n, device);
 }
 
 void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsigned int n, int device) {
     if (device < 0) {
-        evals = tira::cpu::eigenvalues3(tensors, n);
-        evecs = tira::cpu::eigenvectors3polar(tensors, evals, n);
+        evals = tira::cpu::eigenvalues3_symmetric(tensors, n);
+        evecs = tira::cpu::eigenvectors3spherical_symmetric(tensors, evals, n);
     }
 
     float* gpu_tensors;
@@ -79,12 +79,12 @@ void cudaEigendecomposition3D(float* tensors, float*& evals, float*& evecs, unsi
     HANDLE_ERROR(cudaMemcpy(gpu_tensors, tensors, n * sizeof(float) * 9, cudaMemcpyHostToDevice));
 
 
-    float* gpu_evals = tira::cuda::eigenvalues3(gpu_tensors, n);
+    float* gpu_evals = tira::cuda::eigenvalues3_symmetric(gpu_tensors, n);
     evals = (float*)malloc(n * sizeof(float) * 3);
     HANDLE_ERROR(cudaMemcpy(evals, gpu_evals, n * sizeof(float) * 3, cudaMemcpyDeviceToHost));
 
 
-    float* gpu_evecs = tira::cuda::eigenvectors3polar(gpu_tensors, gpu_evals, n);
+    float* gpu_evecs = tira::cuda::eigenvectors3spherical_symmetric(gpu_tensors, gpu_evals, n);
     evecs = (float*)malloc(n * sizeof(float) * 4);    
     HANDLE_ERROR(cudaMemcpy(evecs, gpu_evecs, n * sizeof(float) * 4, cudaMemcpyDeviceToHost));
 }
@@ -98,7 +98,7 @@ void cudaEigenvalue0(float* tensors, unsigned int n, float* evals, int device) {
 }
 
 void cudaEigenvalue1(float* tensors, unsigned int n, float* evals, int device) {
-    float* both_evals = tira::cuda::eigenvalues2<float>(tensors, n, device);
+    float* both_evals = tira::cuda::evals2_symmetric<float>(tensors, n, device);
     for (size_t i = 0; i < n; i++) {
         evals[i] = both_evals[2 * i + 1];
     }

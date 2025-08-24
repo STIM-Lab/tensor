@@ -80,7 +80,7 @@ void UpdateColormap() {
     case ScalarType::EVal0:
     case ScalarType::EVal1:
     case ScalarType::EVal2:
-        tira::cmap::colormap(Scalar.data(), OrthoViewer->data(), Scalar.size(), ColorMap::Brewer);
+        tira::cmap::colormap(Scalar.Data(), OrthoViewer->Data(), Scalar.Size(), ColorMap::Brewer);
         break;
     case ScalarType::EVec0:
         ColormapEigenvector(0);
