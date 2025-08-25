@@ -42,25 +42,33 @@ else()
 	set(CMAKE_CXX_FLAGS_DEBUG "-g")
 endif ( MSVC )
 
+# suppress warnings regarding ImGuiFileDialog, which we didn't write
+set_source_files_properties(
+		ImGuiFileDialog/ImGuiFileDialog.cpp
+		PROPERTIES
+		COMPILE_FLAGS "-Wno-deprecated-enum-enum-conversion"
+)
 
-configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
+#configure_file(Roboto-Medium.ttf Roboto-Medium.ttf COPYONLY)
 
 # copy python scripts
-configure_file(image2tensor.py 
+configure_file(python/image2tensor.py
 				image2tensor.py COPYONLY)
-configure_file(tensorvote.py 
+configure_file(python/tensorvote.py
 				tensorvote.py COPYONLY)
-configure_file(tensorvote3d.py 
+configure_file(python/tensorvote3d.py
 				tensorvote3d.py COPYONLY)
-configure_file(gendata.py 
+configure_file(data/gendata.py
 				gendata.py COPYONLY)
-configure_file(physarum.bmp
+configure_file(data/physarum.bmp
 				physarum.bmp COPYONLY)
-configure_file(demo2.png
+configure_file(data/demo2.png
 		demo2.png COPYONLY)
-configure_file(demo2noise.png
+configure_file(data/demo2noise.png
 		demo2noise.png COPYONLY)
-file(COPY sbfsem DESTINATION .)
+configure_file(data/demo_noisy.npy
+		demo_noisy.npy COPYONLY)
+file(COPY data/sbfsem DESTINATION .)
 
 #set the include directories
 include_directories(
@@ -74,15 +82,16 @@ include_directories(
 
 # tensorview executable
 add_executable(tvote2
-				tvote2/tvote2.cpp
-				tvote2/tvote2.h
-				ImGuiFileDialog/ImGuiFileDialog.cpp
-				tvote2/tvote2_render.cpp
-				tvote2/tvote2_imgui.cpp
-				tvote2/tvote2_processing.cpp
-				tvote2/tvote2_io.cpp
-				tvote2/tvote2_callbacks.cpp
-				tvote2/tvote2_hsa.cu
+				source/tvote2/tvote2.cpp
+				source/tvote2/tvote2.h
+				source/ImGuiFileDialog/ImGuiFileDialog.cpp
+				source/ImGuiFileDialog/ImGuiFileDialog.h
+				source/tvote2/tvote2_render.cpp
+				source/tvote2/tvote2_imgui.cpp
+				source/tvote2/tvote2_processing.cpp
+				source/tvote2/tvote2_io.cpp
+				source/tvote2/tvote2_callbacks.cpp
+				source/tvote2/tvote2_hsa.cu
 )
 
 target_link_libraries(tvote2
@@ -99,17 +108,16 @@ target_link_libraries(tvote2
 
 #create an executable
 add_executable(tvote3
-				tvote3/tvote3.cpp
-				tvote3/tvote3.h
-				tvote3/tvote3_render.cpp
-				tvote3/tvote3_imgui.cpp
-				tvote3/tvote3_processing.cpp
-				tvote3/tvote3_io.cpp
-				tvote3/tvote3_callbacks.cpp
-				tvote3/tvote3_hsa.cu
-				#cuda_calls.cu
-				#tensorvote.cu
-				ImGuiFileDialog/ImGuiFileDialog.cpp
+				source/tvote3/tvote3.cpp
+				source/tvote3/tvote3.h
+				source/tvote3/tvote3_render.cpp
+				source/tvote3/tvote3_imgui.cpp
+				source/tvote3/tvote3_processing.cpp
+				source/tvote3/tvote3_io.cpp
+				source/tvote3/tvote3_callbacks.cpp
+				source/tvote3/tvote3_hsa.cu
+				source/ImGuiFileDialog/ImGuiFileDialog.cpp
+				source/ImGuiFileDialog/ImGuiFileDialog.h
 )
 
 target_link_libraries(tvote3
@@ -124,8 +132,8 @@ target_link_libraries(tvote3
 
 #create an executable
 add_executable(image2tensor
-				image2tensor.cpp
-				cuda_calls.cu
+				source/image2tensor/image2tensor.cpp
+				source/image2tensor/cuda_calls.cu
 )
 
 target_link_libraries(image2tensor
@@ -136,19 +144,6 @@ target_link_libraries(image2tensor
 
 )
 
-# tensorvote executable
-add_executable(tensorvote
-				tensorvote.cpp
-				tensorvote.cuh	
-				tensorvote.cu
-				cuda_calls.cu
-)
-
-target_link_libraries(tensorvote
-				PRIVATE glm::glm
-				Boost::program_options
-				Boost::math
-)
 
 target_compile_options(tvote3 PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:
 		--generate-line-info

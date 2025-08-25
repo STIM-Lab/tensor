@@ -21,11 +21,11 @@ extern GLFWwindow* window;                                     // pointer to the
 extern const char* glsl_version;              // specify the version of GLSL
 
 const std::string colormap_shader_string =
-#include "shaders/colormap.shader"
+#include "../shaders/colormap.shader"
 ;
 
 const std::string glyph_shader_string =
-#include "shaders/glyph2d.shader"
+#include "../shaders/glyph2d.shader"
 ;
 
 tira::glGeometry cmapGeometry;
@@ -37,7 +37,7 @@ tira::glMaterial* testmaterial;
 
 /// Generates the glyph geometry and stores it in a geometry structure for rendering
 void GenerateGlyphs() {
-    if (Tn.size() == 0) return;
+    if (Tn.Size() == 0) return;
 
     tira::trimesh<float> circle = tira::circle<float>(UI.glyph_tesselation).scale({ 0.0f, 0.0f });
 

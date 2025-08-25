@@ -3,7 +3,7 @@
 
 void hsa_tensorvote2(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
     unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples) {
-    tira::cuda::tensorvote2(input_field, output_field, s0, s1, sigma, sigma2,
+    tira::tensorvote::tensorvote2_cuda(input_field, output_field, s0, s1, sigma, sigma2,
         w, power, device, STICK, PLATE, debug, samples);
 }
 

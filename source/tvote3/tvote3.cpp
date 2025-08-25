@@ -39,9 +39,6 @@ int main(int argc, char** argv) {
     float evec2[3];
     tira::evec3_symmetric(M[0][0], M[1][0], M[1][1], M[2][0], M[2][1], M[2][2], evals, evec0, evec1, evec2);
 
-    float dot_01 = dot(evec0, evec1);
-    float dot_12 = dot(evec1, evec2);
-    float dot_02 = dot(evec0, evec2);
 
     std::string in_filename;
     int in_device;
@@ -51,9 +48,6 @@ int main(int argc, char** argv) {
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()
         ("input", boost::program_options::value<std::string>(&in_filename), "input filename for the tensor field (*.npy)")
-        //("volume", boost::program_options::value<std::string>(&in_image), "optional image field corresponding to the tensors")
-        //("gamma, g", boost::program_options::value<float>(&in_gamma)->default_value(3), "glyph gamma (sharpness), 0 = spheroids")
-        //("cmap,c", boost::program_options::value<int>(&in_cmap)->default_value(0), "colormaped eigenvector (0 = longest, 2 = shortest)")
         ("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "CUDA device ID (-1 for CPU only)")
         ("voxel", boost::program_options::value<std::vector<float>>(&in_voxel_size)->multitoken()->default_value(std::vector<float>{1.0f, 1.0f, 1.0f}, "1.0 1.0 1.0"), "voxel size")
         ("help", "produce help message");

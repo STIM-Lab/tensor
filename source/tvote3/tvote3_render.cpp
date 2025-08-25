@@ -111,7 +111,7 @@ GLFWwindow* InitWindow(int width, int height) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
     // Create window with graphics context
-    GLFWwindow* window = glfwCreateWindow(1600, 1200, "TensorView 3D", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(width, height, "TensorView 3D", nullptr, nullptr);
     if (window == nullptr)
         throw std::runtime_error("Failed to create GLFW window");
     glfwMakeContextCurrent(window);

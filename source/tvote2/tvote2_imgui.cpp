@@ -1,7 +1,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "ImGuiFileDialog/ImGuiFileDialog.h"
+#include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include "tvote2.h"
 #include <tira/eigen.h>
@@ -49,13 +49,13 @@ void ImGuiDestroy() {
 
 void ImGuiFieldSpecs() {
     ImGui::Text("Tensor Field Specifications");
-    if (Tn.size() == 0) {
+    if (Tn.Size() == 0) {
         ImGui::Text("None Loaded");
         return;
     }
 
     std::stringstream ss;
-    ss << Tn.shape()[0] << " x " << Tn.shape()[1];
+    ss << Tn.Shape()[0] << " x " << Tn.Shape()[1];
 
     ImGui::Text("%s", ("Field Size: " + ss.str()).c_str());
 }
@@ -261,7 +261,7 @@ void ImGuiRender() {
             const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
             if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
-                Tn.save_npy<float>(filename);
+                Tn.SaveNpy<float>(filename);
             }
         }
         ImGuiFileDialog::Instance()->Close();									// close the file dialog box

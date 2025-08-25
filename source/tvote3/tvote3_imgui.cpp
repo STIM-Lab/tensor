@@ -3,7 +3,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-#include "ImGuiFileDialog/ImGuiFileDialog.h"
+#include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include <tira/graphics/glOrthoView.h>
 #include <tira/eigen.h>
@@ -21,8 +21,6 @@ extern tira::volume<float> Lambda;								// eigenvalues of the tensor field
 extern tira::volume<glm::vec2> ThetaPhi;						// eigenvectors of the tensor field (in spherical coordinates)
 extern tira::volume<float> Scalar;								// scalar field that is currently being visualized
 extern tira::glOrthoView<unsigned char>* OrthoViewer;
-
-#define PI 3.14159265358979323846264338327950288
 
 /// re-calculate the scalar field based on the current settings in the UI
 void UpdateScalarField() {
@@ -104,7 +102,7 @@ void ImGuiInit(GLFWwindow* window, const char* glsl_version) {
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
 	// Load Fonts
-	io.Fonts->AddFontFromFileTTF("Roboto-Medium.ttf", UI.scale * 16.0f);
+	//io.Fonts->AddFontFromFileTTF("Roboto-Medium.ttf", UI.scale * 16.0f);
 
 }
 
@@ -297,9 +295,9 @@ void ImGuiRender() {
 
 	{
 		// Use smaller font size
-		float old_size = ImGui::GetFont()->Scale;
-		ImGui::GetFont()->Scale *= 0.5;
-		ImGui::PushFont(ImGui::GetFont());
+		//float old_size = ImGui::GetFont()->Scale;
+		//ImGui::GetFont()->Scale *= 0.5;
+		//ImGui::PushFont(ImGui::GetFont());
 
 		ImGui::Begin("Tensor");
 		UI.window_focused = (ImGui::IsWindowHovered()) ? false : true;
@@ -508,8 +506,8 @@ void ImGuiRender() {
 			ImGui::EndTabBar();
 		}
 
-		ImGui::GetFont()->Scale = old_size;
-		ImGui::PopFont();
+		//ImGui::GetFont()->Scale = old_size;
+		//ImGui::PopFont();
 		ImGui::End();
 
 

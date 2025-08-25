@@ -66,15 +66,15 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
 
     const auto w = static_cast<unsigned int>(6.0f * std::max(sigma, sigma2) + 1.0f);
 
-    if (cuda_device >= 0) {
+    /*if (cuda_device >= 0) {
         hsa_tensorvote3(reinterpret_cast<const float*>(tensors_in->ConstData()), reinterpret_cast<float*>(tensors_out->Data()),
             static_cast<unsigned int>(tensors_in->Shape()[0]), static_cast<unsigned int>(tensors_in->Shape()[1]), static_cast<unsigned int>(tensors_in->Shape()[2]),
             sigma, sigma2, w, p, cuda_device, stick, plate, false, samples);
     }
-    else {
+    else {*/
     auto* lambdas = tira::cpu::evals3_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), tensors_in->Size());
     auto* evecs = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
-    tira::cpu::tensorvote3(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), reinterpret_cast<glm::mat2*>(evecs), glm::vec2(sigma, sigma2), p,
+    tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), reinterpret_cast<glm::mat2*>(evecs), glm::vec2(sigma, sigma2), p,
         w, tensors_in->Shape()[0], tensors_in->Shape()[1], tensors_in->Shape()[2], stick, plate, samples);
-    }
+    //}
 }

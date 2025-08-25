@@ -12,7 +12,7 @@ void LoadTensorField(const std::string& filename, tira::image<glm::mat2>* tensor
 }
 
 void SaveTensorField(const std::string& filename, tira::image<glm::mat2>* tensor) {
-    tensor->save_npy(filename);
+    tensor->SaveNpy(filename);
 }
 
 /// Generate an impulse tensor field with a single tensor at the center.
