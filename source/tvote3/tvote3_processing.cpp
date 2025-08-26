@@ -74,7 +74,16 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
     else {*/
     auto* lambdas = tira::cpu::evals3_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), tensors_in->Size());
     auto* evecs = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
-    tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), reinterpret_cast<glm::mat2*>(evecs), glm::vec2(sigma, sigma2), p,
+
+	const size_t n = tensors_in->Size();
+    std::vector<glm::vec2> largest_v(n);
+    for (size_t i = 0; i < n; ++i) {
+		const float theta = evecs[i * 6 + 4];
+		const float phi = evecs[i * 6 + 5];
+        largest_v[i] = glm::vec2(theta, phi);
+	}
+    tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), largest_v.data(), glm::vec2(sigma, sigma2), p,
         w, tensors_in->Shape()[0], tensors_in->Shape()[1], tensors_in->Shape()[2], stick, plate, samples);
+    delete[] evecs;
     //}
 }
