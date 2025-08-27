@@ -18,50 +18,97 @@ void RefreshVisualization() {
     OrthoViewer->slice_positions(UI.slice_positions);
 }
 
-void ColormapEigenvector(unsigned vi) {
+
+glm::vec3 ColormapEigenvector(unsigned vi, float l0, float l1, float l2, float theta, float phi, float l2_max) {
+
+    // The color of the eigenvector may be updated by the eigenvalue magnitudes
+    l0 = std::abs(l0);
+    l1 = std::abs(l1);
+    l2 = std::abs(l2);
+
+    // Convert the spherical coordinates for the eigenvector to Cartesian coordinates for visualization
+    float cos_theta = std::cos(theta);
+    float sin_theta = std::sin(theta);
+    float cos_phi = std::cos(phi);
+    float sin_phi = std::sin(phi);
+    float x = std::abs(cos_theta * sin_phi);
+    float y = std::abs(sin_theta * sin_phi);
+    float z = std::abs(cos_phi);
+
+    // The color map incorporates how "certain" we are about the eigenvector direction. This
+    // certainty is based on the size of the corresponding eigenvalue to the other eigenvalues.
+    // If the other eigenvalues have a similar size to this eigenvalue, the orientation tensor is
+    // more isotropic and the orientation of this eigenvector is less "certain".
+
+    // alpha reflects the "certainty" of the current eigenvector orientation
+    float alpha = 1.0f;
+
+    // When visualizing the eigenvector associated with the largest eigenvalue, the certainty
+    // will be based on how "stick-like" the tensor is. The more stick-like it is, the more certain
+    // we are about the orientation of eigenvector 2.
+    if (vi == 2) {
+        alpha = (l2 - l1) / (l0 + l1 + l2);
+    }
+    // For the middle eigenvector, there are two cases where the uncertainty is high:
+    //  1) A plate-like tensor where l1 == l2
+    //  2) A stick-like tensor where l1 == l0
+    // We calculate the certainty with respect to each option and then take the smallest value
+    // to reflect the least amount of certainty.
+    if (vi == 1) {
+        float a1 = (l2 - l1) / (l0 + l1 + l2);
+        float a2 = (l1 - l0) / (l0 + l1);
+        alpha = std::min(a1, a2);
+    }
+    // For the smallest eigenvector, the uncertainty is only high when it is close to the middle
+    // eigenvalue, and this can happen for both plate-like and ball-like tensors.
+    if (vi == 0) {
+        alpha = (l1 - l0) / (l0 + l1);
+    }
+    // In the unique case where all eigenvalues are zero, we have absolutely no certainty
+    if  (l2 == 0)
+        alpha = 0.0f;
+
+    float r = alpha * x + (1.0f - alpha);
+    float g = alpha * y + (1.0f - alpha);
+    float b = alpha * z + (1.0f - alpha);
+
+    r *= l2 / l2_max;
+    g *= l2 / l2_max;
+    b *= l2 / l2_max;
+
+    return {r, g, b};
+
+}
+
+/**
+ * @brief This function calculates the color map for a specified eigenvector and stores the result in the OrthoView
+ * class for visualization.
+ * @param vi is the eigenvector to be visualized
+ */
+void ColormapEigenvectors(unsigned vi) {
     std::cout<<"Colormap Eigenvector"<<std::endl;
+
+    float l2_max = Lambda.maxv();
+
+    // iterate through each voxel in the data set
     for (unsigned zi=0; zi<OrthoViewer->Z(); zi++) {
         for (unsigned yi=0; yi<OrthoViewer->Y(); yi++) {
             for (unsigned xi=0; xi<OrthoViewer->X(); xi++) {
 
-                float l0 = std::abs(Lambda(xi, yi, zi, 0));
-                float l1 = std::abs(Lambda(xi, yi, zi, 1));
-                float l2 = std::abs(Lambda(xi, yi, zi, 2));
+                glm::vec3 color = ColormapEigenvector(
+                    vi,
+                    Lambda(xi, yi, zi, 0),
+                    Lambda(xi, yi, zi, 1),
+                    Lambda(xi, yi, zi, 2),
+                    ThetaPhi(xi, yi, zi, vi).x,
+                    ThetaPhi(xi, yi, zi, vi).y,
+                    l2_max
+                    );
 
-                float alpha = 1.0f;
-                if (vi == 2) {
-                    alpha = (l2 - l1) / (l0 + l1 + l2);
-                }
-                if (vi == 1) {
-                    float a1 = (l2 - l1) / (l0 + l1 + l2);
-                    float a2 = (l1 - l0) / (l0 + l1);
-                    alpha = std::min(a1, a2);
-                }
-                if (vi == 0) {
-                    alpha = (l1 - l0) / (l0 + l1);
-                }
-                if  (l2 == 0)
-                    alpha = 0.0f;
+                (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(color.r * 255.0); // set the color
+                (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(color.g * 255.0);
+                (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(color.b * 255.0);
 
-                //alpha = 1.0f - alpha;
-
-                glm::vec2 theta_phi = ThetaPhi(xi, yi, zi, vi);         // get the eigenvector in spherical coordinates
-                float cos_theta = std::cos(theta_phi.x);
-                float sin_theta = std::sin(theta_phi.x);
-                float cos_phi = std::cos(theta_phi.y);
-                float sin_phi = std::sin(theta_phi.y);
-
-                float x = std::abs(cos_theta * sin_phi);                        // convert to cartesian coordinates
-                float y = std::abs(sin_theta * sin_phi);
-                float z = std::abs(cos_phi);
-
-                float r = alpha * x + (1.0f - alpha);
-                float g = alpha * y + (1.0f - alpha);
-                float b = alpha * z + (1.0f - alpha);
-
-                (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(r * 255.0); // set the color
-                (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(g * 255.0);
-                (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(b * 255.0);
             }
         }
     }
@@ -83,13 +130,13 @@ void UpdateColormap() {
         tira::cmap::colormap(Scalar.Data(), OrthoViewer->Data(), Scalar.Size(), ColorMap::Brewer);
         break;
     case ScalarType::EVec0:
-        ColormapEigenvector(0);
+        ColormapEigenvectors(0);
         break;
     case ScalarType::EVec1:
-        ColormapEigenvector(1);
+        ColormapEigenvectors(1);
         break;
     case ScalarType::EVec2:
-        ColormapEigenvector(2);
+        ColormapEigenvectors(2);
         break;
 
 

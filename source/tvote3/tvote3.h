@@ -126,6 +126,7 @@ void VolumeFrom_TensorElement3D(tira::volume<glm::mat3>* tensors, tira::volume<f
 // Visualization functions (generating colormaps, etc.)
 void RefreshVisualization();
 void UpdateColormap();
+glm::vec3 ColormapEigenvector(unsigned vi, float l0, float l1, float l2, float theta, float phi, float l2_max = 1.0f);
 
 // Heterogeneous system architecture calls
 void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2, 

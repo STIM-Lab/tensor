@@ -203,8 +203,14 @@ void RenderImpulseWindow() {
 
 	ImGui::SeparatorText("Cartesian Eigenvectors");
 
+	float v0_spherical[2];
+	float v1_spherical[2];
+	float v2_spherical[2];
+	tira::evec3spherical_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0_spherical, v1_spherical, v2_spherical);
+
 	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2[0]), std::abs(v2[1]), std::abs(v2[2])));
+	glm::vec3 color_v2 = ColormapEigenvector(2, evals[0], evals[1], evals[2], v2_spherical[0], v2_spherical[1]);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(color_v2.r, color_v2.g, color_v2.b));
 	ImGui::InputFloat3("v2", &v2[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
@@ -212,7 +218,8 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat("#eval2", &evals[2]);
 
 	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v1[0]), std::abs(v1[1]), std::abs(v1[2])));
+	glm::vec3 color_v1 = ColormapEigenvector(1, evals[0], evals[1], evals[2], v1_spherical[0], v1_spherical[1]);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(color_v1.r, color_v1.g, color_v1.b));
 	ImGui::InputFloat3("v1", &v1[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
@@ -220,7 +227,8 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat("#eval1", &evals[1]);
 	
 	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0[0]), std::abs(v0[1]), std::abs(v0[2])));
+	glm::vec3 color_v0 = ColormapEigenvector(0, evals[0], evals[1], evals[2], v0_spherical[0], v0_spherical[1]);
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(color_v0.r, color_v0.g, color_v0.b));
 	ImGui::InputFloat3("v0", &v0[0]);
 	ImGui::PopStyleColor();
 	ImGui::PopID();
