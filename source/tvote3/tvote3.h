@@ -115,6 +115,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 //void scroll_callback(GLFWwindow* window, const double xoffset, const double yoffset);
 
 // Data processing functions
+void ReprocessTensors();
+void ReprocessField();
 void EigenDecomposition(tira::volume<glm::mat3>* tensor, tira::volume<float>* lambda, tira::volume<glm::vec2>* theta, int cuda_device);
 void GaussianFilter(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, 
 	glm::vec3 pixel_size, const int cuda_device);

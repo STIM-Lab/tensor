@@ -41,6 +41,7 @@ int main(int argc, char** argv) {
 
 
     std::string in_filename;
+    std::string in_outfile;
     int in_device;
     std::vector<float> in_voxel_size;
 
@@ -48,8 +49,10 @@ int main(int argc, char** argv) {
     boost::program_options::options_description desc("Allowed options");
     desc.add_options()
         ("input", boost::program_options::value<std::string>(&in_filename), "input filename for the tensor field (*.npy)")
+        ("output", boost::program_options::value<std::string>(&in_outfile), "output file that will be saved after processing")
         ("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "CUDA device ID (-1 for CPU only)")
         ("voxel", boost::program_options::value<std::vector<float>>(&in_voxel_size)->multitoken()->default_value(std::vector<float>{1.0f, 1.0f, 1.0f}, "1.0 1.0 1.0"), "voxel size")
+        ("nogui", "process command line arguments but don't display the tensor3 GUI")
         ("help", "produce help message");
     boost::program_options::variables_map vm;
 
@@ -61,6 +64,16 @@ int main(int argc, char** argv) {
     if (vm.count("help")) {
         std::cout << desc << std::endl;
         return 1;
+    }
+
+    if (vm.count("input")) {
+        T0.load_npy<float>(in_filename);
+        UI.field_loaded = true;
+    }
+
+    // if an output file name is provided, perform all specified processing and save the file
+    if (vm.count("output")) {
+
     }
 
     // make sure there the specified CUDA device is available (otherwise switch to CPU)
@@ -80,6 +93,11 @@ int main(int argc, char** argv) {
     }
 
 
+    if (vm.count("nogui")) {
+        ReprocessTensors();
+        Tn.save_npy<float>(in_outfile);
+    }
+
 
     // create a GLSL window, initialize the OpenGL context, and assign callback functions
     window = InitWindow(1600, 1200);
@@ -87,8 +105,15 @@ int main(int argc, char** argv) {
     OrthoViewer = new tira::glOrthoView<unsigned char>();
     OrthoViewer->init();
 
-    OrthoViewer->generate_rgb(32, 24, 10, 2);
-    UI.field_loaded = true;
+    if (UI.field_loaded) {
+        ReprocessField();
+    }
+    else {
+        OrthoViewer->generate_rgb(32, 24, 10, 2);
+        UI.field_loaded = true;
+    }
+
+
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {

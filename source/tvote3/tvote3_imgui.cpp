@@ -69,14 +69,17 @@ void UpdateScalarField() {
 	RefreshVisualization();
 }
 
-void ReprocessField() {
-
+void ReprocessTensors() {
 	if (UI.processing_type == ProcessingType::Gaussian)
 		GaussianFilter(&T0, &Tn, UI.sigma, { T0.dx(), T0.dy(), T0.dz() }, UI.cuda_device);
 	else if (UI.processing_type == ProcessingType::Vote)
 		TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
 	else
 		Tn = T0;
+}
+
+void ReprocessField() {
+	ReprocessTensors();
 	EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
 	UpdateScalarField();
 }
@@ -322,6 +325,37 @@ void ImGuiRender() {
 
 				if (ImGui::Button("Impulse")) UI.impulse_window = true;
 				if (UI.impulse_window) RenderImpulseWindow();
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Load Field"))					                        // create a button for loading the field
+					ImGuiFileDialog::Instance()->OpenDialog("LoadNpyFile", "Choose NPY File", ".npy,.npz");
+				if (ImGuiFileDialog::Instance()->Display("LoadNpyFile")) {				    // if the user opened a file dialog
+					if (ImGuiFileDialog::Instance()->IsOk()) {								// and clicks okay, they've probably selected a file
+						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+
+						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+							T0.load_npy<float>(filename);
+							ReprocessField();
+						}
+					}
+					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
+				}
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Save Field"))
+					ImGuiFileDialog::Instance()->OpenDialog("SaveNpyFile", "Choose NPY File", ".npy,.npz");
+				if (ImGuiFileDialog::Instance()->Display("SaveNpyFile")) {				    // if the user opened a file dialog
+					if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+
+						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
+							Tn.SaveNpy<float>(filename);
+						}
+					}
+					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
+				}
 
 				ImGui::SeparatorText("Slice Positions");
 				glm::vec3 field_size = OrthoViewer->dimensions();
