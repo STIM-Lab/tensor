@@ -86,8 +86,6 @@ glm::vec3 ColormapEigenvector(unsigned vi, float l0, float l1, float l2, float t
  * @param vi is the eigenvector to be visualized
  */
 void ColormapEigenvectors(unsigned vi) {
-    std::cout<<"Colormap Eigenvector"<<std::endl;
-
     float l2_max = Lambda.maxv();
 
     // iterate through each voxel in the data set
@@ -108,7 +106,6 @@ void ColormapEigenvectors(unsigned vi) {
                 (*OrthoViewer)(xi, yi, zi, 0) = (unsigned char)(color.r * 255.0); // set the color
                 (*OrthoViewer)(xi, yi, zi, 1) = (unsigned char)(color.g * 255.0);
                 (*OrthoViewer)(xi, yi, zi, 2) = (unsigned char)(color.b * 255.0);
-
             }
         }
     }
@@ -142,8 +139,6 @@ void UpdateColormap() {
 
     }
     OrthoViewer->update_texture();
-
-    std::cout<<"Updating colormap"<<std::endl;
 }
 
 GLFWwindow* InitWindow(int width, int height) {

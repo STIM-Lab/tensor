@@ -50,7 +50,7 @@ struct TV3_UI {
 	int cuda_device;					// CUDA device ID (-1 for CPU)
 
 	// settings for processing the tensor field
-	int processing_type = ProcessingType::NoProcessing;
+	int processing_type = ProcessingType::Vote;
 
 	float sigma = 1.0f;						// sigma for Gaussian blur
 

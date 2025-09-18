@@ -94,8 +94,15 @@ int main(int argc, char** argv) {
 
 
     if (vm.count("nogui")) {
+        if (!UI.field_loaded) {
+            std::cout << "No input field specified, cannot process." << std::endl;
+            return 1;
+		}
+		std::cout << "Processing field " << in_filename << std::endl;
         ReprocessTensors();
         Tn.save_npy<float>(in_outfile);
+		std::cout << "Saved processed field to " << in_outfile << std::endl;
+        return 0;
     }
 
 

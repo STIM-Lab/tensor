@@ -76,13 +76,15 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
     auto* evecs = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
 
 	const size_t n = tensors_in->Size();
-    std::vector<glm::vec2> largest_v(n);
+	std::vector<glm::vec3> largest_q(n);                                      // q - the stick tensor (voter) orientation (largest eigenvector)
     for (size_t i = 0; i < n; ++i) {
 		const float theta = evecs[i * 6 + 4];
 		const float phi = evecs[i * 6 + 5];
-        largest_v[i] = glm::vec2(theta, phi);
+		const float cos_theta = cosf(theta), sin_theta = sinf(theta);
+		const float cos_phi = cosf(phi), sin_phi = sinf(phi);
+		largest_q[i] = glm::vec3(cos_theta * sin_phi, sin_theta * sin_phi, cos_phi);
 	}
-    tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), largest_v.data(), glm::vec2(sigma, sigma2), p,
+    tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), largest_q.data(), glm::vec2(sigma, sigma2), p,
         w, tensors_in->Shape()[0], tensors_in->Shape()[1], tensors_in->Shape()[2], stick, plate, samples);
     delete[] evecs;
     //}
