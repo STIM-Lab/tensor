@@ -66,8 +66,6 @@ configure_file(data/demo2.png
 		demo2.png COPYONLY)
 configure_file(data/demo2noise.png
 		demo2noise.png COPYONLY)
-configure_file(data/demo_noisy.npy
-		demo_noisy.npy COPYONLY)
 file(COPY data/sbfsem DESTINATION .)
 
 #set the include directories
