@@ -3,7 +3,7 @@
 
 #include "tira/graphics_gl.h"
 #include "tira/graphics/glShader.h"
-#include "tira/graphics/shapes/circle.h"
+#include "tira/shapes/circle.h"
 #include "tira/image/colormap.h"
 
 #include "tvote2.h"

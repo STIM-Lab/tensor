@@ -66,6 +66,8 @@ configure_file(data/demo2.png
 		demo2.png COPYONLY)
 configure_file(data/demo2noise.png
 		demo2noise.png COPYONLY)
+configure_file(data/impulse_blur_13.npy
+		impulse_blur_13.npy COPYONLY)
 file(COPY data/sbfsem DESTINATION .)
 
 #set the include directories
@@ -126,6 +128,22 @@ target_link_libraries(tvote3
 				${CMAKE_DL_LIBS}
 				Boost::program_options
 				PRIVATE imgui::imgui
+)
+
+#create an executable
+add_executable(glyphs3
+		source/glyphs3/glyphs3.cpp
+		source/glyphs3/glyphs3.h
+)
+
+target_link_libraries(glyphs3
+		PRIVATE glm::glm
+		PRIVATE glfw
+		PRIVATE GLEW::GLEW
+		${OPENGL_LIBRARIES}
+		${CMAKE_DL_LIBS}
+		Boost::program_options
+		PRIVATE imgui::imgui
 )
 
 #create an executable

@@ -31,7 +31,7 @@ glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned in
 float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, 
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
 	unsigned int& out_depth, int deviceID = 0);
-//float* EigenValues2(float* tensors, unsigned int n, int device);
+float* EigenValues2(float* tensors, unsigned int n, int device);
 
 /// <summary>
 /// Calculate the finite difference coefficients for a set of sample points.
@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
 		if (in_blur > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			float* raw_field = GaussianBlur2D(grey.data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height, in_device);
+			float* raw_field = GaussianBlur2D(grey.Data(), grey.X(), grey.Y(), in_blur, raw_width, raw_height, in_device);
 			grey = tira::image<float>(raw_field, raw_width, raw_height);
 			free(raw_field);
 			grey.cmap().save("grey.bmp");
@@ -163,10 +163,10 @@ int main(int argc, char** argv) {
 		// Evaluate the Hessian at each pixel
 		if (vm.count("hessian")) {
 
-			tira::image<float> D2x2 = grey.derivative(1, 2, in_order);			// calculate the derivative along the x axis
-			tira::image<float> D2y2 = grey.derivative(0, 2, in_order);			// calculate the derivative along the y axis
-			tira::image<float> Dx = grey.derivative(1, 1, in_order);
-			tira::image<float> Dxy = Dx.derivative(0, 1, in_order);
+			tira::image<float> D2x2 = grey.Derivative(1, 2, in_order);			// calculate the derivative along the x axis
+			tira::image<float> D2y2 = grey.Derivative(0, 2, in_order);			// calculate the derivative along the y axis
+			tira::image<float> Dx = grey.Derivative(1, 1, in_order);
+			tira::image<float> Dxy = Dx.Derivative(0, 1, in_order);
 
 
 			//field_shape = { Dx, D[0].shape()[1], (size_t)dim, (size_t)dim };
@@ -187,8 +187,8 @@ int main(int argc, char** argv) {
 		}
 		// Evaluate the structure tensor at each pixel
 		else {
-			tira::image<float> Dx = grey.derivative(1, 1, in_order);			// calculate the derivative along the x axis
-			tira::image<float> Dy = grey.derivative(0, 1, in_order);			// calculate the derivative along the y axis
+			tira::image<float> Dx = grey.Derivative(1, 1, in_order);			// calculate the derivative along the x axis
+			tira::image<float> Dy = grey.Derivative(0, 1, in_order);			// calculate the derivative along the y axis
 
 			Dx = Dx.border_remove(in_order);
 			Dy = Dy.border_remove(in_order);
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			glm::mat2* raw_field = GaussianBlur2D(T.data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
+			glm::mat2* raw_field = GaussianBlur2D(T.Data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 			bool keep_positives = true;
 			if(vm.count("negatives")) keep_positives = false;
 
-			float* evals = EigenValues2((float*)T.data(), T.X() * T.Y(), in_device);
+			float* evals = EigenValues2((float*)T.Data(), T.X() * T.Y(), in_device);
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				for (size_t xi = 0; xi < T.X(); xi++) {
 					size_t i = yi * T.X() + xi;
@@ -241,8 +241,8 @@ int main(int argc, char** argv) {
 		}
 
 		// save the tensor field to an output file
-		tira::field<float> Tout({ T.shape()[0], T.shape()[1], 2, 2 }, (float*)T.data());
-		Tout.save_npy(in_outputname);
+		tira::field<float> Tout({ T.Shape()[0], T.Shape()[1], 2, 2 }, (float*)T.Data());
+		Tout.SaveNpy(in_outputname);
 	}
 
 	else if (dim == 3) {
@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
 			unsigned int raw_width;
 			unsigned int raw_height;
 			unsigned int raw_depth;
-			float* raw_field = cudaGaussianBlur3D(grey.data(), grey.X(), grey.Y(), grey.Z(), in_blur/in_dx, 
+			float* raw_field = cudaGaussianBlur3D(grey.Data(), grey.X(), grey.Y(), grey.Z(), in_blur/in_dx, 
 				in_blur/in_dy, in_blur/in_dz, raw_width, raw_height, raw_depth);
 			grey = tira::volume<float>(raw_field, raw_width, raw_height, raw_depth);
 			free(raw_field);
@@ -308,15 +308,15 @@ int main(int argc, char** argv) {
 			unsigned int raw_width;
 			unsigned int raw_height;
 			unsigned int raw_depth;
-			glm::mat3* raw_field = cudaGaussianBlur3D(T.data(), T.X(), T.Y(), T.Z(), in_sigma / in_dx,
+			glm::mat3* raw_field = cudaGaussianBlur3D(T.Data(), T.X(), T.Y(), T.Z(), in_sigma / in_dx,
 				in_sigma / in_dy, in_sigma / in_dz, raw_width, raw_height, raw_depth);
 			T = tira::volume<glm::mat3>(raw_field, raw_width, raw_height, raw_depth);
 			free(raw_field);
 		}
 
 		// save the tensor field to an output file
-		tira::field<float> Tout({ T.shape()[0], T.shape()[1], T.shape()[2], 3, 3 }, (float*)T.data());
-		Tout.save_npy(in_outputname);
+		tira::field<float> Tout({ T.Shape()[0], T.Shape()[1], T.Shape()[2], 3, 3 }, (float*)T.Data());
+		Tout.SaveNpy(in_outputname);
 	}
 
 	return 0;
