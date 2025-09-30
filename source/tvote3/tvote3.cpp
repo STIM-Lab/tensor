@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
     desc.add_options()
         ("input", boost::program_options::value<std::string>(&in_filename), "input filename for the tensor field (*.npy)")
         ("output", boost::program_options::value<std::string>(&in_outfile), "output file that will be saved after processing")
-        ("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "CUDA device ID (-1 for CPU only)")
+        ("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "CUDA device ID (-1 for CPU only)")
         ("voxel", boost::program_options::value<std::vector<float>>(&in_voxel_size)->multitoken()->default_value(std::vector<float>{1.0f, 1.0f, 1.0f}, "1.0 1.0 1.0"), "voxel size")
         ("nogui", "process command line arguments but don't display the tensor3 GUI")
         ("help", "produce help message");
