@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
 
                 tira::tmesh sq_rotate = sq.Transform(glm::transpose(R), 0);
                 //tira::tmesh sq_rotate = sq.Transform(R, 0);
-                tira::tmesh sq_translate = sq_rotate.Translate({ (float)xi, (float)yi, (float)zi }, 0);
+                tira::tmesh sq_translate = sq_rotate.Translate({ (float)xi - Field.X()/2.0f, (float)yi - Field.Y() / 2.0f, (float)zi - Field.Z() / 2.0f }, 0);
                 
                 std::stringstream ss;
                 ss << xi << "_" << yi << "_" << zi;
