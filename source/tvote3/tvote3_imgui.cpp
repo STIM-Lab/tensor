@@ -542,6 +542,16 @@ void ImGuiRender() {
 						UpdateScalarField();
 						RefreshVisualization();
 					}
+				static bool useNumerical = false;
+				if (UI.tv_plate) {
+					if (ImGui::Checkbox("Numerical", &useNumerical))
+						if (!useNumerical) UI.platevote_samples = 0;
+					if (useNumerical)
+						if (ImGui::InputInt("Samples", &UI.platevote_samples))
+							if (UI.platevote_samples < 0) UI.platevote_samples = 0;
+				}
+
+
 
 				ImGui::EndTabItem();
 			}
