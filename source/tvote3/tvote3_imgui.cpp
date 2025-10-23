@@ -440,6 +440,21 @@ void ImGuiRender() {
 					UpdateColormap();
 				}
 				ImGui::Columns(1);
+
+				ImGui::Separator();
+
+				// Toggle button for device selection: GPU (0) <-> CPU (-1)
+				ImGui::Text("Device:");
+				ImGui::SameLine();
+				bool isGPU = (UI.cuda_device == 0);
+				if (ImGui::RadioButton("GPU", isGPU)) {
+					UI.cuda_device = 0;
+				}
+				ImGui::SameLine();
+				if (ImGui::RadioButton("CPU", !isGPU)) {
+					UI.cuda_device = -1;
+				}
+
 				ImGui::EndTabItem();
 			}
 			
