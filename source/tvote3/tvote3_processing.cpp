@@ -76,15 +76,33 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
         auto* evecs = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
 
 	    const size_t n = tensors_in->Size();
-	    std::vector<glm::vec3> largest_q(n);                                      // q - the stick tensor (voter) orientation (largest eigenvector)
+	    std::vector<glm::vec3> largest_q(n);                                    // q - the stick tensor (voter) orientation (largest eigenvector)
+		std::vector<glm::vec3> smallest_q(n);                                   // q - the plate tensor (voter) orientation (smallest eigenvector)
+
+        if (stick)  largest_q.resize(n);
+		if (plate)  smallest_q.resize(n);
+
         for (size_t i = 0; i < n; ++i) {
-		    const float theta = evecs[i * 6 + 4];
-		    const float phi = evecs[i * 6 + 5];
-		    const float cos_theta = cosf(theta), sin_theta = sinf(theta);
-		    const float cos_phi = cosf(phi), sin_phi = sinf(phi);
-		    largest_q[i] = glm::vec3(cos_theta * sin_phi, sin_theta * sin_phi, cos_phi);
+            if (stick)  {
+                const float theta_large = evecs[i * 6 + 4];
+                const float phi_large = evecs[i * 6 + 5];
+                const float cos_theta_large = cosf(theta_large), sin_theta_large = sinf(theta_large);
+                const float cos_phi_large = cosf(phi_large), sin_phi_large = sinf(phi_large);
+                largest_q[i] = glm::vec3(cos_theta_large * sin_phi_large, sin_theta_large * sin_phi_large, cos_phi_large);
+            }
+            
+            if (plate) {
+                const float theta_small = evecs[i * 6 + 0];
+                const float phi_small = evecs[i * 6 + 1];
+                const float cos_theta_small = cosf(theta_small), sin_theta_small = sinf(theta_small);
+                const float cos_phi_small = cosf(phi_small), sin_phi_small = sinf(phi_small);
+                smallest_q[i] = glm::vec3(cos_theta_small * sin_phi_small, sin_theta_small * sin_phi_small, cos_phi_small);
+            }
 	    }
-        tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), largest_q.data(), glm::vec2(sigma, sigma2), p,
+        tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
+            stick ? largest_q.data() : nullptr, 
+            plate ? smallest_q.data() : nullptr, 
+            glm::vec2(sigma, sigma2), p,
             w, tensors_in->Shape()[0], tensors_in->Shape()[1], tensors_in->Shape()[2], stick, plate, samples);
         delete[] evecs;
         delete[] lambdas;
