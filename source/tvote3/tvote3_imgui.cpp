@@ -552,18 +552,39 @@ void ImGuiRender() {
 				ImGui::SameLine();
 				if (ImGui::Checkbox("Plate", &UI.tv_plate) && UI.processing_type == ProcessingType::Vote)
 					if (ImGui::IsItemEdited()) {
+						if (!UI.tv_plate) UI.platevote_samples = 0;			// reset to 0 when disabling plate voting
+
 						TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
 						EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
 						UpdateScalarField();
 						RefreshVisualization();
 					}
-				static bool useNumerical = false;
+
+				bool useNumerical = (UI.platevote_samples > 0);
 				if (UI.tv_plate) {
-					if (ImGui::Checkbox("Numerical", &useNumerical))
-						if (!useNumerical) UI.platevote_samples = 0;
-					if (useNumerical)
-						if (ImGui::InputInt("Samples", &UI.platevote_samples))
+					if (ImGui::Checkbox("Numerical", &useNumerical)) {
+						if (!useNumerical) UI.platevote_samples = 0;								// reset to 0 when switching to analytical
+						else UI.platevote_samples = 10;												// set to default when switching to numerical
+
+						if (ImGui::IsItemEdited() && UI.processing_type == ProcessingType::Vote) {
+							TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+							EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+							UpdateScalarField();
+							RefreshVisualization();
+						}
+					}
+					if (useNumerical) {
+						if (ImGui::InputInt("Samples", &UI.platevote_samples))	{
 							if (UI.platevote_samples < 0) UI.platevote_samples = 0;
+
+							if (ImGui::IsItemEdited() && UI.processing_type == ProcessingType::Vote) {
+								TensorVote(&T0, &Tn, UI.tv_sigma1, UI.tv_sigma2, UI.tv_power, UI.tv_stick, UI.tv_plate, UI.cuda_device, UI.platevote_samples);
+								EigenDecomposition(&Tn, &Lambda, &ThetaPhi, UI.cuda_device);
+								UpdateScalarField();
+								RefreshVisualization();
+							}
+						}
+					}
 				}
 
 
