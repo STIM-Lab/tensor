@@ -33,8 +33,8 @@ struct TV3_UI {
 	float impulse_anisotropy = 0;
 
 	// settings for tensor voting
-	bool tv_stick = true;
-	bool tv_plate = false;
+	bool tv_stick = false;
+	bool tv_plate = true;
 	int platevote_samples = 4;
 	float tv_sigma1 = 3.0f;
 	float tv_sigma2 = 1.0f;
