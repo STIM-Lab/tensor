@@ -3,12 +3,12 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 
-#include <cuda_runtime.h>
+//#include <cuda_runtime.h>
 
 #include "tvote3.h"
 
 #include <tira/graphics/glOrthoView.h>
-#include <tira/eigen.h>
+//#include <tira/eigen.h>
 
 TV3_UI UI;
 
@@ -20,6 +20,8 @@ tira::volume<float> Scalar;								// scalar field that is currently being visua
 
 tira::glOrthoView<unsigned char>* OrthoViewer;
 
+int numCudaDevices();
+
 GLFWwindow* window;
 const char* glsl_version = "#version 130";
 
@@ -28,17 +30,6 @@ float dot(float v0[3], float v1[3]) {
 }
 
 int main(int argc, char** argv) {
-
-    glm::mat3 M(0.41863424, 0.27482766, -0.1500264, 0.27482766, 0.87008137, 0.07092162, -0.1500264, 0.07092162, 0.9612844);
-
-    float evals[3];
-    tira::eval3_symmetric(M[0][0], M[1][0], M[1][1], M[2][0], M[2][1], M[2][2], evals[0], evals[1], evals[2]);
-
-    float evec0[3];
-    float evec1[3];
-    float evec2[3];
-    tira::evec3_symmetric(M[0][0], M[1][0], M[1][1], M[2][0], M[2][1], M[2][2], evals, evec0, evec1, evec2);
-
 
     std::string in_filename;
     std::string in_outfile;
@@ -81,9 +72,8 @@ int main(int argc, char** argv) {
         UI.cuda_device = -1;
     }
     else {
-        int ndevices;
-        cudaError_t error = cudaGetDeviceCount(&ndevices);
-        if (error != cudaSuccess) ndevices = 0;
+
+        int ndevices = numCudaDevices();
         if (ndevices <= in_device) {
             std::cout << "WARNING: Specified CUDA device " << in_device << " is unavailable (" << ndevices << " compatible devices found), defaulting to CPU" << std::endl;
             UI.cuda_device = -1;

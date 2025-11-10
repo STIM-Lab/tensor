@@ -1,8 +1,14 @@
 #include <tira/tensorvote.cuh>
 #include <tira/filter.cuh>
+#include <tira/cuda/error.h>
 
 /// Heterogeneous System Architecture calls (functions that decide how to execute a function)
 
+int numCudaDevices() {
+    int ndevices;
+    HANDLE_ERROR(cudaGetDeviceCount(&ndevices));
+    return ndevices;
+}
 float* hsa_eigenvalues3(float* tensors, unsigned int n, int device) {
     if (device < 0) return tira::cpu::evals3_symmetric<float>(tensors, n);
 
