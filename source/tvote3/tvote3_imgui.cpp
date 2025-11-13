@@ -268,10 +268,6 @@ void ImGuiRender() {
 	ImGui::NewFrame();
 
 	{
-		// Use smaller font size
-		//float old_size = ImGui::GetFont()->Scale;
-		//ImGui::GetFont()->Scale *= 0.5;
-		//ImGui::PushFont(ImGui::GetFont());
 
 		ImGui::Begin("Tensor");
 		UI.window_focused = (ImGui::IsWindowHovered()) ? false : true;
@@ -314,7 +310,10 @@ void ImGuiRender() {
 						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
 						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
-							Tn.SaveNpy<float>(filename);
+							std::vector<size_t> output_shape = Tn.Shape();
+							output_shape[3] = 3;
+							output_shape.push_back(3);
+							Tn.SaveNpy<float>(filename, output_shape);
 						}
 					}
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
