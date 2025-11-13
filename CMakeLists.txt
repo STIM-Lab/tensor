@@ -67,6 +67,8 @@ configure_file(data/demo2noise.png
 		demo2noise.png COPYONLY)
 configure_file(data/impulse_blur_13.npy
 		impulse_blur_13.npy COPYONLY)
+configure_file(data/bar_tensor_field.npy
+		bar_tensor_field.npy COPYONLY)
 file(COPY data/sbfsem DESTINATION .)
 
 #set the include directories
@@ -107,16 +109,17 @@ target_link_libraries(tvote2
 
 #create an executable
 add_executable(tvote3
-				source/tvote3/tvote3.cpp
-				source/tvote3/tvote3.h
-				source/tvote3/tvote3_render.cpp
-				source/tvote3/tvote3_imgui.cpp
-				source/tvote3/tvote3_processing.cpp
-				source/tvote3/tvote3_io.cpp
-				source/tvote3/tvote3_callbacks.cpp
-				source/tvote3/tvote3_hsa.cu
-				source/ImGuiFileDialog/ImGuiFileDialog.cpp
-				source/ImGuiFileDialog/ImGuiFileDialog.h
+		source/tvote3/tvote3.cpp
+		source/tvote3/tvote3.h
+		source/tvote3/tvote3_render.cpp
+		source/tvote3/tvote3_imgui.cpp
+		source/tvote3/tvote3_processing.cpp
+		source/tvote3/tvote3_io.cpp
+		source/tvote3/tvote3_callbacks.cpp
+		source/tvote3/tvote3_hsa.cu
+		source/ImGuiFileDialog/ImGuiFileDialog.cpp
+		source/ImGuiFileDialog/ImGuiFileDialog.h
+		source/include/glyphs.h
 )
 
 target_link_libraries(tvote3
@@ -132,7 +135,7 @@ target_link_libraries(tvote3
 #create an executable
 add_executable(glyphs3
 		source/glyphs3/glyphs3.cpp
-		source/glyphs3/glyphs3.h
+		source/include/glyphs.h
 )
 
 target_link_libraries(glyphs3

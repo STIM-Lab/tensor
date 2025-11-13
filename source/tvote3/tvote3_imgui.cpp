@@ -3,6 +3,8 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+
+#include "../include/glyphs.h"
 #include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include <tira/graphics/glOrthoView.h>
@@ -97,8 +99,8 @@ void ImGuiInit(GLFWwindow* window, const char* glsl_version) {
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
-	ImGui::GetStyle().ScaleAllSizes(UI.scale);
-	ImGui::GetIO().FontGlobalScale = UI.scale;
+	//ImGui::GetStyle().ScaleAllSizes(UI.scale);
+	//ImGui::GetIO().FontGlobalScale = UI.scale;
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);
@@ -237,45 +239,6 @@ void RenderImpulseWindow() {
 	ImGui::PopID();
 	ImGui::SameLine();
 	ImGui::InputFloat("#eval0", &evals[0]);
-	
-	/*// -------------------------------  Testing Eigen Decomposition -------------------------------
-	ImGui::SeparatorText("Eigen Results");
-	Eigen::Map<const Eigen::Matrix<float, 3, 3, Eigen::ColMajor>> A(glm::value_ptr(P));
-
-	Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> solver(A);
-	// Eigen returns eigenvalues in increasing order; eigenvectors are columns
-	const auto& L = solver.eigenvalues();
-	const auto& V = solver.eigenvectors();
-
-	evals[0] = L(0);  evals[1] = L(1);  evals[2] = L(2);		// eigenvalues
-	v0[0] = V(0, 0);	v0[1] = V(1, 0);	v0[2] = V(2, 0);	// col 0
-	v1[0] = V(0, 1);	v1[1] = V(1, 1);	v1[2] = V(2, 1);	// col 1
-	v2[0] = V(0, 2);	v2[1] = V(1, 2);	v2[2] = V(2, 2);    // col 2
-
-	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 0)), std::abs(V(1, 0)), std::abs(V(2, 0))));
-	ImGui::InputFloat3("Eig_v2", &v2[0]);
-	ImGui::PopStyleColor();
-	ImGui::PopID();
-	ImGui::SameLine();
-	ImGui::InputFloat("#Eig_eval2", &evals[2]);
-
-	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 1)), std::abs(V(1, 1)), std::abs(V(2, 1))));
-	ImGui::InputFloat3("Eig_v1", &v1[0]);
-	ImGui::PopStyleColor();
-	ImGui::PopID();
-	ImGui::SameLine();
-	ImGui::InputFloat("#Eig_eval1", &evals[1]);
-
-	ImGui::PushID(0);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(V(0, 2)), std::abs(V(1, 2)), std::abs(V(2, 2))));
-	ImGui::InputFloat3("Eig_v0", &v0[0]);
-	ImGui::PopStyleColor();
-	ImGui::PopID();
-	ImGui::SameLine();
-	ImGui::InputFloat("#Eig_eval0", &evals[0]);
-	*/
 
 	if (!UI.impulse_field_active) {
 		if (ImGui::Button("Impulse On")) {
@@ -352,6 +315,20 @@ void ImGuiRender() {
 
 						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "npy") {
 							Tn.SaveNpy<float>(filename);
+						}
+					}
+					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
+				}
+
+				ImGui::SameLine();
+				if (ImGui::Button("Save Glyphs"))
+					ImGuiFileDialog::Instance()->OpenDialog("SaveGlyphFile", "Choose an OBJ File", ".obj");
+				if (ImGuiFileDialog::Instance()->Display("SaveGlyphFile")) {				    // if the user opened a file dialog
+					if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
+						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
+
+						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "obj") {
+							field2glyphs(Tn, filename);
 						}
 					}
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
