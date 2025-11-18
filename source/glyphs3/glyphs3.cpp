@@ -52,9 +52,5 @@ int main(int argc, char** argv) {
 
     Field.load_npy<float>(arg_infile);
 
-
     field2glyphs(Field, arg_outfile, arg_sigma, arg_epsilon, normalize, arg_subdiv);
-
-
-
 }

@@ -3,12 +3,8 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 
-//#include <cuda_runtime.h>
-
 #include "tvote3.h"
-
 #include <tira/graphics/glOrthoView.h>
-//#include <tira/eigen.h>
 
 TV3_UI UI;
 
