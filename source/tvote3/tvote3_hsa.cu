@@ -56,7 +56,7 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
 	float sigma_w = sigma / pixel_size[0];
 	float sigma_h = sigma / pixel_size[1];
 	float sigma_d = sigma / pixel_size[2];
-    glm::mat3* dest = tira::cuda::gaussian_filter3d<glm::mat3>(source, s0, s1, s2, sigma_w, sigma_h, sigma_d, out_s0, out_s1, out_s2);
+    glm::mat3* dest = tira::cuda::gaussian_filter3d<glm::mat3>(source, s0, s1, s2, sigma_w, sigma_h, sigma_d, pixel_size, out_s0, out_s1, out_s2);
     return dest;
 }
 
