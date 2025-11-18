@@ -57,7 +57,8 @@ void GaussianFilter(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm:
 
     glm::mat3* out_raw = hsa_gaussian3(tensors_in->ConstData(), tensors_in->X(), tensors_in->Y(), tensors_in->Z(), sigma, pixel_size, out_x, out_y, out_z, cuda_device);
     *tensors_out = tira::volume<glm::mat3>(out_raw, out_x, out_y, out_z, 1, {pixel_size[0], pixel_size[1], pixel_size[2]});
-    free(out_raw);
+    if (cuda_device < 0) delete[] out_raw;
+    else free(out_raw);
 }
 
 void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, const float sigma2, 

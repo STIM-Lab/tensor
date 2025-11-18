@@ -28,21 +28,24 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
 
 	// CPU implementation
     if (device < 0) {
-        unsigned kernel_size0 = (unsigned)(6 * sigma * pixel_size[0]);
-        float* gauss0 = tira::cpu::kernel_gaussian<float>(kernel_size0, 0, sigma, pixel_size[0]);
-        glm::mat3* dest_0 = tira::cpu::convolve3<glm::mat3, float>(source, s0, s1, s2, gauss0, kernel_size0, 1, 1, out_s0, out_s1, out_s2);
-        delete[] gauss0;
+        unsigned int kernel_size0 = static_cast<unsigned int>(std::ceil(6 * sigma / pixel_size[0]));
+        if (kernel_size0 % 2 == 0) kernel_size0++;          // ensure odd kernel size
+        auto gauss0 = tira::cpu::kernel_gaussian<float>(kernel_size0, 0, sigma, pixel_size[0]);
+		const float* gauss0_ptr = gauss0.data();
+        glm::mat3* dest_0 = tira::cpu::convolve3<glm::mat3, float>(source, s0, s1, s2, gauss0_ptr, kernel_size0, 1, 1, out_s0, out_s1, out_s2);
 
-        unsigned kernel_size1 = (unsigned)(6 * sigma * pixel_size[1]);
-        float* gauss1 = tira::cpu::kernel_gaussian<float>(kernel_size1, 0, sigma, pixel_size[1]);
-        glm::mat3* dest_1 = tira::cpu::convolve3<glm::mat3, float>(dest_0, out_s0, out_s1, out_s2, gauss1, 1, kernel_size1, 1, out_s0, out_s1, out_s2);
-        delete[] gauss1;
+        unsigned int kernel_size1 = static_cast<unsigned int>(std::ceil(6 * sigma / pixel_size[1]));
+        if (kernel_size1 % 2 == 0) kernel_size1++;          // ensure odd kernel size
+        auto gauss1 = tira::cpu::kernel_gaussian<float>(kernel_size1, 0, sigma, pixel_size[1]);
+		const float* gauss1_ptr = gauss1.data();
+        glm::mat3* dest_1 = tira::cpu::convolve3<glm::mat3, float>(dest_0, out_s0, out_s1, out_s2, gauss1_ptr, 1, kernel_size1, 1, out_s0, out_s1, out_s2);
         delete[] dest_0;
 
-        unsigned kernel_size2 = (unsigned)(6 * sigma * pixel_size[2]);
-        float* gauss2 = tira::cpu::kernel_gaussian<float>(kernel_size2, 0, sigma, pixel_size[2]);
-        glm::mat3* dest_2 = tira::cpu::convolve3<glm::mat3, float>(dest_1, out_s0, out_s1, out_s2, gauss2, 1, 1, kernel_size2, out_s0, out_s1, out_s2);
-        delete[] gauss2;
+        unsigned int kernel_size2 = static_cast<unsigned int>(std::ceil(6 * sigma / pixel_size[2]));
+        if (kernel_size2 % 2 == 0) kernel_size2++;          // ensure odd kernel size
+        auto gauss2 = tira::cpu::kernel_gaussian<float>(kernel_size2, 0, sigma, pixel_size[2]);
+		const float* gauss2_ptr = gauss2.data();
+        glm::mat3* dest_2 = tira::cpu::convolve3<glm::mat3, float>(dest_1, out_s0, out_s1, out_s2, gauss2_ptr, 1, 1, kernel_size2, out_s0, out_s1, out_s2);
         delete[] dest_1;
 
         return dest_2;
@@ -50,7 +53,10 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
 
 	// CUDA implementation
     cudaSetDevice(device);
-    glm::mat3* dest = tira::cuda::gaussian_filter3d<glm::mat3>(source, s0, s1, s2, sigma, sigma, sigma, out_s0, out_s1, out_s2);
+	float sigma_w = sigma / pixel_size[0];
+	float sigma_h = sigma / pixel_size[1];
+	float sigma_d = sigma / pixel_size[2];
+    glm::mat3* dest = tira::cuda::gaussian_filter3d<glm::mat3>(source, s0, s1, s2, sigma_w, sigma_h, sigma_d, out_s0, out_s1, out_s2);
     return dest;
 }
 
