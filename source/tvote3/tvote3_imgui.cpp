@@ -426,10 +426,12 @@ void ImGuiRender() {
 				bool isGPU = (UI.cuda_device == 0);
 				if (ImGui::RadioButton("GPU", isGPU)) {
 					UI.cuda_device = 0;
+					ReprocessField();
 				}
 				ImGui::SameLine();
 				if (ImGui::RadioButton("CPU", !isGPU)) {
 					UI.cuda_device = -1;
+					ReprocessField();
 				}
 
 				ImGui::EndTabItem();
