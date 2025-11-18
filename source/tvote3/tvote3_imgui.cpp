@@ -24,6 +24,8 @@ extern tira::volume<glm::vec2> ThetaPhi;						// eigenvectors of the tensor fiel
 extern tira::volume<float> Scalar;								// scalar field that is currently being visualized
 extern tira::glOrthoView<unsigned char>* OrthoViewer;
 
+static int voxel_coords[3] = { 0,0,0 };
+
 /// re-calculate the scalar field based on the current settings in the UI
 void UpdateScalarField() {
 	switch (UI.scalar_type) {
@@ -268,7 +270,6 @@ void ImGuiRender() {
 	ImGui::NewFrame();
 
 	{
-
 		ImGui::Begin("Tensor");
 		UI.window_focused = (ImGui::IsWindowHovered()) ? false : true;
 
@@ -562,12 +563,92 @@ void ImGuiRender() {
 						}
 					}
 				}
-
-
-
 				ImGui::EndTabItem();
 			}
-			ImGui::EndTabBar();
+
+			if (ImGui::BeginTabItem("Voxel Inspector")) {
+				ImGui::Text("Voxel Coordinate");
+
+				if (Tn.Size() == 0 || Lambda.Size() == 0 || ThetaPhi.Size() == 0)
+					ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "No field loaded");
+				else {
+					ImGui::SliderInt("X", &voxel_coords[0], 0, Tn.X() - 1);
+					ImGui::SliderInt("Y", &voxel_coords[1], 0, Tn.Y() - 1);
+					ImGui::SliderInt("Z", &voxel_coords[2], 0, Tn.Z() - 1);
+
+					ImGui::Separator();
+
+					int x = voxel_coords[0], y = voxel_coords[1], z = voxel_coords[2];
+					glm::mat3 tensor = Tn(x, y, z);
+					float evals[3] = { Lambda(x, y, z, 0), Lambda(x, y, z, 1), Lambda(x, y, z, 2) };
+
+					// Get spherical eigenvectors
+					glm::vec2 tp0 = ThetaPhi(x, y, z, 0);
+					glm::vec2 tp1 = ThetaPhi(x, y, z, 1);
+					glm::vec2 tp2 = ThetaPhi(x, y, z, 2);
+
+					glm::vec3 v0 = { std::cos(tp0.x) * std::sin(tp0.y), std::sin(tp0.x) * std::sin(tp0.y), std::cos(tp0.y) };
+					glm::vec3 v1 = { std::cos(tp1.x) * std::sin(tp1.y), std::sin(tp1.x) * std::sin(tp1.y), std::cos(tp1.y) };
+					glm::vec3 v2 = { std::cos(tp2.x) * std::sin(tp2.y), std::sin(tp2.x) * std::sin(tp2.y), std::cos(tp2.y) };
+
+					ImGui::Text("Tensor (column-major):");
+					// glm::mat3 is column-major. We need a non-const copy for ImGui
+					glm::mat3 display_tensor = tensor;
+					ImGui::InputFloat3("Col 0", &display_tensor[0][0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat3("Col 1", &display_tensor[1][0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+					ImGui::InputFloat3("Col 2", &display_tensor[2][0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+
+					ImGui::Separator();
+					ImGui::SeparatorText("Eigenvalues & Eigenvectors");
+
+					if (ImGui::BeginTable("EigTable", 2, ImGuiTableFlags_BordersInnerV))
+					{
+						// Setup columns
+						ImGui::TableSetupColumn("Eigenvector", ImGuiTableColumnFlags_WidthStretch);
+						ImGui::TableSetupColumn("Eigenvalue", ImGuiTableColumnFlags_WidthFixed, 100.0f);
+
+						// v2 (Stick)
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
+						ImGui::PushID(0);
+						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2.x), std::abs(v2.y), std::abs(v2.z)));
+						ImGui::InputFloat3("EigVec 2 (Stick)", &v2[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::PopStyleColor();
+						ImGui::PopID();
+
+						ImGui::TableSetColumnIndex(1); // --- Column 1 ---
+						ImGui::InputFloat("##Eval2", &evals[2], 0, 0, "%.4f", ImGuiInputTextFlags_ReadOnly);
+
+						// v1 (Plate)
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
+						ImGui::PushID(1);
+						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v1.x), std::abs(v1.y), std::abs(v1.z)));
+						ImGui::InputFloat3("EigVec 1 (Plate)", &v1[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::PopStyleColor();
+						ImGui::PopID();
+
+						ImGui::TableSetColumnIndex(1); // --- Column 1 ---
+						ImGui::InputFloat("##Eval1", &evals[1], 0, 0, "%.4f", ImGuiInputTextFlags_ReadOnly);
+
+						// v0 (Ball)
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
+						ImGui::PushID(2);
+						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0.x), std::abs(v0.y), std::abs(v0.z)));
+						ImGui::InputFloat3("EigVec 0 (Ball) ", &v0[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::PopStyleColor();
+						ImGui::PopID();
+
+						ImGui::TableSetColumnIndex(1); // --- Column 1 ---
+						ImGui::InputFloat("##Eval0", &evals[0], 0, 0, "%.4f", ImGuiInputTextFlags_ReadOnly);
+
+						ImGui::EndTable();
+					}
+				}
+				ImGui::EndTabItem();
+			}
+		ImGui::EndTabBar();
 		}
 
 		//ImGui::GetFont()->Scale = old_size;
