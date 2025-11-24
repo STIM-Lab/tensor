@@ -127,9 +127,11 @@ void RenderImpulseWindow() {
 	ImGui::Begin("Impulse");
 
 	if (ImGui::InputInt("Pixels", &UI.impulse_resolution, 1)) {
+		if (UI.impulse_resolution < 1)  UI.impulse_resolution = 1;
+		if (UI.impulse_resolution > 100) UI.impulse_resolution = 100;
+
 		if (UI.impulse_field_active) {
-			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			//UI.field_loaded = true;
+			GenerateImpulseField(&T0, static_cast<unsigned>(UI.impulse_resolution), UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
 			ReprocessField();
 		}
 	}
@@ -614,7 +616,7 @@ void ImGuiRender() {
 						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
 						ImGui::PushID(0);
 						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v2.x), std::abs(v2.y), std::abs(v2.z)));
-						ImGui::InputFloat3("EigVec 2 (Stick)", &v2[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::InputFloat3("Evec 2", &v2[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
 						ImGui::PopStyleColor();
 						ImGui::PopID();
 
@@ -626,7 +628,7 @@ void ImGuiRender() {
 						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
 						ImGui::PushID(1);
 						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v1.x), std::abs(v1.y), std::abs(v1.z)));
-						ImGui::InputFloat3("EigVec 1 (Plate)", &v1[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::InputFloat3("Evec 1", &v1[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
 						ImGui::PopStyleColor();
 						ImGui::PopID();
 
@@ -638,7 +640,7 @@ void ImGuiRender() {
 						ImGui::TableSetColumnIndex(0); // --- Column 0 ---
 						ImGui::PushID(2);
 						ImGui::PushStyleColor(ImGuiCol_FrameBg, (ImVec4)ImColor(std::abs(v0.x), std::abs(v0.y), std::abs(v0.z)));
-						ImGui::InputFloat3("EigVec 0 (Ball) ", &v0[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
+						ImGui::InputFloat3("Evec 0", &v0[0], "%.4f", ImGuiInputTextFlags_ReadOnly);
 						ImGui::PopStyleColor();
 						ImGui::PopID();
 
