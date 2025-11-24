@@ -56,10 +56,16 @@ void GenerateImpulseField(tira::volume<glm::mat3>* tensor, unsigned resolution, 
 
     glm::mat3 T = GenerateImpulse(stick_polar, plate_theta, lambdas);
 
-    *tensor = tira::volume<glm::mat3>(resolution, resolution, resolution);                  // create a new tensor field
-    glm::mat3 zero = glm::mat3(0.0f);                                        // fill it with zero tensors
-    *tensor = zero;
+    *tensor = tira::volume<glm::mat3>(resolution, resolution, resolution);          // create a new tensor field
+    *tensor = glm::mat3(0.0f);                                                      // fill it with zero tensors
 
-    (*tensor)(resolution/2, resolution/2, resolution/2) = T;
-    tensor->save_npy<float>("impulse_field.npy");
+    (*tensor)(resolution / 2, resolution / 2, resolution / 2) = T;
+
+    // Save as [X, Y, Z, 3, 3]
+    std::vector<size_t> output_shape = tensor->Shape();
+    if (output_shape.size() < 4) output_shape.resize(4, 1);                         // volume should always have 4 dimensions
+
+    output_shape[3] = 3;                                                            // 5th dimension
+    output_shape.push_back(3);                                                      // extra dimension for 3x3 matrix
+    tensor->SaveNpy<float>("impulse_field.npy", output_shape);
 }
