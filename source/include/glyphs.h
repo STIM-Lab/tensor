@@ -45,7 +45,6 @@ static void field2glyphs(tira::volume<glm::mat3>& Field, const std::string obj_f
                 }
             }
         }
-        std::cout << "Normalizing to l2 = " << max_l2;
     }
 
     // Iterate throught the field and generate a glyph for each voxel
