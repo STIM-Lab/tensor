@@ -3,7 +3,6 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-
 #include <glm/glm.hpp>
 
 #include <tira/volume.h>
@@ -33,31 +32,38 @@ struct TV3_UI {
 	float impulse_anisotropy = 0;
 
 	// settings for tensor voting
-	bool tv_stick = false;
-	bool tv_plate = true;
-	int platevote_samples = 4;
+	bool tv_stick = true;
+	bool tv_plate = false;
+	int platevote_samples = 0;
 	float tv_sigma1 = 3.0f;
 	float tv_sigma2 = 1.0f;
 	int tv_power = 1;
 
 	// visualization
 	glm::vec3 slice_positions = glm::vec3(0.0f);
-
 	std::string loaded_filename = "";
 	bool field_loaded = false;			// indicates that a tensor field has been loaded
 	bool image_loaded = false;
 
-	int cuda_device;					// CUDA device ID (-1 for CPU)
+	// saving glyphs setting
+	float glyph_sigma = 0.05f;
+	float glyph_epsilon = 0.01f;
+	bool glyph_normalization = true;
+	unsigned int glyph_subdiv = 1;
+
+	// CUDA device ID (-1 for CPU)
+	int cuda_device = 0;					
 
 	// settings for processing the tensor field
 	int processing_type = ProcessingType::Vote;
 
-	float sigma = 1.0f;						// sigma for Gaussian blur
+	// sigma for Gaussian blur
+	float sigma = 1.0f;						
 
 	// display settings for scalar fields
 	int scalar_type = ScalarType::Tensor00;
 
-	//timers
+	// timers
 	float t_eigendecomposition = inf;
 	float t_loading = inf;
 	float t_resetfield = inf;
