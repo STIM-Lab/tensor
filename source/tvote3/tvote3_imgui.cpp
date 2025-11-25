@@ -324,7 +324,7 @@ void ImGuiRender() {
 
 				ImGui::SameLine();
 
-				if (ImGui::Button("Glyph Settings"))
+				if (ImGui::Button("Save Glyphs"))
 					ImGuiFileDialog::Instance()->OpenDialog("SaveGlyphFile", "Choose an OBJ File", ".obj");
 				if (ImGuiFileDialog::Instance()->Display("SaveGlyphFile")) {				    // if the user opened a file dialog
 					if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
@@ -337,7 +337,7 @@ void ImGuiRender() {
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
 				}
 
-				ImGui::SeparatorText("Save Glyphs");
+				ImGui::SeparatorText("Glyph Settings");
 				
 				ImGui::AlignTextToFramePadding();
 				ImGui::Text("Sigma");	ImGui::SameLine();
