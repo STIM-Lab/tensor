@@ -323,20 +323,60 @@ void ImGuiRender() {
 				}
 
 				ImGui::SameLine();
-				if (ImGui::Button("Save Glyphs"))
+
+				if (ImGui::Button("Glyph Settings"))
 					ImGuiFileDialog::Instance()->OpenDialog("SaveGlyphFile", "Choose an OBJ File", ".obj");
 				if (ImGuiFileDialog::Instance()->Display("SaveGlyphFile")) {				    // if the user opened a file dialog
 					if (ImGuiFileDialog::Instance()->IsOk()) {								    // and clicks okay, they've probably selected a file
 						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
 						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "obj") {
-							field2glyphs(Tn, filename);
+							field2glyphs(Tn, filename, UI.glyph_sigma, UI.glyph_epsilon, UI.glyph_normalization, UI.glyph_subdiv);
 						}
 					}
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
 				}
 
+				ImGui::SeparatorText("Save Glyphs");
+				
+				ImGui::AlignTextToFramePadding();
+				ImGui::Text("Sigma");	ImGui::SameLine();
+				if (ImGui::InputFloat("##GlyphSigma", &UI.glyph_sigma, 0.01f, 0.2f)) {
+					if (UI.glyph_sigma > 1.0f) UI.glyph_sigma = 1.0f;
+					if (UI.glyph_sigma <= 0.0f) UI.glyph_sigma = 0.01f;
+				}
+				if (ImGui::IsItemHovered()) 
+					ImGui::SetTooltip("Minimum ratio l0 / l2 and l1 / l2.\n"
+									  "Prevents glyphs from becoming too flat or needle-like.");
+
+				ImGui::AlignTextToFramePadding();
+				ImGui::Text("Epsilon");	ImGui::SameLine();
+				if (ImGui::InputFloat("##GlyphEpsilon", &UI.glyph_epsilon, 0.01f, 0.2f)) {
+					if (UI.glyph_epsilon > 1.0f) UI.glyph_epsilon = 1.0f;
+					if (UI.glyph_epsilon <= 0.0f) UI.glyph_epsilon = 0.0f;
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Threshold on the largest eigenvalue l2.\n"
+									  "Glyphs with l2 below this value are skipped.");
+
+				if (ImGui::Checkbox("Normalize", &UI.glyph_normalization));
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("If enabled, all glyphs are scaled by the\n"
+						"maximum l2 in the field so their sizes are comparable.");
+
+				int glyph_subdiv_int = static_cast<int>(UI.glyph_subdiv);
+				if (ImGui::InputInt("Subdivisions", &glyph_subdiv_int, 1, 2)) {
+					if (glyph_subdiv_int < 0) glyph_subdiv_int = 0;
+					if (glyph_subdiv_int > 4) glyph_subdiv_int = 4;
+					UI.glyph_subdiv = static_cast<unsigned int>(glyph_subdiv_int);
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Number of mesh subdivisions for each glyph.\n"
+									  "Higher = smoother glyphs but larger OBJ files.");
+				
+				
 				ImGui::SeparatorText("Slice Positions");
+
 				glm::vec3 field_size = OrthoViewer->dimensions();
 				if (ImGui::SliderFloat("X", &UI.slice_positions[0], 0.0f, field_size[0])) {
 					RefreshVisualization();
