@@ -135,8 +135,6 @@ void UpdateColormap() {
     case ScalarType::EVec2:
         ColormapEigenvectors(2);
         break;
-
-
     }
     OrthoViewer->update_texture();
 }
