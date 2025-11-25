@@ -23,7 +23,8 @@ glm::mat2* hsa_gaussian2(const glm::mat2* source, const unsigned int width, cons
     unsigned int& out_width, unsigned int& out_height, const int deviceID = 0) {
     if (deviceID < 0) {
         unsigned kernel_size = (unsigned)(6 * sigma);
-        float* gauss = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
+        auto gauss_kernel = tira::cpu::kernel_gaussian<float>(kernel_size, 0, sigma, 1);
+        float* gauss = gauss_kernel.data();
 
         glm::mat2* dest_x = tira::cpu::convolve2<glm::mat2, float>(source, width, height, gauss, kernel_size, 1, out_width, out_height);
         glm::mat2* dest_xy = tira::cpu::convolve2<glm::mat2, float>(dest_x, out_width, out_height, gauss, 1, kernel_size, out_width, out_height);
