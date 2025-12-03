@@ -34,9 +34,9 @@ struct TV3_UI {
 	// settings for tensor voting
 	bool tv_stick = true;
 	bool tv_plate = false;
-	int platevote_samples = 0;
+	int platevote_samples = 10;
 	float tv_sigma1 = 3.0f;
-	float tv_sigma2 = 1.0f;
+	float tv_sigma2 = 0.0f;
 	int tv_power = 1;
 
 	// visualization
@@ -55,7 +55,7 @@ struct TV3_UI {
 	int cuda_device = 0;					
 
 	// settings for processing the tensor field
-	int processing_type = ProcessingType::Vote;
+	int processing_type = ProcessingType::NoProcessing;
 
 	// sigma for Gaussian blur
 	float sigma = 1.0f;						
