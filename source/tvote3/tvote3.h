@@ -45,7 +45,7 @@ struct TV3_UI {
 	bool field_loaded = false;			// indicates that a tensor field has been loaded
 	bool image_loaded = false;
 
-	// saving glyphs setting
+	// glyphs setting
 	float glyph_sigma = 0.05f;
 	float glyph_epsilon = 0.01f;
 	bool glyph_normalization = true;

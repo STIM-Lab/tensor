@@ -177,7 +177,6 @@ void RenderImpulseWindow() {
 
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
@@ -185,7 +184,6 @@ void RenderImpulseWindow() {
 		if (UI.impulse_lambdas[1] < UI.impulse_lambdas[0]) UI.impulse_lambdas[1] = UI.impulse_lambdas[0];
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
-			//UI.field_loaded = true;
 			ReprocessField();
 		}
 	}
@@ -200,7 +198,6 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat3("##row1", &row1[0]);
 	ImGui::InputFloat3("##row2", &row2[0]);
 	ImGui::InputFloat3("##row3", &row3[0]);
-
 
 	float evals[3];
 	tira::shared::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
@@ -259,6 +256,25 @@ void RenderImpulseWindow() {
 	}
 	if (ImGui::Button("Close")) UI.impulse_window = false;
 	ImGui::End();
+}
+
+static size_t GlyphCounter(tira::volume<glm::mat3>& vol, float epsilon) {
+	if (vol.Size() == 0) return 0;
+
+	size_t count = 0;
+	for (size_t z = 0; z < vol.Z(); z++) {
+		for (size_t y = 0; y < vol.Y(); y++) {
+			for (size_t x = 0; x < vol.X(); x++) {
+				glm::mat3 t = vol(x, y, z);
+				float lambda[3];
+
+				tira::shared::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
+					lambda[0], lambda[1], lambda[2]);
+				if (lambda[2] >= epsilon) ++count;
+			}
+		}
+	}
+	return count;
 }
 
 /// <summary>
@@ -337,6 +353,8 @@ void ImGuiRender() {
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box
 				}
 
+
+				// ---- Glyph saving settings ----
 				ImGui::SeparatorText("Glyph Settings");
 				
 				ImGui::AlignTextToFramePadding();
@@ -358,7 +376,18 @@ void ImGuiRender() {
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("Threshold on the largest eigenvalue l2.\n"
 									  "Glyphs with l2 below this value are skipped.");
-
+				{
+					size_t last_glyph_count = GlyphCounter(Tn, UI.glyph_epsilon);
+					ImGui::SameLine();
+					char buf[64];
+					std::snprintf(buf, sizeof(buf), "Glyphs: %zu", last_glyph_count);
+					// right-align inside remaining space
+					float textWidth = ImGui::CalcTextSize(buf).x;
+					float availWidth = ImGui::GetContentRegionAvail().x;
+					if (availWidth > textWidth)
+						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (availWidth - textWidth));
+					ImGui::TextUnformatted(buf);
+				}
 				if (ImGui::Checkbox("Normalize", &UI.glyph_normalization));
 				if (ImGui::IsItemHovered())
 					ImGui::SetTooltip("If enabled, all glyphs are scaled by the\n"
