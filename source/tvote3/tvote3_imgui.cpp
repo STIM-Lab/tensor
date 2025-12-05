@@ -137,7 +137,7 @@ void RenderImpulseWindow() {
 	}
 	ImGui::SeparatorText("Stick Orientation (largest eigenvector)");
 	ImGui::Columns(2);
-	if (ImGui::SliderFloat("theta##stick", &UI.impulse_stick[0], 0, 2 * PI)) {
+	if (ImGui::SliderFloat("theta##stick", &UI.impulse_stick[0], 0, 2 * tira::constant::PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
 			ReprocessField();
@@ -145,7 +145,7 @@ void RenderImpulseWindow() {
 	}
 
 	ImGui::NextColumn();
-	if (ImGui::SliderFloat("phi##stick", &UI.impulse_stick[1], 0, PI)) {
+	if (ImGui::SliderFloat("phi##stick", &UI.impulse_stick[1], 0, tira::constant::PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
 			ReprocessField();
@@ -164,7 +164,7 @@ void RenderImpulseWindow() {
 	ImGui::PopID();
 
 	ImGui::SeparatorText("Plate Orientation (smallest eigenvector)");
-	if (ImGui::SliderFloat("theta##plate", &UI.impulse_plate, 0.0f, 2 * PI)) {
+	if (ImGui::SliderFloat("theta##plate", &UI.impulse_plate, 0.0f, 2 * tira::constant::PI)) {
 		if (UI.impulse_field_active) {
 			GenerateImpulseField(&T0, UI.impulse_resolution, UI.impulse_stick, UI.impulse_plate, UI.impulse_lambdas);
 			//UI.field_loaded = true;
