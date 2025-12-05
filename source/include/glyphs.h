@@ -36,7 +36,7 @@ static void field2glyphs(tira::volume<glm::mat3>& Field, const std::string obj_f
                     // Perform an eigendecomposition to extract the eigenvalues
                     glm::mat3 t = Field(xi, yi, zi);
                     float lambda[3];
-                    tira::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
+                    tira::shared::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
                         lambda[0], lambda[1], lambda[2]);
 
                     // Update the maximum value if the current tensor has a larger eigenvalue
@@ -57,14 +57,14 @@ static void field2glyphs(tira::volume<glm::mat3>& Field, const std::string obj_f
                 float lambda[3];
 
                 // Calculate the eigenvalues
-                tira::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
+                tira::shared::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
                     lambda[0], lambda[1], lambda[2]);
 
                 // Calculate the eigenvectors
                 float evec0[3];
                 float evec1[3];
                 float evec2[3];
-                tira::evec3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
+                tira::shared::evec3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
                     (const float*)lambda, evec0, evec1, evec2);
 
                 // Create a new material and assign a color to the diffuse component based on the largest eigenvector direction

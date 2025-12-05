@@ -65,8 +65,8 @@ configure_file(data/demo2.png
 		demo2.png COPYONLY)
 configure_file(data/demo2noise.png
 		demo2noise.png COPYONLY)
-configure_file(data/impulse_blur_13.npy
-		impulse_blur_13.npy COPYONLY)
+#configure_file(data/impulse_blur_13.npy
+#		impulse_blur_13.npy COPYONLY)
 configure_file(data/bar_tensor_field.npy
 		bar_tensor_field.npy COPYONLY)
 file(COPY data/sbfsem DESTINATION .)

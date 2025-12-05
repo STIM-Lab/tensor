@@ -1,8 +1,7 @@
 import numpy as np
 import scipy as sp
+import image2tensor as it
 import matplotlib.pyplot as plt
-import tensorvote as tv
-import tensorvote3d as tv3
 import skimage as ski
 import os
 
@@ -137,7 +136,6 @@ def genCircleGrid2T(N, b, linewidth, noise):
     return T
 
 def genSpiral3(N, d):
-    
     I = np.zeros((N, N, N)).astype(np.float32)
     
     dt = 0.00001
@@ -371,10 +369,13 @@ def gen_plate_impulse(N, impulsefile, votefile, numericalfile, sigma=3, sigma2=0
 
 
 # generate an impulse plate field
-# print("Generating plate impulse response:")
+print("Generating plate impulse response:")
 # T, Ta, Tn = gen_plate_impulse((3, 2, 1), "plate_field.npy", "plate_python.npy",
 #                               "plate_python_numerical.npy", p=3, normalize=False)
 
+vol = genSample3D((31, 31, 31), noise=0.2)
+Tvol = it.structure3d(vol, 0)
+np.save('../../../build/tensor/sample_vol.npy', vol)
 
 
 

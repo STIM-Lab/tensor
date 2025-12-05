@@ -203,19 +203,19 @@ void RenderImpulseWindow() {
 
 
 	float evals[3];
-	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
+	tira::shared::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
 
 	float v0[3];
 	float v1[3];
 	float v2[3];
-	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
+	tira::shared::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
 
 	ImGui::SeparatorText("Cartesian Eigenvectors");
 
 	float v0_spherical[2];
 	float v1_spherical[2];
 	float v2_spherical[2];
-	tira::evec3spherical_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0_spherical, v1_spherical, v2_spherical);
+	tira::shared::evec3spherical_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0_spherical, v1_spherical, v2_spherical);
 
 	ImGui::PushID(0);
 	glm::vec3 color_v2 = ColormapEigenvector(2, evals[0], evals[1], evals[2], v2_spherical[0], v2_spherical[1]);
