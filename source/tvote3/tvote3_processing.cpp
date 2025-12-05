@@ -103,7 +103,7 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
                 smallest_q[i] = glm::vec3(cos_theta_small * sin_phi_small, sin_theta_small * sin_phi_small, cos_phi_small);
             }
 	    }
-        tira::tensorvote::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
+        tira::tensorvote::cpu::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
             stick ? largest_q.data() : nullptr, 
             plate ? smallest_q.data() : nullptr, 
             glm::vec2(sigma, sigma2), p,
