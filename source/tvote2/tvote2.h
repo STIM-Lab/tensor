@@ -134,3 +134,5 @@ float* hsa_eigenvectors2polar(float* tensors, float* evals, unsigned int n, int 
 float* hsa_eigenvalues2(float* tensors, unsigned int n, int device);
 glm::mat2* hsa_gaussian2(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,
     unsigned int& out_width, unsigned int& out_height, const int deviceID = 0);
+
+void InitializeCuda(int& device_id, std::vector<std::string>& device_names);

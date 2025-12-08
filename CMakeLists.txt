@@ -21,6 +21,7 @@ find_package(GLEW REQUIRED)
 find_package(TIRA REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options math)
 find_package(glm CONFIG REQUIRED)
+find_package(CImg CONFIG REQUIRED)
 find_package(PNG REQUIRED)
 find_package (JPEG REQUIRED)
 
@@ -87,12 +88,12 @@ add_executable(tvote2
 				source/tvote2/tvote2.h
 				source/ImGuiFileDialog/ImGuiFileDialog.cpp
 				source/ImGuiFileDialog/ImGuiFileDialog.h
-				source/tvote2/tvote2_render.cpp
-				source/tvote2/tvote2_imgui.cpp
-				source/tvote2/tvote2_processing.cpp
-				source/tvote2/tvote2_io.cpp
-				source/tvote2/tvote2_callbacks.cpp
-				source/tvote2/tvote2_hsa.cu
+		source/tvote2/render.cpp
+		source/tvote2/imgui.cpp
+		source/tvote2/processing.cpp
+		source/tvote2/io.cpp
+		source/tvote2/callbacks.cpp
+		source/tvote2/cuda_wrappers.cu
 )
 
 target_link_libraries(tvote2
@@ -151,7 +152,7 @@ target_link_libraries(glyphs3
 #create an executable
 add_executable(image2tensor
 				source/image2tensor/image2tensor.cpp
-				source/image2tensor/cuda_calls.cu
+		source/image2tensor/cuda_wrappers.cu
 )
 
 target_link_libraries(image2tensor
@@ -159,6 +160,8 @@ target_link_libraries(image2tensor
 				${X11_LIBRARIES}
 				PNG::PNG
 				JPEG::JPEG
+				CImg::CImg
+
 
 )
 

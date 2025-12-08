@@ -3,8 +3,6 @@
 
 #include <boost/program_options.hpp>
 
-#include <cuda_runtime.h>
-
 #include "tvote2.h"
 #include "tira/image.h"
 
@@ -77,16 +75,11 @@ int main(int argc, char** argv) {
 
     // set up CUDA devices
     UI.device_names.emplace_back("CPU");                            // push the CPU as the first device option
-    cudaError_t error = cudaGetDeviceCount(&UI.num_devices);    // get the number of CUDA devices
+    InitializeCuda(UI.cuda_device, UI.device_names);
+    UI.num_devices = UI.device_names.size();
 
-    // fill the main structure with a list of the names of every CUDA device
-    for (int di = 0; di < UI.num_devices; di++) {
-        cudaDeviceProp prop{};
-        cudaGetDeviceProperties(&prop, di);
-        UI.device_names.emplace_back(prop.name);
-    }
 
-    if (error != cudaSuccess) UI.num_devices = 0;                    // if the device count function returns an error, there are no devices
+
     if (UI.num_devices <= in_device) UI.cuda_device = -1;            // if the specified device is out of range, set it to the CPU
     else UI.cuda_device = in_device;                                 // otherwise use the specified CUDA device
 

@@ -1,4 +1,4 @@
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
 #include <iostream>
 #include <cmath>
 #include <chrono>
@@ -21,8 +21,8 @@ float in_dx, in_dy, in_dz;
 std::vector<unsigned int> in_crop_loc, in_crop_len;
 int in_device;						// cuda device
 
-glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
+//glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+//	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
@@ -39,7 +39,7 @@ float* EigenValues2(float* tensors, unsigned int n, int device);
 /// <param name="derivative">Derivative value provided by these coefficients</param>
 /// <param name="samples">Sample points used to evaluate the derivative</param>
 /// <returns>Set of coefficients applied to each sample point.</returns>
-template<typename T>
+/*template<typename T>
 Eigen::VectorX<T> finite_difference_coefficients(unsigned int derivative, Eigen::VectorX<T> samples) {
 
 	unsigned int N = samples.size();
@@ -83,7 +83,7 @@ std::vector< std::vector<T> > finite_difference_coefficients(unsigned int deriva
 	}
 	return Coefficients;
 }
-
+*/
 
 int main(int argc, char** argv) {
 
@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			glm::mat2* raw_field = GaussianBlur2D(T.Data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
+			glm::mat2* raw_field = (glm::mat2*)GaussianBlur2D((float*)T.Data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
