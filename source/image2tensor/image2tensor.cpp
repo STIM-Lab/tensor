@@ -21,71 +21,22 @@ float in_dx, in_dy, in_dz;
 std::vector<unsigned int> in_crop_loc, in_crop_len;
 int in_device;						// cuda device
 
-//glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-//	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
+
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
+
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
 	unsigned int& out_depth, int deviceID = 0);
+
 float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height, unsigned int depth, 
 	float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height, 
 	unsigned int& out_depth, int deviceID = 0);
+
 float* EigenValues2(float* tensors, unsigned int n, int device);
 
-/// <summary>
-/// Calculate the finite difference coefficients for a set of sample points.
-/// </summary>
-/// <param name="derivative">Derivative value provided by these coefficients</param>
-/// <param name="samples">Sample points used to evaluate the derivative</param>
-/// <returns>Set of coefficients applied to each sample point.</returns>
-/*template<typename T>
-Eigen::VectorX<T> finite_difference_coefficients(unsigned int derivative, Eigen::VectorX<T> samples) {
-
-	unsigned int N = samples.size();
-
-	Eigen::MatrixX<T> S(N, N);
-	for (unsigned int ri = 0; ri < N; ri++) {
-		for (unsigned int ci = 0; ci < N; ci++) {
-			S(ri, ci) = pow(samples[ci], ri);
-		}
-	}
-
-	Eigen::VectorX<T> b = Eigen::VectorX<T>::Zero(N);
-	b(derivative) = tgamma(derivative + 1);
-
-	return S.colPivHouseholderQr().solve(b);
-}
-
-/// <summary>
-/// Calculate a matrix of finite difference coefficients, where each row represents a different center position.
-/// </summary>
-/// <typeparam name="T"></typeparam>
-/// <param name="derivative"></param>
-/// <param name="order"></param>
-/// <returns></returns>
-template<typename T>
-std::vector< std::vector<T> > finite_difference_coefficients(unsigned int derivative, unsigned int order) {
-
-	unsigned int N = order + 1;					// calculate the number of samples required to achieve the desired order
-
-	std::vector< std::vector<T> > Coefficients;
-
-	Eigen::VectorX<T> Samples(N);				// allocate a vector that will be used to store sample points
-
-	for (int ri = 0; ri < N; ri++) {			// for each shifted sample position
-		for (int ci = 0; ci < N; ci++) {		// calculate the point for each sample
-			Samples(ci) = -ri + ci;				// store that point in the Samples vector
-		}
-		std::vector<T> c(N);
-		Eigen::Map< Eigen::VectorX<T> >(&c[0], N) = finite_difference_coefficients<T>(derivative, Samples);
-		Coefficients.push_back(c);
-	}
-	return Coefficients;
-}
-*/
 
 int main(int argc, char** argv) {
 
@@ -100,12 +51,11 @@ int main(int argc, char** argv) {
 		("order", boost::program_options::value<unsigned int>(&in_order)->default_value(2), "order used to calculate the derivative")
 		("blur", boost::program_options::value<float>(&in_blur)->default_value(0.0f), "sigma value for blurring the input image")
 		("sigma", boost::program_options::value<float>(&in_sigma)->default_value(2.0f), "sigma value for the tensor field blur")
-		("cuda", boost::program_options::value<int>(&in_device)->default_value(-1), "cuda device number (-1 for CPU)")
+		("cuda", boost::program_options::value<int>(&in_device)->default_value(0), "cuda device number (-1 for CPU)")
 		("dx", boost::program_options::value<float>(&in_dx)->default_value(1.0f), "size of X pixels")
 		("dy", boost::program_options::value<float>(&in_dy)->default_value(1.0f), "size of Y pixels")
 		("dz", boost::program_options::value<float>(&in_dz)->default_value(1.0f), "size of Z pixels")
-		//("noise", boost::program_options::value<float>(&in_noise)->default_value(0.0f), "gaussian noise standard deviation added to the field")
-		
+
 		("crop_loc", boost::program_options::value<std::vector<unsigned int>>()->multitoken(), "crop location (two values -> 2D (w, h), three values -> 3D (w, h, d)")
 		("crop_len", boost::program_options::value<std::vector<unsigned int>>()->multitoken(), "crop length (width, height, depth")
 		("help", "produce help message")
@@ -123,19 +73,29 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	//if (vm.count("crop")) in_crop = true;
-
 	int dim = 3;															// number of dimensions
 	std::vector< tira::field<float> > D;									// vector stores the derivatives
 
+	// If the user does not specify a wildcard in the file name, we assume that the input
+	// is a 2D image and set the dimension to 2
 	if (in_inputname.rfind("*") == std::string::npos)
 		dim = 2;
 
+	/**
+	 * If the input image is 2D:
+	 * (1) the image is loaded and cropped based on user-specified parameters
+	 * (2) the input may also undergo a preliminary blur to remove noise
+	 * (3) a border is added to ensure that the output image is the same size as the input image
+	 * The tensor field is then computed based on whether the user requests the structure tensor (default) or the Hessian.
+	*/
 	if (dim == 2) {
 		tira::image<float> I(in_inputname);												// load the input image
-		tira::image<float> grey = I.channel(0);											// get the first channel if this is a color image
+		tira::image<float> grey = I.channel(0);												// get the first channel if this is a color image
 		grey = grey / 255.0f;
 
+		/////////////////////////////////////////////////////////////////////
+		// Crop the image if necessary
+		/////////////////////////////////////////////////////////////////////
 		std::vector<unsigned int> crop_loc, crop_len;
 		if (!vm["crop_loc"].empty() && (crop_loc = vm["crop_loc"].as<std::vector<unsigned int> >()).size() == 2) {
 			if (!vm["crop_len"].empty() && (crop_len = vm["crop_len"].as<std::vector<unsigned int> >()).size() == 2) {
@@ -148,6 +108,9 @@ int main(int argc, char** argv) {
 		else if (!vm["crop_loc"].empty())
 			std::cout << "Wrong number of inputs for crop location, input two." << std::endl;
 
+		/////////////////////////////////////////////////////////////////////
+		/// Apply an initial blur if the user reqests it
+		/////////////////////////////////////////////////////////////////////
 		if (in_blur > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
@@ -156,13 +119,22 @@ int main(int argc, char** argv) {
 			free(raw_field);
 			grey.cmap().save("grey.bmp");
 		}
-		
+
+		/////////////////////////////////////////////////////////////////////
+		/// Add a border around the image to ensure that the output is the same size
+		/////////////////////////////////////////////////////////////////////
 		grey = grey.border(in_order, 0);
 
+		/////////////////////////////////////////////////////////////////////
+		/// Generate the tensor field
+		/////////////////////////////////////////////////////////////////////
 		tira::image<glm::mat2> T;
 		std::vector<size_t> field_shape;
 
-		// Evaluate the Hessian at each pixel
+		/**
+		 * If the user specifies that the Hessian matrix should be calculated, compute the first and second order
+		 * derivatives and build the tensor field.
+		*/
 		if (vm.count("hessian")) {
 
 			tira::image<float> D2x2 = grey.Derivative(1, 2, in_order);			// calculate the derivative along the x axis
@@ -187,7 +159,9 @@ int main(int argc, char** argv) {
 			std::cout << "done." << std::endl;
 
 		}
-		// Evaluate the structure tensor at each pixel
+		/**
+		 * Otherwise calculate the structure tensor (which is the default)
+		*/
 		else {
 			tira::image<float> Dx = grey.Derivative(1, 1, in_order);			// calculate the derivative along the x axis
 			tira::image<float> Dy = grey.Derivative(0, 1, in_order);			// calculate the derivative along the y axis
@@ -212,6 +186,10 @@ int main(int argc, char** argv) {
 			std::cout << "done." << std::endl;
 		}
 
+		/**
+		 * Blur the output field based on user parameters. Generally this will be a small blur value to remove
+		 * noise introduces by taking the derivative using finite difference methods.
+		 */
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
@@ -220,6 +198,10 @@ int main(int argc, char** argv) {
 			free(raw_field);
 		}
 
+		/**
+		 * The user can specify whether or not negative or positive eigenvalues are kept for the Hessian field.
+		 * If one of the values are specified, the others are set to zero.
+		 */
 		if(vm.count("negatives") || vm.count("positives")) {
 			bool keep_positives = true;
 			if(vm.count("negatives")) keep_positives = false;

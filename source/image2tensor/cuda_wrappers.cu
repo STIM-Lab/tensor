@@ -1,7 +1,7 @@
 #include <glm/glm.hpp>
 #include <tira/cuda/cudaGaussianFilter.cuh>
-#include <tira/eigen.h>
-#include <tira/filter.h>
+#include <tira/functions/eigen.h>
+#include <tira/functions/filter.h>
 
 
 
@@ -9,27 +9,27 @@
 glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
-    //if (deviceID < 0) {
+    if (deviceID < 0) {
         return tira::cpu::gaussian_convolve2<glm::mat2>(source, width, height, sigma, out_width, out_height);
-    //}
+    }
 
-    //cudaSetDevice(deviceID);
-    //float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);
+    cudaSetDevice(deviceID);
+    glm::mat2* dest = tira::cuda::gaussian_convolve2<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
 
-    //return dest;
+    return dest;
 }
 
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
-    //if (deviceID < 0) {
+    if (deviceID < 0) {
     return tira::cpu::gaussian_convolve2<float>(source, width, height, sigma, out_width, out_height);
-    //}
+    }
 
-    //cudaSetDevice(deviceID);
-    //float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);
+    cudaSetDevice(deviceID);
+    float* dest = tira::cuda::gaussian_convolve2<float>(source, width, height, sigma, sigma, out_width, out_height);
 
-    //return dest;
+    return dest;
 }
 
 float* EigenValues2(float* tensors, unsigned int n, int device) {
@@ -37,7 +37,7 @@ float* EigenValues2(float* tensors, unsigned int n, int device) {
 	return tira::cuda::evals2_symmetric<float>(tensors, n, device);
 }
 
-glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, 
+glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
     float sigma_w, float sigma_h, float sigma_d, unsigned int& out_width, unsigned int& out_height,
     unsigned int& out_depth, int deviceID = 0) {
 
