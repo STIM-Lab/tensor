@@ -1,7 +1,5 @@
 #include <glm/glm.hpp>
 #include <tira/cuda/cudaGaussianFilter.cuh>
-
-//#include <tira/eigen.cuh>
 #include <tira/eigen.h>
 #include <tira/filter.h>
 
@@ -26,6 +24,11 @@ float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, fl
     float* dest = tira::cuda::GaussianFilter2D<float>(source, width, height, sigma, sigma, out_width, out_height);
 
     return dest;
+}
+
+float* EigenValues2(float* tensors, unsigned int n, int device) {
+    if (device < 0) return tira::cpu::evals2_symmetric<float>(tensors, n);
+	return tira::cuda::evals2_symmetric<float>(tensors, n, device);
 }
 
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth, 
