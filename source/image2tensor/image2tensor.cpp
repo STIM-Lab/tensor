@@ -23,6 +23,8 @@ int in_device;						// cuda device
 
 //glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
 //	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
+glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
+	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 float* GaussianBlur2D(float* source, unsigned int width, unsigned int height, float sigma,
 	unsigned int& out_width, unsigned int& out_height, int deviceID = 0);
 glm::mat3* cudaGaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int height, unsigned int depth,
@@ -213,7 +215,7 @@ int main(int argc, char** argv) {
 		if (in_sigma > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
-			glm::mat2* raw_field = (glm::mat2*)GaussianBlur2D((float*)T.Data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
+			glm::mat2* raw_field = GaussianBlur2D(T.Data(), T.X(), T.Y(), in_sigma, raw_width, raw_height, in_device);
 			T = tira::image<glm::mat2>(raw_field, raw_width, raw_height);
 			free(raw_field);
 		}
