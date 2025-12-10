@@ -4,13 +4,11 @@
 #include <boost/program_options.hpp>
 
 #include "tvote2.h"
-#include "tira/image.h"
 
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 
 #include <sstream>
-#include <string>
 
 TV2_UI UI;                            // structure stores the GUI information for tensorview2
 

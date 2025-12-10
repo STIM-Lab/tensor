@@ -4,8 +4,6 @@
 #include <tira/functions/filter.h>
 
 
-
-
 glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
     unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
 
@@ -57,7 +55,6 @@ float* cudaGaussianBlur3D(float* source, unsigned int width, unsigned int height
 
     return dest;
 }
-
 
 
 float* cudaEigenvalues3(float* tensors, unsigned int n, int device) {

@@ -1,13 +1,11 @@
 #pragma once
 
 #include <string>
-
+#include <vector>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h> // Will drag system OpenGL headers
 
-
 #include <glm/glm.hpp>
-
 #include <tira/image.h>
 
 enum ScalarType { NoScalar, Tensor00, Tensor01, Tensor11, EVal0, EVal1, EVec0, EVec1, Eccentricity, LinearEccentricity };
