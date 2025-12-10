@@ -72,7 +72,7 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
 void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
     unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples) {
 
-	tira::tensorvote::cuda::tensorvote3_cuda(input_field, output_field, s0, s1, s2, sigma, sigma2, w,
+	tira::cuda::tensorvote3_cuda(input_field, output_field, s0, s1, s2, sigma, sigma2, w,
 		power, device, STICK, PLATE, debug, samples);
 }
 

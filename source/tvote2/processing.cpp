@@ -1,8 +1,9 @@
 #include <glm/glm.hpp>
 #include <tira/image.h>
 #include "tvote2.h"
-#include <tira/eigen.h>
-#include <tira/tensorvote.h>
+#include <tira/functions/eigen.h>
+#include <tira/functions/filter.h>
+#include <tira/functions/tensorvote.h>
 
 extern TV2_UI UI;
 
@@ -113,9 +114,6 @@ void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar
     *scalar = theta->channel(i);
 }
 
-
-
-
 /// <summary>
 /// Blurs the tensor field and re-calculates the current scalar image
 /// </summary>
@@ -124,29 +122,27 @@ void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar
 /// <param name="sigma">standard deviation of the Gaussian kernel</param>
 /// <param name="cuda_device">CUDA device used for filtering (-1 will use the CPU)</param>
 void GaussianFilter(const tira::image<glm::mat2>* tensors_in, tira::image<glm::mat2>* tensors_out, const float sigma, const int cuda_device) {
+    *tensors_out = tira::image<glm::mat2>(tensors_in->X(), tensors_in->Y());
+	unsigned int out_width = 0, out_height = 0;
+
     // if a CUDA device is enabled, use a blur kernel
     if (cuda_device >= 0) {
-        unsigned int blur_width;
-        unsigned int blur_height;
-        glm::mat2* blurred = hsa_gaussian2(tensors_in->ConstData(), tensors_in->X(), tensors_in->Y(), sigma, blur_width, blur_height, cuda_device);
-
-        *tensors_out = tira::image<glm::mat2>(blurred, blur_width, blur_height);
+        glm::mat2* blurred = hsa_gaussian2(tensors_in->ConstData(), static_cast<unsigned int>(tensors_in->X()), static_cast<unsigned int>(tensors_in->Y()), 
+                                            sigma, out_width, out_height, cuda_device);
+		std::memcpy(tensors_out->Data(), blurred, sizeof(glm::mat2) * tensors_in->Size());
         free(blurred);
     }
     // otherwise use the CPU
     else {
-        const unsigned int size = std::ceil(sigma * 6);
-        const float start = -static_cast<float>(size - 1) / 2.0f;
-        tira::image<float> Kx(size, 1);
-        tira::image<float> Ky(1, size);
-        for (size_t i = 0; i < size; i++) {
-            constexpr float dx = 1.0f;
-            const float v = normaldist(start + dx * static_cast<float>(i), sigma);
-            Kx(i, 0, 0) = v;
-            Ky(0, i, 0) = v;
-        }
-        *tensors_out = tensors_in->convolve2(Kx);
-        *tensors_out = tensors_out->convolve2(Ky);
+        glm::mat2* blurred = tira::cpu::gaussian_convolve2<glm::mat2>(
+            tensors_in->ConstData(),
+            static_cast<unsigned int>(tensors_in->X()),
+            static_cast<unsigned int>(tensors_in->Y()),
+            sigma,
+            out_width,
+            out_height);
+        std::memcpy(tensors_out->Data(), blurred, sizeof(glm::mat2) * tensors_in->Size());
+		free(blurred);
     }
 }
 

@@ -1,3 +1,8 @@
+#include<vector>
+#include<string>
+#include <cuda_runtime.h>
+
+#include<tira/functions/eigen.h>
 #include <tira/functions/filter.h>
 #include <tira/functions/tensorvote.h>
 #include <tira/filter.cuh>
@@ -13,7 +18,10 @@ void InitializeCuda(int& device_id, std::vector<std::string>& device_names) {
         device_names.emplace_back(prop.name);
     }
 
-    if (error != cudaSuccess) device_id = -1;                    // if the device count function returns an error, there are no devices
+    if (error != cudaSuccess) {
+        // If the device count function returns an error, there are no devices
+        device_id = -1;                    
+    }
 }
 
 void hsa_tensorvote2(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, float sigma, float sigma2,
@@ -35,15 +43,14 @@ float* hsa_eigenvectors2polar(float* tensors, float* evals, unsigned int n, int 
     return tira::cuda::evecs2polar_symmetric<float>(tensors, evals, n, device);
 }
 
-glm::mat2* GaussianBlur2D(glm::mat2* source, unsigned int width, unsigned int height, float sigma,
-    unsigned int& out_width, unsigned int& out_height, int deviceID = 0) {
+glm::mat2* hsa_gaussian2(const glm::mat2* source, const unsigned int width, const unsigned int height, const float sigma,
+    unsigned int& out_width, unsigned int& out_height, const int deviceID = 0) {
 
-    if (deviceID < 0) {
+    if (deviceID < 0) 
         return tira::cpu::gaussian_convolve2<glm::mat2>(source, width, height, sigma, out_width, out_height);
-    }
 
     cudaSetDevice(deviceID);
-    glm::mat2* dest = tira::cuda::GaussianFilter2D<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
+    glm::mat2* dest = tira::cuda::gaussian_convolve2<glm::mat2>(source, width, height, sigma, sigma, out_width, out_height);
 
     return dest;
 }
