@@ -2,10 +2,9 @@
 #include<string>
 #include <cuda_runtime.h>
 
-#include<tira/functions/eigen.h>
+#include <tira/functions/eigen.h>
 #include <tira/functions/filter.h>
 #include <tira/functions/tensorvote.h>
-#include <tira/filter.cuh>
 
 void InitializeCuda(int& device_id, std::vector<std::string>& device_names) {
     int num_devices;

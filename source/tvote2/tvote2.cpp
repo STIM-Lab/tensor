@@ -40,7 +40,7 @@ tira::image<unsigned char> CurrentColormap;
 
 
 // Functions for updating individual components of the processed tensor field
-void UpdateEigenDecomposition() {
+static void UpdateEigenDecomposition() {
     EigenDecomposition(&Tn, &Lambda, &Theta, UI.cuda_device);
 }
 
