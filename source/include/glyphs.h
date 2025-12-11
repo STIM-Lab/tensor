@@ -19,7 +19,7 @@
  */
 static void field2glyphs(tira::volume<glm::mat3>& Field, const std::string obj_filename,
                          const float sigma = 0.05f, const float epsilon = 0.01f,
-                         const bool normalize = true, const unsigned int subdivisions = 1) {
+                         const bool normalize = true, const int color_eigenvector = 2, const unsigned int subdivisions = 1) {
     // create an OBJ data structure for a mesh that will contain all glyphs
     tira::obj OBJ;
 
@@ -69,9 +69,21 @@ static void field2glyphs(tira::volume<glm::mat3>& Field, const std::string obj_f
 
                 // Create a new material and assign a color to the diffuse component based on the largest eigenvector direction
                 tira::mtl new_material;
-                new_material.Kd[0] = std::abs(evec2[0]);
-                new_material.Kd[1] = std::abs(evec2[1]);
-                new_material.Kd[2] = std::abs(evec2[2]);
+                if (color_eigenvector == 2) {
+                    new_material.Kd[0] = std::abs(evec2[0]);
+                    new_material.Kd[1] = std::abs(evec2[1]);
+                    new_material.Kd[2] = std::abs(evec2[2]);
+                }
+                else if (color_eigenvector == 1) {
+                    new_material.Kd[0] = std::abs(evec1[0]);
+                    new_material.Kd[1] = std::abs(evec1[1]);
+                    new_material.Kd[2] = std::abs(evec1[2]);
+                }
+                else {
+                    new_material.Kd[0] = std::abs(evec0[0]);
+                    new_material.Kd[1] = std::abs(evec0[1]);
+                    new_material.Kd[2] = std::abs(evec0[2]);
+                }
 
                 // if the largest eigenvalue is less than epsilon, skip this glyph
                 if (lambda[2] < epsilon) continue;

@@ -347,7 +347,12 @@ void ImGuiRender() {
 						const std::string filename = ImGuiFileDialog::Instance()->GetFilePathName();	// get the name of the file
 
 						if (const std::string extension = filename.substr(filename.find_last_of('.') + 1); extension == "obj") {
-							field2glyphs(Tn, filename, UI.glyph_sigma, UI.glyph_epsilon, UI.glyph_normalization, UI.glyph_subdiv);
+							if (UI.scalar_type == ScalarType::EVec0)
+								field2glyphs(Tn, filename, UI.glyph_sigma, UI.glyph_epsilon, UI.glyph_normalization, 0, UI.glyph_subdiv);
+							else if (UI.scalar_type == ScalarType::EVec1)
+								field2glyphs(Tn, filename, UI.glyph_sigma, UI.glyph_epsilon, UI.glyph_normalization, 1, UI.glyph_subdiv);
+							else
+								field2glyphs(Tn, filename, UI.glyph_sigma, UI.glyph_epsilon, UI.glyph_normalization, 2, UI.glyph_subdiv);
 						}
 					}
 					ImGuiFileDialog::Instance()->Close();									// close the file dialog box

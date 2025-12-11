@@ -97,15 +97,16 @@ add_executable(tvote2
 )
 
 target_link_libraries(tvote2
-				PRIVATE glfw
-				PRIVATE glm::glm
-				PRIVATE GLEW::GLEW
-				${OPENGL_LIBRARIES}
-				${CMAKE_DL_LIBS}
-				Boost::program_options
-				PRIVATE imgui::imgui
-				PNG::PNG
-				JPEG::JPEG
+		PRIVATE glfw
+		PRIVATE glm::glm
+		PRIVATE GLEW::GLEW
+		${X11_LIBRARIES}
+		${OPENGL_LIBRARIES}
+		${CMAKE_DL_LIBS}
+		Boost::program_options
+		PRIVATE imgui::imgui
+		PNG::PNG
+		JPEG::JPEG
 )
 
 #create an executable
