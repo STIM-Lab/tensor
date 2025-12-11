@@ -33,7 +33,7 @@ glm::mat3* GaussianBlur3D(glm::mat3* source, unsigned int width, unsigned int he
     unsigned int& out_depth, int deviceID) {
 
     if (deviceID < 0) {
-		return tira::cpu::gaussian_convolve3<glm::mat3>(source, width, height, depth, sigma_w,
+		return tira::cpu::gaussian_convolve3<glm::mat3>(source, width, height, depth, sigma_w, sigma_h, sigma_d,
 			out_width, out_height, out_depth);
 	}
 
@@ -47,7 +47,7 @@ float* GaussianBlur3D(float* source, unsigned int width, unsigned int height, un
     unsigned int& out_depth, int deviceID) {
     
 	if (deviceID < 0) {
-		return tira::cpu::gaussian_convolve3<float>(source, width, height, depth, sigma_w,
+		return tira::cpu::gaussian_convolve3<float>(source, width, height, depth, sigma_w, sigma_h, sigma_d,
 			out_width, out_height, out_depth);
 	}
 

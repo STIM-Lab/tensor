@@ -73,13 +73,12 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	int dim = 3;															// number of dimensions
+	int dim = 2;															// number of dimensions
 	std::vector< tira::field<float> > D;									// vector stores the derivatives
 
-	// If the user does not specify a wildcard in the file name, we assume that the input
-	// is a 2D image and set the dimension to 2
-	if (in_inputname.rfind("*") == std::string::npos)
-		dim = 2;
+	// If the user specify a wildcard or a .npy file, assume this is a 3D volume
+	if (in_inputname.rfind("*") != std::string::npos || in_inputname.ends_with(".npy"))
+		dim = 3;
 
 	/**
 	 * If the input image is 2D:
@@ -236,6 +235,7 @@ int main(int argc, char** argv) {
 		tira::volume<float> V(in_inputname);									// load input volume
 		tira::volume<float> grey = V.channel(0);								// get the first channel if this is a colored volume
 
+		// Crop the volume from the specified location
 		std::vector<unsigned int> crop_loc, crop_len;
 		if (!vm["crop_loc"].empty() && (crop_loc = vm["crop_loc"].as<std::vector<unsigned int> >()).size() == 3) {
 			if (!vm["crop_len"].empty() && (crop_len = vm["crop_len"].as<std::vector<unsigned int> >()).size() == 3) {
@@ -248,6 +248,7 @@ int main(int argc, char** argv) {
 		else if (!vm["crop_loc"].empty())
 			std::cout << "Wrong number of inputs for crop location, input three." << std::endl;
 
+		// Apply an initial blur if the user requests it
 		if (in_blur > 0) {
 			unsigned int raw_width;
 			unsigned int raw_height;
@@ -258,25 +259,28 @@ int main(int argc, char** argv) {
 			free(raw_field);
 		}
 
-		//grey = grey.border(in_order, 0);
+		grey = grey.border(in_order, 0);
+		// Generate the tensor field
 		tira::volume<glm::mat3> T;
 		std::vector<size_t> field_shape;
 
-		// Evaluate the structure tensor at each pixel
-		tira::volume<float> Dx = grey.gradient_dx() * (1 / in_dx);			// calculate the derivative along the x axis
-		tira::volume<float> Dy = grey.gradient_dy() * (1 / in_dy);			// calculate the derivative along the y axis
-		tira::volume<float> Dz = grey.gradient_dz() * (1 / in_dz);			// calculate the derivative along the z axis
+		// Calculate the structure tensor
+		tira::volume<float> Dx = grey.derivative(2, 1, in_order);			// calculate the derivative along the x axis
+		tira::volume<float> Dy = grey.derivative(1, 1, in_order);			// calculate the derivative along the y axis
+		tira::volume<float> Dz = grey.derivative(0, 1, in_order);			// calculate the derivative along the z axis
+		Dx = Dx.border_remove(in_order);
+		Dy = Dy.border_remove(in_order);
+		Dz = Dz.border_remove(in_order);
 
 		T = tira::volume<glm::mat3>(Dx.X(), Dx.Y(), Dx.Z());
-
 		std::cout << "Generating tensor field..." << std::endl;
 		// build the tensor field
 		for (size_t zi = 0; zi < T.Z(); zi++) {
 			for (size_t yi = 0; yi < T.Y(); yi++) {
 				for (size_t xi = 0; xi < T.X(); xi++) {
-					T(xi, yi, zi)[0][0] = std::pow(Dx(xi, yi, zi), 2);					// Dxx
-					T(xi, yi, zi)[1][1] = std::pow(Dy(xi, yi, zi), 2);					// Dyy
-					T(xi, yi, zi)[2][2] = std::pow(Dz(xi, yi, zi), 2);					// Dyy
+					T(xi, yi, zi)[0][0] = Dx(xi, yi, zi) * Dx(xi, yi, zi);				// Dxx
+					T(xi, yi, zi)[1][1] = Dy(xi, yi, zi) * Dy(xi, yi, zi);				// Dyy
+					T(xi, yi, zi)[2][2] = Dz(xi, yi, zi) * Dz(xi, yi, zi);				// Dzz
 					T(xi, yi, zi)[0][1] = Dx(xi, yi, zi) * Dy(xi, yi, zi);				// Dxy
 					T(xi, yi, zi)[1][0] = T(xi, yi, zi)[0][1];							// Dyx
 					T(xi, yi, zi)[0][2] = Dx(xi, yi, zi) * Dz(xi, yi, zi);				// Dxz
@@ -285,9 +289,8 @@ int main(int argc, char** argv) {
 					T(xi, yi, zi)[2][1] = T(xi, yi, zi)[1][2];							// Dzy
 				}
 			}
-			tira::progressbar((float)zi / (float)T.Z());
 		}
-		std::cout << std::endl;
+		std::cout << "Done" << std::endl;
 
 		if (in_sigma > 0) {
 			unsigned int raw_width;
