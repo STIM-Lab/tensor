@@ -100,7 +100,7 @@ void ImageFrom_TensorElement2D(tira::image<glm::mat2>* tensors, tira::image<floa
 /// <param name="lambda">pointer to the image containing all of the eigenvalues</param>
 /// <param name="scalar">pointer to the image that will be filled with the specified eigenvalues</param>
 /// <param name="i">eigenvalue to turn into an image</param>
-static void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, const unsigned i) {
+void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<float>* scalar, const unsigned i) {
     *scalar = lambda->channel(i);
 }
 
@@ -110,7 +110,7 @@ static void ImageFrom_Eigenvalue(const tira::image<float>* lambda, tira::image<f
 /// <param name="theta">pointer to the image containing the eigenvectors</param>
 /// <param name="scalar">pointer to the image that will be filled with the specified eigenvector</param>
 /// <param name="i">eigenvector to turn into an image</param>
-static void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, const unsigned i) {
+void ImageFrom_Theta(const tira::image<float>* theta, tira::image<float>* scalar, const unsigned i) {
     *scalar = theta->channel(i);
 }
 
