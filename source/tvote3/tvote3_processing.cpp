@@ -1,8 +1,8 @@
 #include <glm/glm.hpp>
 #include <tira/volume.h>
 #include "tvote3.h"
-#include <tira/eigen.h>
-#include <tira/tensorvote.h>
+#include <tira/functions/eigen.h>
+#include <tira/functions/tensorvote.h>
 
 extern TV3_UI UI;
 
@@ -103,7 +103,7 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
                 smallest_q[i] = glm::vec3(cos_theta_small * sin_phi_small, sin_theta_small * sin_phi_small, cos_phi_small);
             }
 	    }
-        tira::tensorvote::cpu::tensorvote3_cpu(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
+        tira::cpu::tensorvote3(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
             stick ? largest_q.data() : nullptr, 
             plate ? smallest_q.data() : nullptr, 
             glm::vec2(sigma, sigma2), p,

@@ -8,7 +8,7 @@
 #include "../ImGuiFileDialog/ImGuiFileDialog.h"
 
 #include <tira/graphics/glOrthoView.h>
-#include <tira/eigen.h>
+#include <tira/functions/eigen.h>
 
 #include <glm/gtc/matrix_access.hpp>
 //#include <Eigen/Core>

@@ -1,5 +1,5 @@
-#include <tira/tensorvote.h>
-#include <tira/filter.cuh>
+#include <tira/functions/tensorvote.h>
+#include <tira/functions/filter.h>
 #include <tira/cuda/error.h>
 
 /// Heterogeneous System Architecture calls (functions that decide how to execute a function)
@@ -42,37 +42,21 @@ glm::mat3* hsa_gaussian3(const glm::mat3* source, const unsigned int s0, const u
 
 	// CPU implementation
     if (device < 0) {
-        // X-convolution
-        auto gauss0 = tira::cpu::kernel_gaussian<float>(kernel_size0, 0.0f, sigma_w_scaled, 1.0f);
-		const float* gauss0_ptr = gauss0.data();
-        glm::mat3* dest_0 = tira::cpu::convolve3<glm::mat3, float>(source, s0, s1, s2, gauss0_ptr, kernel_size0, 1, 1, out_s0, out_s1, out_s2);
-
-        // Y-convolution
-        auto gauss1 = tira::cpu::kernel_gaussian<float>(kernel_size1, 0.0f, sigma_h_scaled, 1.0f);
-		const float* gauss1_ptr = gauss1.data();
-        glm::mat3* dest_1 = tira::cpu::convolve3<glm::mat3, float>(dest_0, out_s0, out_s1, out_s2, gauss1_ptr, 1, kernel_size1, 1, out_s0, out_s1, out_s2);
-        delete[] dest_0;
-        
-        // Z-convolution
-        auto gauss2 = tira::cpu::kernel_gaussian<float>(kernel_size2, 0.0f, sigma_d_scaled, 1.0f);
-		const float* gauss2_ptr = gauss2.data();
-        glm::mat3* dest_2 = tira::cpu::convolve3<glm::mat3, float>(dest_1, out_s0, out_s1, out_s2, gauss2_ptr, 1, 1, kernel_size2, out_s0, out_s1, out_s2);
-        delete[] dest_1;
-
-        return dest_2;
+        return tira::cpu::gaussian_convolve3<glm::mat3>(source, s0, s1, s2, sigma_w_scaled, sigma_h_scaled, sigma_d_scaled,
+                                                        out_s0, out_s1, out_s2);
     }
 
 	// CUDA implementation
     cudaSetDevice(device);
     glm::mat3* dest = tira::cuda::gaussian_filter3d<glm::mat3>(source, s0, s1, s2, sigma_w_scaled, sigma_h_scaled, sigma_d_scaled, 
-                                                               kernel_size0, kernel_size1, kernel_size2, out_s0, out_s1, out_s2);
+                                                               out_s0, out_s1, out_s2);
     return dest;
 }
 
 void hsa_tensorvote3(const float* input_field, float* output_field, unsigned int s0, unsigned int s1, unsigned int s2, float sigma, float sigma2,
     unsigned int w, unsigned int power, int device, bool STICK, bool PLATE, bool debug, unsigned samples) {
 
-	tira::cuda::tensorvote3_cuda(input_field, output_field, s0, s1, s2, sigma, sigma2, w,
+	tira::cuda::tensorvote3(input_field, output_field, s0, s1, s2, sigma, sigma2, w,
 		power, device, STICK, PLATE, debug, samples);
 }
 

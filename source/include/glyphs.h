@@ -6,7 +6,7 @@
 #include <tira/obj.h>
 
 #include <tira/shapes.h>
-#include <tira/eigen.h>
+#include <tira/functions/eigen.h>
 
 /**
  * @brief Generate an OBJ file containing colored glyphs representing a 3D tensor field
