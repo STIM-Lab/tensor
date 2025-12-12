@@ -90,17 +90,13 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
             if (stick)  {
                 const float theta_large = evecs[i * 6 + 4];
                 const float phi_large = evecs[i * 6 + 5];
-                const float cos_theta_large = cosf(theta_large), sin_theta_large = sinf(theta_large);
-                const float cos_phi_large = cosf(phi_large), sin_phi_large = sinf(phi_large);
-                largest_q[i] = glm::vec3(cos_theta_large * sin_phi_large, sin_theta_large * sin_phi_large, cos_phi_large);
+				largest_q[i] = tira::spherical_to_cartesian(theta_large, phi_large);
             }
             
             if (plate) {
                 const float theta_small = evecs[i * 6 + 0];
                 const float phi_small = evecs[i * 6 + 1];
-                const float cos_theta_small = cosf(theta_small), sin_theta_small = sinf(theta_small);
-                const float cos_phi_small = cosf(phi_small), sin_phi_small = sinf(phi_small);
-                smallest_q[i] = glm::vec3(cos_theta_small * sin_phi_small, sin_theta_small * sin_phi_small, cos_phi_small);
+				smallest_q[i] = tira::spherical_to_cartesian(theta_small, phi_small);
             }
 	    }
         tira::cpu::tensorvote3(tensors_out->Data(), reinterpret_cast<glm::vec3*>(lambdas), 
@@ -154,6 +150,7 @@ void SaveEigenCPUvsCUDA(tira::volume<glm::mat3>* tensor_field, const int cuda_de
 	tira::volume<float> lambda_cuda(evals_cuda, s0, s1, s2, 3);
 	tira::volume<float> theta_cuda(s0, s1, s2, 3);
     tira::volume<float> phi_cuda(s0, s1, s2, 3);
+
     for (unsigned int idx=0; idx < n; ++idx) {
         theta_cuda.Data()[idx * 3 + 0] = evecs_cuda[idx * 6 + 0];
         phi_cuda.Data()[idx * 3 + 0] = evecs_cuda[idx * 6 + 1];
