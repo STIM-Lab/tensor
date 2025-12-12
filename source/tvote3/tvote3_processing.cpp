@@ -76,8 +76,8 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
 
     // CPU version
     else {
-        auto* lambdas = tira::cpu::evals3_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), tensors_in->Size());
-        auto* evecs = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
+        float* lambdas = tira::cpu::evals3_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), tensors_in->Size());
+        float* evecs   = tira::cpu::evecs3spherical_symmetric<float>(reinterpret_cast<const float*>(tensors_in->ConstData()), lambdas, tensors_in->Size());
 
 	    const size_t n = tensors_in->Size();
 	    std::vector<glm::vec3> largest_q(n);                                    // q - the stick tensor (voter) orientation (largest eigenvector)
@@ -111,4 +111,61 @@ void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat
         delete[] evecs;
         delete[] lambdas;
     }
+}
+
+/**
+* Save CPU and GPU eigendecomposition for the same tensor field to NPY files.
+*/
+void SaveEigenCPUvsCUDA(tira::volume<glm::mat3>* tensor_field, const int cuda_device, const std::string& base_name) {
+
+    // CPU eigendecomposition
+	const unsigned int s0 = tensor_field->Shape()[0];
+	const unsigned int s1 = tensor_field->Shape()[1];
+	const unsigned int s2 = tensor_field->Shape()[2];
+	const unsigned int n = static_cast<unsigned int>(tensor_field->Size());
+
+	float* evals_cpu = hsa_eigenvalues3(reinterpret_cast<float*>(tensor_field->Data()), n, -1);
+    float* evecs_cpu = hsa_eigenvectors3spherical(reinterpret_cast<float*>(tensor_field->Data()), evals_cpu, n, -1);
+
+	tira::volume<float> lambda_cpu(evals_cpu, s0, s1, s2, 3);
+    tira::volume<float> theta_cpu(s0, s1, s2, 3);
+    tira::volume<float> phi_cpu(s0, s1, s2, 3);
+
+    for (unsigned int idx=0; idx < n; ++idx) {
+        theta_cpu.Data()[idx * 3 + 0] = evecs_cpu[idx * 6 + 0];
+        phi_cpu.Data()[idx * 3 + 0] = evecs_cpu[idx * 6 + 1];
+        theta_cpu.Data()[idx * 3 + 1] = evecs_cpu[idx * 6 + 2];
+        phi_cpu.Data()[idx * 3 + 1] = evecs_cpu[idx * 6 + 3];
+        theta_cpu.Data()[idx * 3 + 2] = evecs_cpu[idx * 6 + 4];
+        phi_cpu.Data()[idx * 3 + 2] = evecs_cpu[idx * 6 + 5];
+	}
+
+	lambda_cpu.save_npy(base_name + "_evals_cpu.npy");
+	theta_cpu.save_npy(base_name + "_theta_cpu.npy");
+	phi_cpu.save_npy(base_name + "_phi_cpu.npy");
+
+    free(evals_cpu);
+	free(evecs_cpu);
+
+	// CUDA eigendecomposition
+    float* evals_cuda = hsa_eigenvalues3(reinterpret_cast<float*>(tensor_field->Data()), n, cuda_device);
+	float* evecs_cuda = hsa_eigenvectors3spherical(reinterpret_cast<float*>(tensor_field->Data()), evals_cuda, n, cuda_device);
+
+	tira::volume<float> lambda_cuda(evals_cuda, s0, s1, s2, 3);
+	tira::volume<float> theta_cuda(s0, s1, s2, 3);
+    tira::volume<float> phi_cuda(s0, s1, s2, 3);
+    for (unsigned int idx=0; idx < n; ++idx) {
+        theta_cuda.Data()[idx * 3 + 0] = evecs_cuda[idx * 6 + 0];
+        phi_cuda.Data()[idx * 3 + 0] = evecs_cuda[idx * 6 + 1];
+        theta_cuda.Data()[idx * 3 + 1] = evecs_cuda[idx * 6 + 2];
+        phi_cuda.Data()[idx * 3 + 1] = evecs_cuda[idx * 6 + 3];
+        theta_cuda.Data()[idx * 3 + 2] = evecs_cuda[idx * 6 + 4];
+        phi_cuda.Data()[idx * 3 + 2] = evecs_cuda[idx * 6 + 5];
+	}
+
+	lambda_cuda.save_npy(base_name + "_evals_cuda.npy");
+	theta_cuda.save_npy(base_name + "_theta_cuda.npy");
+	phi_cuda.save_npy(base_name + "_phi_cuda.npy");
+	free(evals_cuda);
+	free(evecs_cuda);
 }

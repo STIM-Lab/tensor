@@ -200,19 +200,19 @@ void RenderImpulseWindow() {
 	ImGui::InputFloat3("##row3", &row3[0]);
 
 	float evals[3];
-	tira::shared::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
+	tira::eval3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals[0], evals[1], evals[2]);
 
 	float v0[3];
 	float v1[3];
 	float v2[3];
-	tira::shared::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
+	tira::evec3_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0, v1, v2);
 
 	ImGui::SeparatorText("Cartesian Eigenvectors");
 
 	float v0_spherical[2];
 	float v1_spherical[2];
 	float v2_spherical[2];
-	tira::shared::evec3spherical_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0_spherical, v1_spherical, v2_spherical);
+	tira::evec3spherical_symmetric(P[0][0], P[1][0], P[1][1], P[2][0], P[2][1], P[2][2], evals, v0_spherical, v1_spherical, v2_spherical);
 
 	ImGui::PushID(0);
 	glm::vec3 color_v2 = ColormapEigenvector(2, evals[0], evals[1], evals[2], v2_spherical[0], v2_spherical[1]);
@@ -268,7 +268,7 @@ static size_t GlyphCounter(tira::volume<glm::mat3>& vol, float epsilon) {
 				glm::mat3 t = vol(x, y, z);
 				float lambda[3];
 
-				tira::shared::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
+				tira::eval3_symmetric<float>(t[0][0], t[0][1], t[1][1], t[0][2], t[1][2], t[2][2],
 					lambda[0], lambda[1], lambda[2]);
 				if (lambda[2] >= epsilon) ++count;
 			}
@@ -509,6 +509,17 @@ void ImGuiRender() {
 					UI.cuda_device = -1;
 					ReprocessField();
 				}
+
+				ImGui::Separator();
+
+				// Debug button that saves the eigendecomposition results
+				if (ImGui::Button("Debug") and UI.cuda_device >= 0) {
+					SaveEigenCPUvsCUDA(&Tn, UI.cuda_device, "field");
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Saves the eigenvalues and eigenvectors\n"
+						"computed on CPU and GPU.");
+
 
 				ImGui::EndTabItem();
 			}

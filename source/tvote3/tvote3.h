@@ -128,6 +128,7 @@ void GaussianFilter(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm:
 	glm::vec3 pixel_size, const int cuda_device);
 void TensorVote(const tira::volume<glm::mat3>* tensors_in, tira::volume<glm::mat3>* tensors_out, const float sigma, const float sigma2, 
 	const unsigned int p, const bool stick, const bool plate, const int cuda_device, const unsigned samples);
+void SaveEigenCPUvsCUDA(tira::volume<glm::mat3>* tensor_field, const int cuda_device, const std::string& base_name);
 void VolumeFrom_Eigenvalue(const tira::volume<float>* lambda, tira::volume<float>* scalar, const unsigned i);
 void VolumeFrom_TensorElement3D(tira::volume<glm::mat3>* tensors, tira::volume<float>* elements, const unsigned int u, const unsigned int v);
 
